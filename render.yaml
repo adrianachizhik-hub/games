@@ -1,0 +1,7 @@
+# Render Blueprint: serves the game as a static site. index.html is the whole game.
+services:
+  - type: web
+    name: mutation-mayhem
+    runtime: static
+    buildCommand: echo "nothing to build"
+    staticPublishPath: .
