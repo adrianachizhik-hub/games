@@ -1,0 +1,123 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#c9b48a;font-family:system-ui,sans-serif;width:2000px}canvas{display:block}
+#labels{display:flex;position:absolute;top:18px;left:0;width:2000px}#labels div{flex:1;text-align:center;color:#1d2a2e}
+#labels b{display:block;font-size:30px}#labels span{font-size:20px;opacity:.8}</style></head><body>
+<div id="labels">
+<div><b>Common</b><span>brown egg</span></div><div><b>Rare</b><span>purple egg</span></div><div><b>Legendary</b><span>yellow egg</span></div>
+<div><b>Mythic?</b><span>gold egg</span></div><div><b>Prismatic?</b><span>swirly egg</span></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const W = 2000, Hh = 560;
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(W, Hh); document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xcfe6f2);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb59a6a, 0.75));
+const sun = new THREE.DirectionalLight(0xfff2dc, 0.7); sun.position.set(-4, 8, -5); scene.add(sun);
+const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
+const block = (parent, mat, w, h, d, x, y, z, rx, ry, rz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); parent.add(m); return m; };
+const joint = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), lam(0xc9b48a)); ground.rotation.x = -Math.PI / 2; scene.add(ground);
+
+/* One dragon. "c" is its colours: body, dark (legs, wing bones), belly, spike, wing, wing2. */
+function makeDragon(c) {
+  const shine = c.gem || c.metal, mk = (col) => shine ? new THREE.MeshPhongMaterial({ color: col, specular: c.gem ? 0xffffff : 0xfff0d0, shininess: c.gem ? 80 : 45,
+      emissive: new THREE.Color(col).multiplyScalar(c.gem ? 0.32 : 0.08) }) : lam(col);
+  const G = mk(c.body), DG = mk(c.dark), BELLY = mk(c.belly), SPIKE = mk(c.spike), WING = mk(c.wing), WINGD = mk(c.wing2),
+        EYEW = lam(0xffffff), EYE = lam(0x1d2a2e), HORN = lam(0xf6efe0), NOSE = lam(c.dark);
+  const dragon = new THREE.Group();
+  block(dragon, G, 0.7, 0.6, 1.0, 0, 0.75, 0);
+  block(dragon, BELLY, 0.56, 0.1, 0.84, 0, 0.44, 0);
+  block(dragon, BELLY, 0.5, 0.42, 0.06, 0, 0.74, -0.51);
+  [[-0.25, -0.32], [0.25, -0.32], [-0.25, 0.32], [0.25, 0.32]].forEach(([x, z]) => { const j = joint(dragon, x, 0.55, z); block(j, DG, 0.22, 0.5, 0.24, 0, -0.25, 0); block(j, HORN, 0.24, 0.06, 0.08, 0, -0.47, -0.14); });
+  const neck = joint(dragon, 0, 0.92, -0.42); block(neck, G, 0.34, 0.5, 0.32, 0, 0.18, -0.05, -0.35); block(neck, BELLY, 0.26, 0.42, 0.04, 0, 0.16, -0.22, -0.35);
+  const head = joint(neck, 0, 0.48, -0.18);
+  block(head, G, 0.56, 0.48, 0.52, 0, 0.06, 0);
+  block(head, G, 0.4, 0.26, 0.3, 0, -0.04, -0.38);
+  block(head, BELLY, 0.36, 0.06, 0.28, 0, -0.18, -0.36);
+  [-0.1, 0.1].forEach((x) => block(head, NOSE, 0.06, 0.05, 0.03, x, 0.03, -0.535));
+  [-0.17, 0.17].forEach((x) => { block(head, EYEW, 0.16, 0.18, 0.04, x, 0.13, -0.27); block(head, EYE, 0.08, 0.12, 0.03, x + (x < 0 ? 0.02 : -0.02), 0.12, -0.295); });
+  [-0.18, 0.18].forEach((x) => block(head, HORN, 0.08, 0.28, 0.08, x, 0.38, 0.1, 0.5, 0, x < 0 ? 0.25 : -0.25));
+  [-0.12, 0.12].forEach((x) => block(head, HORN, 0.04, 0.07, 0.04, x, -0.2, -0.47));
+  [[-0.12, 1.0, 0.17], [-0.38, 1.05, 0.15], [0.12, 1.08, 0.15], [0.36, 1.08, 0.13]].forEach(([z, y, s]) => block(dragon, SPIKE, 0.06, s, s, 0, y, z, Math.PI / 4));
+  block(neck, SPIKE, 0.06, 0.12, 0.12, 0, 0.3, 0.12, Math.PI / 4);
+  block(head, SPIKE, 0.06, 0.12, 0.12, 0, 0.32, 0.18, Math.PI / 4);
+  let t = joint(dragon, 0, 0.78, 0.5);
+  [[0.4, 0.36, 0.4, 0.25], [0.3, 0.28, 0.38, 0.3], [0.22, 0.2, 0.36, 0.25], [0.14, 0.14, 0.32, -0.3]].forEach(([w, h, d, bend]) => { t.rotation.x = bend; block(t, G, w, h, d, 0, 0, d / 2); block(t, SPIKE, 0.05, h * 0.5, h * 0.5, 0, h / 2 + 0.03, d / 2, Math.PI / 4); t = joint(t, 0, 0, d - 0.02); });
+  block(t, SPIKE, 0.06, 0.26, 0.26, 0, 0, 0.12, Math.PI / 4);
+  [-1, 1].forEach((s) => {
+    const w = joint(dragon, 0.32 * s, 1.0, -0.12); w.rotation.z = 0.6 * s; w.rotation.y = -0.35 * s;
+    block(w, DG, 0.9, 0.08, 0.08, 0.45 * s, 0, 0);
+    block(w, WING, 0.86, 0.04, 0.42, 0.45 * s, -0.02, 0.24);
+    block(w, WINGD, 0.6, 0.04, 0.3, 0.42 * s, -0.03, 0.55);
+    block(w, DG, 0.08, 0.06, 0.46, 0.88 * s, 0, 0.2);
+  });
+  if (c.gem) {   // sparkles: little bright diamonds stuck on the scales
+    const SP = new THREE.MeshBasicMaterial({ color: 0xffffff }), SP2 = new THREE.MeshBasicMaterial({ color: c.glint });
+    let seed = 7; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 40; i++) {
+      const side = r(), sz = 0.035 + r() * 0.05, m = i % 3 ? SP : SP2;
+      if (side < 0.45) block(dragon, m, sz, sz, sz, (r() - 0.5) * 0.66, 0.5 + r() * 0.52, -0.36 - r() * 0.15 + (side < 0.2 ? 0 : 0) , Math.PI / 4, 0, Math.PI / 4);
+      else if (side < 0.8) block(dragon, m, sz, sz, sz, (r() < 0.5 ? -1 : 1) * 0.36, 0.5 + r() * 0.5, (r() - 0.5) * 0.9, Math.PI / 4, 0, Math.PI / 4);
+      else block(head, m, sz, sz, sz, (r() < 0.5 ? -1 : 1) * 0.29, -0.1 + r() * 0.3, -0.2 + r() * 0.4, Math.PI / 4, 0, Math.PI / 4);
+    }
+  }
+  if (c.gem) {
+    const ST = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    [[-0.55, 1.5, -0.2, 1], [0.6, 1.25, 0.1, 0.8], [-0.2, 1.85, 0.3, 0.6], [0.5, 0.55, -0.5, 0.7], [-0.6, 0.7, 0.4, 0.55]].forEach(([x, y, z, k]) => {
+      const st = joint(dragon, x, y, z); st.rotation.y = 1.0;   // face the camera
+      block(st, ST, 0.035 * k, 0.32 * k, 0.01, 0, 0, 0); block(st, ST, 0.32 * k, 0.035 * k, 0.01, 0, 0, 0); block(st, ST, 0.09 * k, 0.09 * k, 0.012, 0, 0, 0, 0, 0, Math.PI / 4);
+    });
+  }
+  dragon.scale.setScalar(0.85);
+  return dragon;
+}
+const kinds = [
+  { body: 0x3fae6a, dark: 0x2e8a52, belly: 0xf4d36b, spike: 0xf08a2c, wing: 0x8a5ad6, wing2: 0x6b44b0 },   // green
+  { body: 0xd8433a, dark: 0xa02e27, belly: 0xf6c56b, spike: 0xf6c93b, wing: 0x3a2f33, wing2: 0x2a2226 },   // red
+  { body: 0x8a5ad6, dark: 0x6440a8, belly: 0xf5c4e1, spike: 0x4fd1c5, wing: 0xef6fae, wing2: 0xcc4f90 },   // purple
+  { body: 0x3f7fd6, dark: 0x2c5fa8, belly: 0xd6f0fa, spike: 0x7fe0f0, wing: 0xe9eef6, wing2: 0xc4ccd8 },   // blue
+  { metal: 1, body: 0xa8642c, dark: 0x6e421d, belly: 0xd9a066, spike: 0xf0c060, wing: 0x8a5426, wing2: 0x6a3e1a },   // bronze
+  { metal: 1, body: 0xaab4c2, dark: 0x6f7988, belly: 0xe2e8f0, spike: 0x5f8fd0, wing: 0x8f99a8, wing2: 0x737d8c },   // silver
+  { metal: 1, body: 0xe8be45, dark: 0xb88d22, belly: 0xfff4d6, spike: 0xffffff, wing: 0x5bc0f0, wing2: 0x3a98d0 }    // gold
+];
+const gems = [
+  { gem: 1, body: 0xe8115f, dark: 0xa80c48, belly: 0xff8fb3, spike: 0xffd0e0, wing: 0xff3b7f, wing2: 0xc81050, glint: 0xffb0cc },   // ruby
+  { gem: 1, body: 0xc6ecff, dark: 0x86c4ea, belly: 0xffffff, spike: 0x8fe8ff, wing: 0xbfe8ff, wing2: 0x8fd0f5, glint: 0x8fe8ff },   // diamond
+  { gem: 1, body: 0x00b874, dark: 0x008554, belly: 0xa8f0c8, spike: 0xe8fff2, wing: 0x3fe0a8, wing2: 0x18b880, glint: 0xc8ffe8 }    // jade
+];
+
+/* A blocky egg. "c" holds: shell, spot, shiny, and for the swirly egg a list of layer colours that twist round. */
+function makeEgg(c) {
+  const egg = new THREE.Group();
+  const mk = (col, glow) => c.shiny ? new THREE.MeshPhongMaterial({ color: col, specular: 0xffffff, shininess: 70, emissive: new THREE.Color(col).multiplyScalar(glow || 0.12) }) : lam(col);
+  const layers = [[0.5, 0.18, 0.09], [0.62, 0.22, 0.29], [0.66, 0.2, 0.5], [0.62, 0.2, 0.7], [0.5, 0.14, 0.87], [0.32, 0.1, 0.99]];
+  layers.forEach(([w, h, y], i) => block(egg, c.swirl ? mk(c.swirl[i % c.swirl.length], 0.3) : mk(c.shell), w, h, w, 0, y, 0));
+  if (c.swirl) {   // stripes of the next colour wind round the egg, so it looks swirly
+    layers.forEach(([w, h, y], i) => { for (let k = 0; k < 3; k++) { const a = i * 0.9 + k * 2.09, r = w / 2 + 0.012, m = mk(c.swirl[(i + 2) % c.swirl.length], 0.3);
+      const face = Math.round(a / (Math.PI / 2)) * (Math.PI / 2), off = (a - face) * r;   // stick it flat on the nearest side of the block
+      const bl = block(egg, m, Math.min(0.2, w * 0.4), h + 0.002, 0.02, 0, y, 0); bl.rotation.y = face; bl.position.x = Math.sin(face) * r + Math.cos(face) * off; bl.position.z = Math.cos(face) * r - Math.sin(face) * off; } });
+  }
+  if (c.spot) { const P = mk(c.spot); [[0.21, 0.32, -0.31], [-0.17, 0.55, -0.33], [0.12, 0.72, -0.31], [-0.18, 0.28, -0.31], [0.33, 0.55, 0.1], [-0.33, 0.45, -0.05], [0.05, 0.9, -0.25]].forEach(([x, y, z]) =>
+    block(egg, P, Math.abs(x) > 0.3 ? 0.03 : 0.1, 0.09, Math.abs(z) > 0.3 ? 0.03 : 0.1, x, y, z)); }
+  if (c.stars) { const ST = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    [[-0.45, 1.05, 0.6], [0.42, 0.75, 0.5], [0.3, 1.25, 0.4]].forEach(([x, y, k]) => { const st = joint(egg, x, y, -0.2); block(st, ST, 0.035 * k * 1.4, 0.32 * k * 1.4, 0.01, 0, 0, 0); block(st, ST, 0.32 * k * 1.4, 0.035 * k * 1.4, 0.01, 0, 0, 0); }); }
+  egg.scale.setScalar(0.95);
+  return egg;
+}
+const [green, red, purple, blue, bronze, silver, gold] = kinds, [ruby, diamond, jade] = gems;
+const tiers = [
+  { egg: { shell: 0x9a6a3f, spot: 0x6b4426 }, dragons: [green, red] },
+  { egg: { shell: 0x8a5ad6, spot: 0xc9a8f5 }, dragons: [blue, purple] },
+  { egg: { shell: 0xf8e45c, spot: 0xffffff }, dragons: [bronze, silver] },
+  { egg: { shell: 0xc8901e, spot: 0xffe9a0, shiny: 1, stars: 1 }, dragons: [gold, ruby] },
+  { egg: { swirl: [0xef6fae, 0xf08a2c, 0xf6c93b, 0x4fd1c5, 0x3f7fd6, 0x8a5ad6], shiny: 1, stars: 1 }, dragons: [diamond, jade] }
+];
+const cols = 5, vw = W / cols;
+tiers.forEach((t, i) => {
+  const cx = i * 30;   // each tier far apart, each gets its own camera
+  t.dragons.forEach((k, j) => { const d = makeDragon(k); d.position.set(cx + (j ? -0.9 : 0.9), 0, 0.7); d.rotation.y = j ? -0.45 : 0.45; d.scale.multiplyScalar(0.8); scene.add(d); });
+  const e = makeEgg(t.egg); e.position.set(cx, 0, -1.1); scene.add(e);
+  t.cam = new THREE.PerspectiveCamera(30, vw / Hh, 0.1, 100); t.cam.position.set(cx, 2.6, -7.4); t.cam.lookAt(cx, 0.7, 0.1);
+});
+renderer.setScissorTest(true);
+tiers.forEach((t, i) => { renderer.setViewport(i * vw, 0, vw, Hh); renderer.setScissor(i * vw, 0, vw, Hh); renderer.render(scene, t.cam); });
+document.title = 'done';
+</script></body></html>

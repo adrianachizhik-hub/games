@@ -36,6 +36,20 @@ These are her words from the conversation, lightly tidied. Treat them as the spe
 - She wants it in the **App Store** one day. She does not want it on Roblox.
 - **Admins** exist. Their commands will be things "like restocking shops or giving more coins". She said: "We will figure out what admins can do later."
 
+### Dragons and eggs (decided 4 October 2026, in Claude Code)
+
+Players hatch dragons from eggs. Each egg tier hatches one of two colours. Every dragon is the same blocky model in different colours (`concepts/dragon-colors.html`, `concepts/dragon-eggs.html`).
+
+| Tier | Egg | Hatches |
+|---|---|---|
+| Common | brown, spotted | green or red |
+| Rare | purple | blue or purple |
+| Legendary | yellow | bronze or silver (shiny metal) |
+| Mythic (name not confirmed) | shiny gold, twinkles | gold or ruby |
+| Prismatic (name not confirmed) | swirly rainbow, twinkles | diamond or jade |
+
+Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scales and twinkle stars around them. Still open: where eggs come from, how hatching works, the odds of each colour, and the names of the top two tiers.
+
 ### The build order we agreed on
 
 1. Starter pet: pick one of the three, and it follows you around.
