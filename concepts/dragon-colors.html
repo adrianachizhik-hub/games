@@ -58,11 +58,12 @@ const kinds = [
   { body: 0x3fae6a, dark: 0x2e8a52, belly: 0xf4d36b, spike: 0xf08a2c, wing: 0x8a5ad6, wing2: 0x6b44b0 },   // green
   { body: 0xd8433a, dark: 0xa02e27, belly: 0xf6c56b, spike: 0xf6c93b, wing: 0x3a2f33, wing2: 0x2a2226 },   // red
   { body: 0x8a5ad6, dark: 0x6440a8, belly: 0xf5c4e1, spike: 0x4fd1c5, wing: 0xef6fae, wing2: 0xcc4f90 },   // purple
+  { body: 0x3f7fd6, dark: 0x2c5fa8, belly: 0xd6f0fa, spike: 0x7fe0f0, wing: 0xe9eef6, wing2: 0xc4ccd8 },   // blue
   { body: 0xe8be45, dark: 0xb88d22, belly: 0xfff4d6, spike: 0xffffff, wing: 0x5bc0f0, wing2: 0x3a98d0 }    // gold (rare idea)
 ];
-kinds.forEach((k, i) => { const d = makeDragon(k); d.position.set(3.0 - i * 2.0, 0, 0); d.rotation.y = -1.0; scene.add(d); });
-const egg = makeEgg(0xf3ead2, 0x3fae6a); egg.position.set(-5.0, 0, -0.3); scene.add(egg);
-const cam = new THREE.PerspectiveCamera(24, W / Hh, 0.1, 100); cam.position.set(-0.6, 3.4, -13.5); cam.lookAt(-1.0, 0.8, 0);
+kinds.forEach((k, i) => { const d = makeDragon(k); d.position.set(4.0 - i * 2.0, 0, 0); d.rotation.y = -1.0; scene.add(d); });
+const egg = makeEgg(0xf3ead2, 0x3fae6a); egg.position.set(-6.0, 0, -0.3); scene.add(egg);
+const cam = new THREE.PerspectiveCamera(24, W / Hh, 0.1, 100); cam.position.set(-0.6, 3.6, -15.5); cam.lookAt(-0.9, 0.8, 0);
 renderer.render(scene, cam);
 document.title = 'done';
 </script></body></html>
