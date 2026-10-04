@@ -299,6 +299,36 @@
   @media (max-height: 470px) { #adminPanel { max-height: calc(100vh - clamp(92px, 17vmin, 132px) - 96px); } }   /* a phone on its side: let the open panel cover Jump */
   #adminPanel h2 { margin: 0 0 10px; font-size: 1.25rem; font-weight: 600; line-height: 1.1; }
   #adminCommands { display: grid; gap: 8px; }
+  #adminCommands button {
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: left;
+    padding: 9px 14px;
+    border-radius: 12px;
+    border: 3px solid #0d2f37;
+    background: var(--panel-ink);
+    color: #0d2f37;
+    cursor: pointer;
+  }
+  #adminCommands button[aria-pressed="true"] { background: #ffd23f; }
+  /* The egg radar's readout, in the gap between the minimap and the admin arrow */
+  #radar {
+    position: fixed;
+    right: calc(14px + env(safe-area-inset-right, 0px));
+    top: calc(clamp(92px, 17vmin, 132px) + 18px + env(safe-area-inset-top, 0px));
+    margin: 0;
+    padding: 1px 10px;
+    border-radius: 999px;
+    background: #ffd23f;
+    color: #0d2f37;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  #radar[hidden] { display: none; }
+  body.shopping #radar { display: none; }
   #adminPanel .none { display: none; margin: 0; font-size: 0.98rem; line-height: 1.45; opacity: 0.85; }
   #adminCommands:empty + .none { display: block; }
   .keys {
@@ -587,6 +617,7 @@
   <p class="hint" id="hint" aria-live="polite"></p>
 </div>
 <canvas id="map" width="264" height="264" aria-hidden="true"></canvas>
+<p id="radar" aria-live="off" hidden></p>
 <p class="keys">Up and down arrows (or W and S) walk. Left and right arrows (or A and D) turn. Space jumps, hold Shift to run. Hold the mouse button and drag to look up and down. Keys 1 to 8 jump between places. Walk up to the blue stall in town to change your avatar. Find dragon eggs and carry them home to your plot before they hatch.</p>
 
 <div id="stick"><div id="knob"></div></div>
@@ -2423,6 +2454,25 @@ const World = (function () {
     adminTab.setAttribute('aria-label', open ? 'Close admin commands' : 'Open admin commands');
     if (e.detail > 0) adminTab.blur();                    // after a click or tap, hand the keys back to walking
   });
+  /* Admin command: the egg radar. While it is on, the minimap marks the nearest egg and draws a line to it,
+     and a label under the minimap says what kind it is and how far. */
+  let radarOn = false;
+  const radarEl = $('radar'), radarBtn = document.createElement('button');
+  radarBtn.type = 'button';
+  function setRadar(on) {
+    radarOn = on;
+    radarBtn.textContent = 'Egg radar: ' + (on ? 'on' : 'off');
+    radarBtn.setAttribute('aria-pressed', String(on));
+    if (!on) radarEl.hidden = true;
+  }
+  setRadar(false);
+  radarBtn.addEventListener('click', (e) => { setRadar(!radarOn); if (e.detail > 0) radarBtn.blur(); });
+  $('adminCommands').appendChild(radarBtn);
+  function nearestEgg() {
+    let best = null, bd = Infinity;
+    for (const egg of eggs) { if (egg.taken) continue; const d = Math.hypot(egg.spot.x - p.x, egg.spot.z - p.z); if (d < bd) { bd = d; best = egg; } }
+    return best && { egg: best, dist: bd };
+  }
   function start(fromTouch) {
     if (started) return;
     const typed = typedName();
@@ -2454,7 +2504,7 @@ const World = (function () {
     if (!started) return;
     closeShop(); shopBtn.hidden = true; avatar.visible = false;
     dropEgg(); toastEl.hidden = true;
-    started = false; isAdmin = false;
+    started = false; isAdmin = false; setRadar(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
     document.body.classList.remove('playing');
@@ -2670,6 +2720,21 @@ const World = (function () {
       mapCtx.fillStyle = '#ffd23f'; mapCtx.strokeStyle = '#0d2f37'; mapCtx.lineWidth = size * 0.012;
       mapCtx.fillRect(toMap(q.x, size) - r, toMap(q.z, size) - r, r * 2, r * 2); mapCtx.strokeRect(toMap(q.x, size) - r, toMap(q.z, size) - r, r * 2, r * 2);
     }
+    const near = radarOn && isAdmin && started ? nearestEgg() : null;
+    if (near) {                                           // admin egg radar: a line from you to the nearest egg, and a pulsing ring on it
+      const t = EGG_TIERS[near.egg.tier], ex = toMap(near.egg.spot.x, size), ez = toMap(near.egg.spot.z, size), col = '#' + (t.shell || t.swirl[0]).toString(16).padStart(6, '0');
+      mapCtx.setLineDash([size * 0.03, size * 0.025]); mapCtx.strokeStyle = '#ffffff'; mapCtx.lineWidth = size * 0.014;
+      mapCtx.beginPath(); mapCtx.moveTo(toMap(p.x, size), toMap(p.z, size)); mapCtx.lineTo(ex, ez); mapCtx.stroke(); mapCtx.setLineDash([]);
+      const pulse = reduced ? 0.5 : (performance.now() / 900) % 1;
+      mapCtx.strokeStyle = 'rgba(255, 210, 63, ' + (1 - pulse).toFixed(2) + ')'; mapCtx.lineWidth = size * 0.016;
+      mapCtx.beginPath(); mapCtx.arc(ex, ez, size * (0.04 + pulse * 0.06), 0, 6.3); mapCtx.stroke();
+      mapCtx.fillStyle = col; mapCtx.strokeStyle = '#0d2f37'; mapCtx.lineWidth = size * 0.012;
+      mapCtx.beginPath(); mapCtx.arc(ex, ez, size * 0.032, 0, 6.3); mapCtx.fill(); mapCtx.stroke();
+      const where = near.egg.spot.dungeon ? ' · in the mine' : near.egg.spot.cave ? ' · in the cave' : '';
+      const txt = t.name + ' egg · ' + Math.round(near.dist) + ' away' + where;
+      if (radarEl.textContent !== txt) radarEl.textContent = txt;
+      radarEl.hidden = false;
+    } else if (!radarEl.hidden) radarEl.hidden = true;
     mapCtx.save();
     mapCtx.translate(toMap(p.x, size), toMap(p.z, size));
     mapCtx.rotate(Math.atan2(-Math.cos(p.yaw), -Math.sin(p.yaw)));
@@ -2722,7 +2787,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate };
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg };
   requestAnimationFrame(tick);
 })();
 </script>

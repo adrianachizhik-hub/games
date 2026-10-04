@@ -74,8 +74,8 @@ const THREE = {
   BackSide: 1, DoubleSide: 2, RepeatWrapping: 1000
 };
 function ctx2d(canvas) {
-  return { createRadialGradient: () => ({ addColorStop() {} }), fillRect() {}, createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
-    putImageData(img) { images.push(img); }, fillText(t) { (canvas.texts = canvas.texts || []).push(t); }, strokeRect() {}, drawImage() {}, beginPath() {}, arc() {}, fill() {}, save() {}, translate() {}, rotate() {}, moveTo() {}, lineTo() {}, closePath() {}, stroke() {}, restore() {} };
+  return { createRadialGradient: () => ({ addColorStop() {} }), createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
+    putImageData(img) { images.push(img); }, fillText(t) { (canvas.texts = canvas.texts || []).push(t); }, strokeRect() {}, drawImage() {}, setLineDash() {}, fillRect() {}, beginPath() {}, arc() {}, fill() {}, save() {}, translate() {}, rotate() {}, moveTo() {}, lineTo() {}, closePath() {}, stroke() {}, restore() {} };
 }
 function el(id) {
   const cls = new Set();
@@ -361,3 +361,16 @@ const trips = E.map((t, ti) => { const egg = I.eggs.find((q) => q.tier === ti); 
   });
   return '  ' + t.name.padEnd(10) + ' found ' + found + '/' + t.spots.length + ', home in time ' + home + '/' + found + ' | slowest run home ' + worst.toFixed(0) + ' s, closest call ' + spare.toFixed(0) + ' s spare'; });
 console.log('every hiding place, found on foot and run home:'); trips.forEach((l) => console.log(l));
+
+// ---- admin egg radar ----
+const radarBtn = els.adminCommands.children.find((b) => /radar/i.test(b.textContent));
+if (!radarBtn) throw new Error('no egg radar button');
+I.goTo(6); tick(0.1);
+const near = I.nearestEgg(); let brute = Infinity; I.eggs.forEach((e) => { if (!e.taken) brute = Math.min(brute, Math.hypot(e.spot.x - I.p.x, e.spot.z - I.p.z)); });
+console.log('nearest egg from the Meadow:', I.EGG_TIERS[near.egg.tier].name, near.dist.toFixed(1), '| checked against every egg', Math.abs(near.dist - brute) < 1e-9);
+radarBtn.fire('click', ev({ detail: 1 })); raf(9000); raf(9016); raf(9032); raf(9048);
+console.log('radar button clicked (admin ' + I.admin() + '): button', JSON.stringify(radarBtn.textContent), '| label shown', !els.radar.hidden, '| label', JSON.stringify(els.radar.textContent));
+if (!I.admin() && !els.radar.hidden) throw new Error('radar shown to a non-admin');
+if (I.admin() && els.radar.hidden) throw new Error('radar not shown to an admin');
+els.leave.fire('click', ev({ detail: 1 })); raf(9100); raf(9116); raf(9132);
+console.log('after Leave: radar on', I.radarOn(), '| button', JSON.stringify(radarBtn.textContent), '| label shown', !els.radar.hidden);
