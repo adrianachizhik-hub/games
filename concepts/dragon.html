@@ -1,0 +1,76 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#cfe6f2}canvas{display:block}</style></head><body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const W = 1500, Hh = 560;
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(W, Hh); renderer.setScissorTest(true); document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb59a6a, 0.75));
+const sun = new THREE.DirectionalLight(0xfff2dc, 0.7); sun.position.set(4, 8, 5); scene.add(sun);
+const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
+const block = (parent, mat, w, h, d, x, y, z, rx, ry, rz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); parent.add(m); return m; };
+const joint = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
+
+// ground
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), lam(0xf3dca0)); ground.rotation.x = -Math.PI / 2; scene.add(ground);
+
+// ---- the dragon: faces -z like the avatar ----
+const G = lam(0x3fae6a), DG = lam(0x2e8a52), BELLY = lam(0xf4d36b), SPIKE = lam(0xf08a2c), WING = lam(0x8a5ad6), WINGD = lam(0x6b44b0),
+      EYEW = lam(0xffffff), EYE = lam(0x1d2a2e), HORN = lam(0xf6efe0), NOSE = lam(0x24683f);
+const dragon = new THREE.Group(); scene.add(dragon);
+// body and belly
+block(dragon, G, 0.7, 0.6, 1.0, 0, 0.75, 0);
+block(dragon, BELLY, 0.56, 0.1, 0.84, 0, 0.44, 0);
+block(dragon, BELLY, 0.5, 0.42, 0.06, 0, 0.74, -0.51);
+// legs
+[[-0.25, -0.32], [0.25, -0.32], [-0.25, 0.32], [0.25, 0.32]].forEach(([x, z]) => { const j = joint(dragon, x, 0.55, z); block(j, DG, 0.22, 0.5, 0.24, 0, -0.25, 0); block(j, HORN, 0.24, 0.06, 0.08, 0, -0.47, -0.14); });
+// neck and head
+const neck = joint(dragon, 0, 0.92, -0.42); block(neck, G, 0.34, 0.5, 0.32, 0, 0.18, -0.05, -0.35); block(neck, BELLY, 0.26, 0.42, 0.04, 0, 0.16, -0.22, -0.35);
+const head = joint(neck, 0, 0.48, -0.18);
+block(head, G, 0.56, 0.48, 0.52, 0, 0.06, 0);
+block(head, G, 0.4, 0.26, 0.3, 0, -0.04, -0.38);       // snout
+block(head, BELLY, 0.36, 0.06, 0.28, 0, -0.18, -0.36);   // chin
+[-0.1, 0.1].forEach((x) => block(head, NOSE, 0.06, 0.05, 0.03, x, 0.03, -0.535));
+[-0.17, 0.17].forEach((x) => { block(head, EYEW, 0.16, 0.18, 0.04, x, 0.13, -0.27); block(head, EYE, 0.08, 0.12, 0.03, x + (x < 0 ? 0.02 : -0.02), 0.12, -0.295); });
+[-0.18, 0.18].forEach((x) => block(head, HORN, 0.08, 0.28, 0.08, x, 0.38, 0.1, 0.5, 0, x < 0 ? 0.25 : -0.25));
+[-0.12, 0.12].forEach((x) => block(head, HORN, 0.04, 0.07, 0.04, x, -0.2, -0.47));   // little teeth
+// spikes down the back
+[[-0.12, 1.0, 0.17], [-0.38, 1.05, 0.15], [0.12, 1.08, 0.15], [0.36, 1.08, 0.13]].forEach(([z, y, s]) => block(dragon, SPIKE, 0.06, s, s, 0, y, z, Math.PI / 4));
+block(neck, SPIKE, 0.06, 0.12, 0.12, 0, 0.3, 0.12, Math.PI / 4);
+block(head, SPIKE, 0.06, 0.12, 0.12, 0, 0.32, 0.18, Math.PI / 4);
+// tail: tapering blocks bending up at the end
+let t = joint(dragon, 0, 0.78, 0.5); const segs = [[0.4, 0.36, 0.4, 0.25], [0.3, 0.28, 0.38, 0.3], [0.22, 0.2, 0.36, 0.25], [0.14, 0.14, 0.32, -0.3]];
+segs.forEach(([w, h, d, bend]) => { t.rotation.x = bend; block(t, G, w, h, d, 0, 0, d / 2); block(t, SPIKE, 0.05, h * 0.5, h * 0.5, 0, h / 2 + 0.03, d / 2, Math.PI / 4); t = joint(t, 0, 0, d - 0.02); });
+block(t, SPIKE, 0.06, 0.26, 0.26, 0, 0, 0.12, Math.PI / 4);   // spade at the tip
+// wings: an arm bone and a fan of membrane panels
+[-1, 1].forEach((s) => {
+  const w = joint(dragon, 0.32 * s, 1.0, -0.12); w.rotation.z = 0.6 * s; w.rotation.y = -0.35 * s;
+  block(w, DG, 0.9, 0.08, 0.08, 0.45 * s, 0, 0);
+  block(w, WING, 0.86, 0.04, 0.42, 0.45 * s, -0.02, 0.24);
+  block(w, WINGD, 0.6, 0.04, 0.3, 0.42 * s, -0.03, 0.55);
+  block(w, DG, 0.08, 0.06, 0.46, 0.88 * s, 0, 0.2);
+});
+dragon.scale.setScalar(0.85);
+
+// ---- a copy of the player avatar, for size ----
+const av = new THREE.Group(); scene.add(av); av.position.set(2.0, 0, 0.3);
+const SK = lam(0xe0ac69), SH = lam(0x3f7fd6), PA = lam(0x2c3e63), HA = lam(0x4a2f1d);
+block(av, PA, 0.32, 0.8, 0.34, -0.17, 0.4, 0); block(av, PA, 0.32, 0.8, 0.34, 0.17, 0.4, 0);
+block(av, SH, 0.72, 0.74, 0.4, 0, 1.17, 0);
+[-0.47, 0.47].forEach((x) => { block(av, SH, 0.2, 0.42, 0.26, x, 1.33, 0); block(av, SK, 0.18, 0.32, 0.24, x, 0.96, 0); });
+block(av, SK, 0.55, 0.55, 0.55, 0, 1.82, 0); block(av, HA, 0.57, 0.16, 0.57, 0, 2.17, 0.01); block(av, HA, 0.57, 0.34, 0.12, 0, 1.97, 0.24);
+[-0.12, 0.12].forEach((x) => block(av, EYE, 0.07, 0.1, 0.02, x, 1.86, -0.28));
+
+// three views side by side
+const views = [
+  { x: 0, w: 500, pos: [-2.6, 2.0, -3.4], at: [0.4, 0.75, 0] },   // front three-quarter, avatar beside it
+  { x: 500, w: 500, pos: [-4.0, 1.3, 0.1], at: [0, 0.75, 0.2] },   // side
+  { x: 1000, w: 500, pos: [2.2, 3.2, 3.0], at: [0, 0.7, 0.1] }     // from behind and above
+];
+scene.background = new THREE.Color(0xcfe6f2);
+views.forEach((v, i) => {
+  const cam = new THREE.PerspectiveCamera(42, v.w / Hh, 0.1, 100); cam.position.set(...v.pos); cam.lookAt(...v.at);
+  av.visible = i === 0;
+  renderer.setViewport(v.x, 0, v.w, Hh); renderer.setScissor(v.x, 0, v.w, Hh); renderer.render(scene, cam);
+});
+document.title = 'done';
+</script></body></html>
