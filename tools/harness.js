@@ -264,6 +264,9 @@ function flat(obj, M, out) {
 const hairShown = () => Object.keys(I.hair).filter((k) => I.hair[k].all.visible).join('+') + ' (up pieces ' + (I.hair[I.AV.hair].up.visible ? 'shown' : 'tucked away') + ')';
 I.optionButtons.find((q) => q.key === 'hair' && q.value === 'ponytail').b.fire('click', ev({ detail: 1 }));
 I.optionButtons.find((q) => q.key === 'hairColor' && q.value === '#ef6fae').b.fire('click', ev({ detail: 1 }));
+const tieOf = (k) => { const out = []; const walk = (o) => { if (o.material === I.paint.tieBlue || o.material === I.paint.tie) out.push(hex(o.material.color)); (o.children || []).forEach(walk); }; walk(I.hair[k].all); return out.join(','); };
+console.log('hair ties      : ponytail', tieOf('ponytail'), '| pigtails', tieOf('pigtails'));
+if (tieOf('ponytail') !== '#2f7fe0') throw new Error('ponytail band should be blue');
 console.log('hair picked    :', I.AV.hair, I.AV.hairColor, '| paint', hex(I.paint.hair.color), '| showing', hairShown());
 I.optionButtons.find((q) => q.key === 'hair' && q.value === 'spiky').b.fire('click', ev({ detail: 1 }));
 I.optionButtons.find((q) => q.key === 'head' && q.value === 'cap').b.fire('click', ev({ detail: 1 })); console.log('spiky + cap    :', hairShown());

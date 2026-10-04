@@ -1724,12 +1724,12 @@ const World = (function () {
     scene.add(root);
     return f;
   }
-  const paint = { skin: lam(AV.skin), shirt: lam(AV.shirt), pants: lam(AV.pants), hair: lam(AV.hairColor), face: lam(0x1d2a2e), tie: lam(0xef6fae) };
+  const paint = { skin: lam(AV.skin), shirt: lam(AV.shirt), pants: lam(AV.pants), hair: lam(AV.hairColor), face: lam(0x1d2a2e), tie: lam(0xef6fae), tieBlue: lam(0x2f7fe0) };
   const me = figure(paint), avatar = me.root, legL = me.legL, legR = me.legR, armL = me.armL, armR = me.armR, headJ = me.head;
   avatar.visible = false;
 
   /* Hairstyles. Each is a few blocks on the head: [width, height, depth, x, y, z, and optional tilts].
-     "up" pieces stick up above the head, so they tuck away under a hat. "tie" pieces are hair ties. */
+     "up" pieces stick up above the head, so they tuck away under a hat. "tie" pieces are hair ties, pink unless "tieColor" names another paint. */
   const TOP = [0.57, 0.16, 0.57, 0, 0.5, 0.01], NAPE = [0.57, 0.34, 0.12, 0, 0.3, 0.24];
   const HAIR_SHAPES = {
     short: { on: [TOP, NAPE] },
@@ -1740,7 +1740,7 @@ const World = (function () {
     curly: { on: [[0.74, 0.3, 0.74, 0, 0.54, 0.02], [0.7, 0.36, 0.2, 0, 0.3, 0.27], [0.12, 0.34, 0.5, -0.32, 0.32, 0.04], [0.12, 0.34, 0.5, 0.32, 0.32, 0.04]], up: [[0.58, 0.14, 0.58, 0, 0.71, 0.02]] },
     bob: { on: [TOP, [0.62, 0.52, 0.14, 0, 0.22, 0.25], [0.11, 0.48, 0.44, -0.3, 0.24, 0.03], [0.11, 0.48, 0.44, 0.3, 0.24, 0.03], [0.5, 0.1, 0.06, 0, 0.46, -0.275]] },
     long: { on: [TOP, [0.6, 0.86, 0.13, 0, 0.05, 0.26], [0.1, 0.62, 0.3, -0.3, 0.17, 0.1], [0.1, 0.62, 0.3, 0.3, 0.17, 0.1]] },
-    ponytail: { on: [TOP, NAPE, [0.2, 0.18, 0.2, 0, 0.44, 0.37], [0.2, 0.62, 0.16, 0, 0.12, 0.49, -0.22, 0, 0]], tie: [[0.23, 0.08, 0.17, 0, 0.44, 0.34]] },
+    ponytail: { on: [TOP, NAPE, [0.2, 0.18, 0.2, 0, 0.44, 0.37], [0.2, 0.62, 0.16, 0, 0.12, 0.49, -0.22, 0, 0]], tie: [[0.24, 0.08, 0.24, 0, 0.44, 0.37]], tieColor: 'tieBlue' },
     pigtails: { on: [TOP, NAPE, [0.15, 0.48, 0.15, -0.36, 0.12, 0.1, 0, 0, -0.18], [0.15, 0.48, 0.15, 0.36, 0.12, 0.1, 0, 0, 0.18]], tie: [[0.17, 0.07, 0.17, -0.32, 0.36, 0.1], [0.17, 0.07, 0.17, 0.32, 0.36, 0.1]] },
     bun: { on: [TOP, NAPE, [0.27, 0.27, 0.27, 0, 0.55, 0.3]] },
     none: { on: [] }
@@ -1749,7 +1749,7 @@ const World = (function () {
   for (const name in HAIR_SHAPES) {
     const all = new THREE.Group(), up = new THREE.Group(), shape = HAIR_SHAPES[name];
     (shape.on || []).forEach((q) => block(all, paint.hair, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
-    (shape.tie || []).forEach((q) => block(all, paint.tie, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
+    (shape.tie || []).forEach((q) => block(all, paint[shape.tieColor || 'tie'], q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
     (shape.up || []).forEach((q) => block(up, paint.hair, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
     all.add(up); headJ.add(all);
     hair[name] = { all, up };
