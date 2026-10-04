@@ -48,7 +48,7 @@ class Color { constructor(v) { this.r = this.g = this.b = 1; if (v !== undefined
   copy(c) { this.r = c.r; this.g = c.g; this.b = c.b; return this; } lerp(c, t) { this.r += (c.r - this.r) * t; this.g += (c.g - this.g) * t; this.b += (c.b - this.b) * t; return this; }
   setRGB(r, g, b) { if ([r, g, b].some((v) => typeof v !== 'number' || isNaN(v))) throw new Error('bad colour'); this.r = r; this.g = g; this.b = b; return this; } }
 class Obj { constructor() { this.position = new Vector3(); this.rotation = { x: 0, y: 0, z: 0, order: 'XYZ', set(x, y, z) { this.x = x; this.y = y; this.z = z; } }; this.scale = new Vector3(1, 1, 1); this.children = []; this.matrix = null; this.visible = true; }
-  add(o) { this.children.push(o); } lookAt(x, y, z) { if ([x, y, z].some((v) => typeof v !== 'number' || isNaN(v))) throw new Error('lookAt args'); this.lookedAt = [x, y, z]; } updateMatrix() { for (const v of [this.position, this.scale]) if ([v.x, v.y, v.z].some((q) => typeof q !== 'number' || isNaN(q))) throw new Error('NaN transform');
+  add(o) { this.children.push(o); } remove(o) { const i = this.children.indexOf(o); if (i >= 0) this.children.splice(i, 1); } lookAt(x, y, z) { if ([x, y, z].some((v) => typeof v !== 'number' || isNaN(v))) throw new Error('lookAt args'); this.lookedAt = [x, y, z]; } updateMatrix() { for (const v of [this.position, this.scale]) if ([v.x, v.y, v.z].some((q) => typeof q !== 'number' || isNaN(q))) throw new Error('NaN transform');
     this.matrix = { x: this.position.x, y: this.position.y, z: this.position.z, sy: this.scale.y }; } }
 const allMeshes = [];
 class Mesh extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; allMeshes.push(this); } }
@@ -283,3 +283,81 @@ let o = []; flat(K, new Matrix4(), o); shots.push({ name: 'shopkeeper', pts: o }
 I.keeper.armR.rotation.z = 2.4; o = []; flat(K, new Matrix4(), o); shots.push({ name: 'shopkeeper waving', pts: o });
 fs.writeFileSync('avatar.json', JSON.stringify(shots));
 console.log('figures dumped:', shots.length);
+
+// ---- dragon eggs: claim a plot, find eggs, carry them home, hatch ----
+const E = I.EGG_TIERS, said = () => JSON.stringify(els.toast.hidden ? '' : els.toast.textContent);
+const tick = (secs) => { for (let f = 0; f < secs * 60; f++) { I.update(1 / 60, f / 60); I.eggsAnimate(1 / 60, f / 60); } };
+const stand = (spot) => { I.p.x = spot.x; I.p.z = spot.z; I.p.y = spot.y; I.p.vy = 0; I.p.onGround = true; I.p.dungeon = !!spot.dungeon; I.p.inLid = !!spot.cave; I.p.inCave = !!spot.cave; };
+const zonesOf = (t) => { const z = {}; t.spots.forEach((s) => { stand(s); const n = I.zoneName(); z[n] = (z[n] || 0) + 1; }); return JSON.stringify(z); };
+I.goTo(0);
+console.log('egg hiding places:'); E.forEach((t, i) => console.log(' ', t.name.padEnd(10), t.spots.length, 'spots,', I.eggs.filter((e) => e.tier === i).length, 'out at once | zones', zonesOf(t)));
+els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear();
+const common = I.eggs.find((e) => e.tier === 0);
+stand(common.spot); tick(0.2);
+console.log('touch an egg with no plot : carrying', !!I.carrying(), '| message', said());
+if (I.carrying()) throw new Error('picked up an egg without a plot');
+I.goTo(7); const home = I.plotWorld(2, 0, 3); I.p.x = home.x; I.p.z = home.z; tick(0.2);
+console.log('walk onto Plot 3         : my plot', I.myPlot() + 1, '| message', said());
+if (I.myPlot() !== 2) throw new Error('plot not claimed');
+const p4 = I.plotWorld(3, 0, 0); I.p.x = p4.x; I.p.z = p4.z; tick(0.2);
+console.log('walk onto Plot 4 as well : my plot still', I.myPlot() + 1);
+stand(common.spot); tick(0.1);
+const c = I.carrying();
+console.log('touch a Common egg       : carrying', !!c, '| time', c && c.total, 's | egg hidden in world', !common.g.visible, '| countdown', JSON.stringify(els.carryText.textContent), 'shown', !els.carry.hidden, '| message', said());
+const bx0 = I.p.x; window.fire('keydown', ev({ code: 'Digit8' })); window.fire('keyup', ev({ code: 'Digit8' }));
+console.log('press 8 while carrying   : moved', I.p.x !== bx0, '| message', said());
+if (I.p.x !== bx0) throw new Error('jumped while carrying');
+const oldSpot = common.spot; I.p.x = home.x; I.p.z = home.z; I.p.y = 6.3; I.p.dungeon = false; I.p.inCave = I.p.inLid = false; tick(0.1);
+console.log('walk into my plot        : carrying', !!I.carrying(), '| hatching', !!I.hatching(), '| message', said());
+tick(2);
+console.log('2 seconds later          : dragons', JSON.stringify(I.ownDragons), '| pets on plot', I.plotPets.length, '| message', said(), '| egg back out elsewhere', common.g.visible && common.spot !== oldSpot);
+if (I.ownDragons.length !== 1 || !['green', 'red'].includes(I.ownDragons[0])) throw new Error('common egg did not hatch a green or red dragon');
+// a prismatic egg in the mine, and nobody takes it home
+const pris = I.eggs.find((e) => e.tier === 4); stand(pris.spot); tick(0.1);
+const pc = I.carrying(); console.log('touch the Prismatic egg  : carrying', !!pc, '| time', pc && pc.total, 's | zone', I.zoneName());
+tick(pc.total - 9.5); console.log('nearly out of time       : countdown', JSON.stringify(els.carryText.textContent), '| red', els.carry.classList.contains('low'));
+tick(10); console.log('time ran out             : carrying', !!I.carrying(), '| flying away', I.flyers.length, '| message', said(), '| dragons still', I.ownDragons.length);
+if (I.carrying() || I.ownDragons.length !== 1) throw new Error('egg should have hatched and flown off');
+tick(5); console.log('5 seconds later          : still flying', I.flyers.length);
+// leaving while carrying puts the egg back
+const leg = I.eggs.find((e) => e.tier === 2); stand(leg.spot); tick(0.1); const ls = leg.spot;
+els.leave.fire('click', ev({ detail: 1 })); console.log('Leave while carrying     : carrying', !!I.carrying(), '| egg back in its place', leg.g.visible && leg.spot === ls, '| countdown hidden', els.carry.hidden);
+els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear();
+// how often each dragon comes out
+const odds = E.map((t, i) => { const n = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(i); n[d] = (n[d] || 0) + 1; } return t.name + ' ' + Object.keys(n).map((d) => d + ' ' + Math.round(n[d] / 200) + '%').join(' '); });
+console.log('hatch odds:', odds.join(' | '));
+// dragons on the plot stay on it
+let outside = 0; for (let f = 0; f < 3600; f++) { I.eggsAnimate(1 / 60, f / 60); I.plotPets.forEach((d) => { if (I.plotAt(d.root.position.x, d.root.position.z) !== I.myPlot()) outside++; }); }
+console.log('pets wandering 60 s: frames spent off the plot', outside);
+// time allowed for each tier, from Plot 3, against how long running straight home would take
+E.forEach((t) => { const ds = t.spots.map((s) => Math.hypot(s.x - I.plotWorld(2, 0, 0).x, s.z - I.plotWorld(2, 0, 0).z)); const lo = Math.min(...ds), hi = Math.max(...ds);
+  console.log(' ', t.name.padEnd(10), 'distance', lo.toFixed(0), '-', hi.toFixed(0), '| time', Math.round(t.base + lo / 7), '-', Math.round(t.base + hi / 7), 's | straight run takes', (lo / 17).toFixed(0), '-', (hi / 17).toFixed(0), 's'); });
+// can you get to every egg on foot, and home again in time? Every hiding place gets an egg in turn.
+// The run home goes up the ladder, along the cave and out behind the waterfall when it has to.
+// (a straight-line runner: it can snag on trees where a person would steer round)
+const runTo = (x, z, limit, near = 2.2) => { let f = 0; I.keys.add('KeyW'); I.keys.add('ShiftLeft');
+  for (; f < limit && Math.hypot(I.p.x - x, I.p.z - z) > near && !(near < 1 && I.carrying()); f++) { I.p.yaw = face(x, z); if (f % 90 === 45) I.keys.add('Space'); else I.keys.delete('Space'); I.update(1 / 60, f / 60); } I.keys.clear(); return f; };
+const homeXZ = I.plotWorld(I.myPlot(), 0, 0);
+const trips = E.map((t, ti) => { const egg = I.eggs.find((q) => q.tier === ti); let found = 0, home = 0, worst = 0, spare = 1e9;
+  t.spots.forEach((s) => {
+    egg.spot = s; egg.taken = false; egg.g.visible = true;
+    if (s.dungeon) { I.goTo(4); I.p.x = I.DG.x; I.p.z = I.DG.z; I.p.inCave = I.p.inLid = true; tick(2.5); runTo(s.x, s.z, 600, 0.5); }
+    else { let best = 0, bd = 1e9; I.places.forEach((pl, i) => { if (!!pl.cave !== !!s.cave) return; const d = Math.hypot(pl.x - s.x, pl.z - s.z); if (d < bd) { bd = d; best = i; } }); I.goTo(best); runTo(s.x, s.z, 60 * 40, 0.5); }
+    if (!I.carrying()) tick(1);                         // land, if it was in the middle of a jump
+    const c = I.carrying(); if (!c) { if (process.env.EGGDEBUG) console.log('    not found:', t.name, 'spot', s.x.toFixed(0), s.z.toFixed(0), 'h', s.y.toFixed(1), '| stopped', Math.hypot(I.p.x - s.x, I.p.z - s.z).toFixed(1), 'away at', I.zoneName(), 'h', I.p.y.toFixed(1)); return; } found++;
+    let f = 0;
+    if (I.p.dungeon) { I.keys.add('KeyW'); while (I.p.dungeon && f < 900) { I.p.yaw = face(I.DG.x, I.DG.z + I.DG.z1 + 3); I.update(1 / 60, 0); f++; } I.keys.clear(); }
+    if (I.p.inCave) for (let tt = W.axisCoords(I.p.x, I.p.z).t; tt > W.tA - 6 && I.carrying(); tt -= 4) { const q = W.axisPoint(tt, W.caveOffset(tt)); f += runTo(q.x, q.z, 600); }
+    if (I.carrying()) {                                  // into town, round the walkway between the stalls and the plots, then onto the plot
+      const H0 = W.HUB, ang = (x, z) => Math.atan2(z - H0.z, x - H0.x), ring = (a) => ({ x: H0.x + Math.cos(a) * 15.5, z: H0.z + Math.sin(a) * 15.5 });
+      let a = ang(I.p.x, I.p.z); const goal = ang(homeXZ.x, homeXZ.z);
+      let q = ring(a); f += runTo(q.x, q.z, 60 * 60);
+      while (I.carrying()) { let d = goal - a; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < 0.05) break; a += Math.sign(d) * Math.min(0.4, Math.abs(d)); q = ring(a); f += runTo(q.x, q.z, 600); }
+      if (I.carrying()) f += runTo(homeXZ.x, homeXZ.z, 600);
+    }
+    if (process.env.EGGDEBUG && (I.carrying() || I.flyers.length)) console.log('    not home:', t.name, 'from', s.x.toFixed(0), s.z.toFixed(0), '| ended at', I.p.x.toFixed(0), I.p.z.toFixed(0), I.zoneName(), 'h', I.p.y.toFixed(1), 'inCave', I.p.inCave, 'dungeon', I.p.dungeon, '| frames', f, 'left', c.left.toFixed(0), 'flown', I.flyers.length);
+    if (I.ownDragons.length && !I.carrying() && !I.flyers.length) { home++; worst = Math.max(worst, f / 60); spare = Math.min(spare, c.total - f / 60); }
+    I.dropEgg(); tick(2.5); I.flyers.length = 0;
+  });
+  return '  ' + t.name.padEnd(10) + ' found ' + found + '/' + t.spots.length + ', home in time ' + home + '/' + found + ' | slowest run home ' + worst.toFixed(0) + ' s, closest call ' + spare.toFixed(0) + ' s spare'; });
+console.log('every hiding place, found on foot and run home:'); trips.forEach((l) => console.log(l));

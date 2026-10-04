@@ -149,6 +149,45 @@
     white-space: nowrap;
   }
   #shopOpen[hidden], #avatarShop[hidden] { display: none; }
+  /* Dragon eggs: the countdown while you carry one, and short messages above it */
+  #carry, #toast {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100% - 32px);
+    text-align: center;
+    pointer-events: none;
+  }
+  #carry {
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--panel-ink);
+    border: 3px solid #ffd23f;
+    font-size: 1.1rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  #carry.low { border-color: #ef6b4f; background: #b8392a; color: #fff; }
+  #carryDot { width: 16px; height: 20px; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%; flex: none; border: 2px solid rgba(255, 255, 255, 0.7); }
+  #toast {
+    bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    padding: 9px 18px;
+    border-radius: 14px;
+    background: var(--panel);
+    color: var(--panel-ink);
+    font-size: 1.02rem;
+    font-weight: 500;
+    width: max-content;
+  }
+  #carry[hidden], #toast[hidden] { display: none; }
+  body.touch #carry { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
+  body.touch #toast { bottom: calc(254px + env(safe-area-inset-bottom, 0px)); }
   #shopOpen kbd { margin-left: 8px; padding: 1px 8px; border-radius: 7px; background: #0d2f37; color: #ffd23f; font: inherit; font-size: 0.85rem; }
   body.touch #shopOpen kbd { display: none; }
   body.touch #shopOpen { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
@@ -548,7 +587,7 @@
   <p class="hint" id="hint" aria-live="polite"></p>
 </div>
 <canvas id="map" width="264" height="264" aria-hidden="true"></canvas>
-<p class="keys">Up and down arrows (or W and S) walk. Left and right arrows (or A and D) turn. Space jumps, hold Shift to run. Hold the mouse button and drag to look up and down. Keys 1 to 8 jump between places. Walk up to the blue stall in town to change your avatar.</p>
+<p class="keys">Up and down arrows (or W and S) walk. Left and right arrows (or A and D) turn. Space jumps, hold Shift to run. Hold the mouse button and drag to look up and down. Keys 1 to 8 jump between places. Walk up to the blue stall in town to change your avatar. Find dragon eggs and carry them home to your plot before they hatch.</p>
 
 <div id="stick"><div id="knob"></div></div>
 <button id="jump" type="button">Jump</button>
@@ -565,6 +604,8 @@
   </div>
 </div>
 
+<div id="carry" role="status" hidden><span id="carryDot"></span><span id="carryText"></span></div>
+<p id="toast" aria-live="polite" hidden></p>
 <button id="shopOpen" type="button" hidden>Open the avatar shop<kbd>Enter</kbd></button>
 <div id="avatarShop" role="dialog" aria-label="Avatar shop" hidden>
   <h2>Avatar shop</h2>
@@ -1979,6 +2020,330 @@ const World = (function () {
     codeEl.hidden = !wanted; codeEl.value = ''; codeMsg.hidden = true;
     if (wanted) codeEl.focus();
   });
+  /* ---------- Dragon eggs ---------- */
+  /* Eggs are hidden around the island, rarer ones in harder places. Walk into an egg to pick it up,
+     then carry it home to your plot before it hatches: rarer eggs hatch sooner, and an egg found
+     further from home gives you a little more time. If it hatches on the way, the baby dragon flies
+     off. At home it hatches into a dragon that lives on your plot. The first plot you walk onto in
+     town becomes yours. Your plot and your dragons are kept on this device. */
+  const DRAGON_KINDS = {
+    green:   { name: 'Green',   body: 0x3fae6a, dark: 0x2e8a52, belly: 0xf4d36b, spike: 0xf08a2c, wing: 0x8a5ad6, wing2: 0x6b44b0 },
+    red:     { name: 'Red',     body: 0xd8433a, dark: 0xa02e27, belly: 0xf6c56b, spike: 0xf6c93b, wing: 0x3a2f33, wing2: 0x2a2226 },
+    blue:    { name: 'Blue',    body: 0x3f7fd6, dark: 0x2c5fa8, belly: 0xd6f0fa, spike: 0x7fe0f0, wing: 0xe9eef6, wing2: 0xc4ccd8 },
+    purple:  { name: 'Purple',  body: 0x8a5ad6, dark: 0x6440a8, belly: 0xf5c4e1, spike: 0x4fd1c5, wing: 0xef6fae, wing2: 0xcc4f90 },
+    bronze:  { name: 'Bronze',  body: 0xa8642c, dark: 0x6e421d, belly: 0xd9a066, spike: 0xf0c060, wing: 0x8a5426, wing2: 0x6a3e1a, metal: true },
+    silver:  { name: 'Silver',  body: 0xaab4c2, dark: 0x6f7988, belly: 0xe2e8f0, spike: 0x5f8fd0, wing: 0x8f99a8, wing2: 0x737d8c, metal: true },
+    gold:    { name: 'Gold',    body: 0xe8be45, dark: 0xb88d22, belly: 0xfff4d6, spike: 0xffffff, wing: 0x5bc0f0, wing2: 0x3a98d0, metal: true },
+    ruby:    { name: 'Ruby',    body: 0xe8115f, dark: 0xa80c48, belly: 0xff8fb3, spike: 0xffd0e0, wing: 0xff3b7f, wing2: 0xc81050, gem: 0xffb0cc },
+    diamond: { name: 'Diamond', body: 0xc6ecff, dark: 0x86c4ea, belly: 0xffffff, spike: 0x8fe8ff, wing: 0xbfe8ff, wing2: 0x8fd0f5, gem: 0x8fe8ff },
+    jade:    { name: 'Jade',    body: 0x00b874, dark: 0x008554, belly: 0xa8f0c8, spike: 0xe8fff2, wing: 0x3fe0a8, wing2: 0x18b880, gem: 0xc8ffe8 }
+  };
+  /* base: seconds to get home before it hatches; hatch: which dragons, and how likely each is */
+  const EGG_TIERS = [
+    { name: 'Common',    shell: 0x9a6a3f, spot: 0x6b4426, base: 30, count: 6, hatch: [['green', 1], ['red', 1]] },
+    { name: 'Rare',      shell: 0x8a5ad6, spot: 0xc9a8f5, base: 24, count: 4, hatch: [['blue', 1], ['purple', 1]] },
+    { name: 'Legendary', shell: 0xf8e45c, spot: 0xffffff, base: 20, count: 3, hatch: [['bronze', 1], ['silver', 1]] },
+    { name: 'Mythic',    shell: 0xc8901e, spot: 0xffe9a0, base: 17, count: 2, hatch: [['gold', 1], ['ruby', 1]], shiny: true },
+    { name: 'Prismatic', swirl: [0xef6fae, 0xf08a2c, 0xf6c93b, 0x4fd1c5, 0x3f7fd6, 0x8a5ad6], base: 15, count: 1, hatch: [['diamond', 3], ['jade', 2]], shiny: true }
+  ];
+  const EXTRA_PER_UNIT = 1 / 7;                          // seconds of extra time for each unit the egg is from your plot
+  const metalMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60, specular: 0x8a8a8a });
+  const gemMat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x383838 });   // gems glow a little
+  const twinkleMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  function twinkle(parent, x, y, z, k) {                 // a little three-way sparkle
+    const s = new THREE.Group(); s.position.set(x, y, z); parent.add(s);
+    block(s, twinkleMat, 0.4 * k, 0.04 * k, 0.04 * k, 0, 0, 0); block(s, twinkleMat, 0.04 * k, 0.4 * k, 0.04 * k, 0, 0, 0); block(s, twinkleMat, 0.04 * k, 0.04 * k, 0.4 * k, 0, 0, 0);
+    return s;
+  }
+
+  /* An egg: stacked blocks with spots, or rainbow layers with stripes winding round for the swirly one. */
+  const EGG_LAYERS = [[0.5, 0.18, 0.09], [0.62, 0.22, 0.29], [0.66, 0.2, 0.5], [0.62, 0.2, 0.7], [0.5, 0.14, 0.87], [0.32, 0.1, 0.99]];
+  const eggGeo = EGG_TIERS.map((t) => {
+    const parts = EGG_LAYERS.map(([w, h, y], i) => bx(w, h, w, t.swirl ? t.swirl[i % t.swirl.length] : t.shell, 0, y, 0));
+    if (t.swirl) EGG_LAYERS.forEach(([w, h, y], i) => { for (let k = 0; k < 3; k++) {
+      const a = i * 0.9 + k * 2.09, r = w / 2 + 0.012, face = Math.round(a / (Math.PI / 2)) * (Math.PI / 2), off = (a - face) * r;
+      parts.push(bx(Math.min(0.2, w * 0.4), h + 0.002, 0.02, t.swirl[(i + 2) % t.swirl.length], Math.sin(face) * r + Math.cos(face) * off, y, Math.cos(face) * r - Math.sin(face) * off, 0, face, 0));
+    } });
+    else [[0.21, 0.32, -0.32], [-0.17, 0.55, -0.34], [0.12, 0.72, -0.32], [-0.18, 0.28, -0.32], [0.34, 0.55, 0.1], [-0.34, 0.45, -0.05], [0.05, 0.9, -0.26], [0.1, 0.45, 0.34]].forEach(([x, y, z]) =>
+      parts.push(bx(Math.abs(x) > 0.3 ? 0.03 : 0.1, 0.09, Math.abs(x) > 0.3 ? 0.1 : 0.03, t.spot, x, y, z)));
+    return merge(parts);
+  });
+  const eggMat = (i) => EGG_TIERS[i].shiny ? metalMat : plantMat;
+
+  /* Where eggs can turn up. They get their own random stream, so the plants stay where they are. */
+  const ER = W.rng(4142);
+  function clearOfTrees(x, z, r) {
+    const cx = Math.floor(x / 8), cz = Math.floor(z / 8);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      const arr = colliders.get((cx + a) + ',' + (cz + b));
+      if (arr) for (let i = 0; i < arr.length; i += 3) if (Math.hypot(x - arr[i], z - arr[i + 1]) < arr[i + 2] + r) return false;
+    }
+    return true;
+  }
+  function outdoorSpots(n, gap, test) {
+    const out = [];
+    for (let k = 0; k < 20000 && out.length < n; k++) {
+      const x = (ER() * 2 - 1) * 180, z = (ER() * 2 - 1) * 180;
+      if (W.lidAt(x, z) || Math.hypot(x - HUB.x, z - HUB.z) < HUB.r + 4) continue;
+      const h = W.bil(H, x, z);
+      if (h < 0.7 || Math.abs(W.bil(H, x + 1, z) - W.bil(H, x - 1, z)) > 1.2 || Math.abs(W.bil(H, x, z + 1) - W.bil(H, x, z - 1)) > 1.2) continue;
+      if (!clearOfTrees(x, z, 1.3) || !test(x, z, h) || out.some((q) => Math.hypot(q.x - x, q.z - z) < gap)) continue;
+      out.push({ x, y: h, z });
+    }
+    return out;
+  }
+  const fromTown = (x, z) => Math.hypot(x - HUB.x, z - HUB.z);
+  EGG_TIERS[0].spots = outdoorSpots(14, 24, (x, z, h) => h < 9 && W.mountainAt(x, z) < 4 && W.jungleF(x, z) < 0.5 && W.desertF(x, z) < 0.5 && fromTown(x, z) > 45);   // beaches and meadows
+  EGG_TIERS[1].spots = outdoorSpots(10, 22, (x, z, h) => (W.jungleF(x, z) > 0.7 || W.desertF(x, z) > 0.7) && h > 2.5 && W.coastS(x, z) > 0.3 && fromTown(x, z) > 80);                                  // deep in the jungle and the desert
+  EGG_TIERS[2].spots = outdoorSpots(7, 12, (x, z, h) => h > 16 && W.mountainAt(x, z) > 9 && Math.hypot(x - peakSpot.x, z - peakSpot.z) < 55);                     // high in the mountains
+  EGG_TIERS[3].spots = [];                                                                                                                                       // inside the crystal cave
+  for (let t = W.tA + 8; t < W.tB - 6; t += 7) {
+    const q = W.axisPoint(t, W.caveOffset(t));
+    if (Math.hypot(q.x - W.POOL.x, q.z - W.POOL.z) > 8) EGG_TIERS[3].spots.push({ x: q.x, y: W.bil(H, q.x, q.z), z: q.z, cave: true });
+  }
+  EGG_TIERS[4].spots = [[-7.5, 8.5], [7.5, 9], [-7.5, 2.5], [6, 14.5], [-3.5, 15], [-8, 5.5], [8, 5.5], [-8, 12], [8, 12], [-2.5, 8.5], [2.5, 8.5], [4, 2.5]]                                                                               // down in the mine
+    .filter(([lx, lz]) => { for (let i = 0; i < dgBlocks.length; i += 3) if (Math.hypot(lx - dgBlocks[i], lz - dgBlocks[i + 1]) < dgBlocks[i + 2] + 1) return false; return true; })
+    .map(([lx, lz]) => ({ x: DG.x + lx, y: DG.floor, z: DG.z + lz, dungeon: true }));
+
+  const eggs = [];
+  EGG_TIERS.forEach((t, i) => {
+    for (let k = 0; k < Math.min(t.count, t.spots.length); k++) {
+      const g = new THREE.Group(), body = new THREE.Mesh(eggGeo[i], eggMat(i));
+      g.add(body); g.scale.set(1.4, 1.4, 1.4);            // a bit bigger than life, so they can be spotted
+      const stars = t.shiny ? [twinkle(g, -0.5, 1.1, 0, 0.7), twinkle(g, 0.45, 0.75, 0.1, 0.55), twinkle(g, 0.2, 1.35, -0.3, 0.45)] : [];
+      scene.add(g);
+      const egg = { tier: i, g, body, stars, spot: null, taken: false, phase: k * 1.7 + i };
+      placeEgg(egg, t.spots[k]);
+      eggs.push(egg);
+    }
+  });
+  function placeEgg(egg, spot) { egg.spot = spot; egg.taken = false; egg.g.visible = true; egg.g.position.set(spot.x, spot.y, spot.z); }
+  function respawnEgg(egg) {                             // the same kind of egg turns up again somewhere else, away from you
+    const t = EGG_TIERS[egg.tier], used = eggs.filter((e) => e !== egg && e.tier === egg.tier).map((e) => e.spot);
+    const open = t.spots.filter((s) => !used.includes(s) && s !== egg.spot);
+    let free = open.filter((s) => Math.hypot(s.x - p.x, s.z - p.z) > 40);
+    if (!free.length) free = open.filter((s) => Math.hypot(s.x - p.x, s.z - p.z) > 5);
+    if (!free.length) free = open;
+    placeEgg(egg, free[Math.floor(Math.random() * free.length)] || egg.spot);
+  }
+
+  /* A dragon, built the same way as the concept pictures. The body is one mesh; the wings are two more, so they can flap. */
+  const dragonGeos = {};
+  function dragonGeo(kind) {
+    if (dragonGeos[kind]) return dragonGeos[kind];
+    const c = DRAGON_KINDS[kind], body = [], wings = [[], []], O = M4(), HORN = 0xf6efe0, EYE_W = 0xffffff, EYE_D = 0x1d2a2e, PI4 = Math.PI / 4;
+    const J = (m, x, y, z, rx, ry, rz) => m.clone().multiply(xf(x, y, z, 1, 1, 1, rx || 0, ry || 0, rz || 0));
+    const B = (list, m, w, h, d, color, x, y, z, rx, ry, rz) => list.push({ g: new THREE.BoxGeometry(w, h, d), color, m: J(m, x, y, z, rx, ry, rz), jitter: 0.05 });
+    B(body, O, 0.7, 0.6, 1.0, c.body, 0, 0.75, 0);
+    B(body, O, 0.56, 0.1, 0.84, c.belly, 0, 0.44, 0);
+    B(body, O, 0.5, 0.42, 0.06, c.belly, 0, 0.74, -0.51);
+    [[-0.25, -0.32], [0.25, -0.32], [-0.25, 0.32], [0.25, 0.32]].forEach(([x, z]) => { const j = J(O, x, 0.55, z); B(body, j, 0.22, 0.5, 0.24, c.dark, 0, -0.25, 0); B(body, j, 0.24, 0.06, 0.08, HORN, 0, -0.47, -0.14); });
+    const neck = J(O, 0, 0.92, -0.42), head = J(neck, 0, 0.48, -0.18);
+    B(body, neck, 0.34, 0.5, 0.32, c.body, 0, 0.18, -0.05, -0.35); B(body, neck, 0.26, 0.42, 0.04, c.belly, 0, 0.16, -0.22, -0.35);
+    B(body, head, 0.56, 0.48, 0.52, c.body, 0, 0.06, 0);
+    B(body, head, 0.4, 0.26, 0.3, c.body, 0, -0.04, -0.38);                  // snout
+    B(body, head, 0.36, 0.06, 0.28, c.belly, 0, -0.18, -0.36);               // chin
+    [-0.1, 0.1].forEach((x) => B(body, head, 0.06, 0.05, 0.03, c.dark, x, 0.03, -0.535));
+    [-0.17, 0.17].forEach((x) => { B(body, head, 0.16, 0.18, 0.04, EYE_W, x, 0.13, -0.27); B(body, head, 0.08, 0.12, 0.03, EYE_D, x + (x < 0 ? 0.02 : -0.02), 0.12, -0.295); });
+    [-0.18, 0.18].forEach((x) => B(body, head, 0.08, 0.28, 0.08, HORN, x, 0.38, 0.1, 0.5, 0, x < 0 ? 0.25 : -0.25));
+    [-0.12, 0.12].forEach((x) => B(body, head, 0.04, 0.07, 0.04, HORN, x, -0.2, -0.47));   // little teeth
+    [[-0.12, 1.0, 0.17], [-0.38, 1.05, 0.15], [0.12, 1.08, 0.15], [0.36, 1.08, 0.13]].forEach(([z, y, s]) => B(body, O, 0.06, s, s, c.spike, 0, y, z, PI4));
+    B(body, neck, 0.06, 0.12, 0.12, c.spike, 0, 0.3, 0.12, PI4);
+    B(body, head, 0.06, 0.12, 0.12, c.spike, 0, 0.32, 0.18, PI4);
+    let t = J(O, 0, 0.78, 0.5);                                              // tail: thinner blocks, bending up at the end
+    [[0.4, 0.36, 0.4, 0.25], [0.3, 0.28, 0.38, 0.3], [0.22, 0.2, 0.36, 0.25], [0.14, 0.14, 0.32, -0.3]].forEach(([w, h, d, bend]) => {
+      t = J(t, 0, 0, 0, bend); B(body, t, w, h, d, c.body, 0, 0, d / 2); B(body, t, 0.05, h * 0.5, h * 0.5, c.spike, 0, h / 2 + 0.03, d / 2, PI4); t = J(t, 0, 0, d - 0.02);
+    });
+    B(body, t, 0.06, 0.26, 0.26, c.spike, 0, 0, 0.12, PI4);                  // the spade at the tip
+    [-1, 1].forEach((s, i) => {                                             // wings, measured from the shoulder
+      B(wings[i], O, 0.9, 0.08, 0.08, c.dark, 0.45 * s, 0, 0);
+      B(wings[i], O, 0.86, 0.04, 0.42, c.wing, 0.45 * s, -0.02, 0.24);
+      B(wings[i], O, 0.6, 0.04, 0.3, c.wing2, 0.42 * s, -0.03, 0.55);
+      B(wings[i], O, 0.08, 0.06, 0.46, c.dark, 0.88 * s, 0, 0.2);
+    });
+    if (c.gem) {                                                             // gem dragons: little bright gems stuck on their scales
+      let seed = 7; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      for (let i = 0; i < 40; i++) {
+        const side = r(), sz = 0.035 + r() * 0.05, col = i % 3 ? 0xffffff : c.gem;
+        if (side < 0.45) B(body, O, sz, sz, sz, col, (r() - 0.5) * 0.66, 0.5 + r() * 0.52, -0.36 - r() * 0.15, PI4, 0, PI4);
+        else if (side < 0.8) B(body, O, sz, sz, sz, col, (r() < 0.5 ? -1 : 1) * 0.36, 0.5 + r() * 0.5, (r() - 0.5) * 0.9, PI4, 0, PI4);
+        else B(body, head, sz, sz, sz, col, (r() < 0.5 ? -1 : 1) * 0.29, -0.1 + r() * 0.3, -0.2 + r() * 0.4, PI4, 0, PI4);
+      }
+    }
+    return (dragonGeos[kind] = { body: merge(body), wings: wings.map(merge) });
+  }
+  function makeDragon(kind) {
+    const c = DRAGON_KINDS[kind], geo = dragonGeo(kind), mat = c.gem ? gemMat : c.metal ? metalMat : plantMat;
+    const root = new THREE.Group(), wings = [];
+    root.add(new THREE.Mesh(geo.body, mat));
+    [-1, 1].forEach((s, i) => { const w = new THREE.Mesh(geo.wings[i], mat); w.position.set(0.32 * s, 1.0, -0.12); w.rotation.set(0, -0.35 * s, 0.6 * s); root.add(w); wings.push(w); });
+    const stars = c.gem ? [[-0.55, 1.5, -0.2, 0.8], [0.6, 1.25, 0.1, 0.65], [-0.2, 1.85, 0.3, 0.5], [0.5, 0.55, -0.5, 0.55]].map(([x, y, z, k]) => twinkle(root, x, y, z, k)) : [];
+    root.scale.set(0.75, 0.75, 0.75);
+    scene.add(root);
+    return { kind, root, wings, stars, flap: 0 };
+  }
+  function flapWings(d, speed, amount, time) {
+    d.flap = Math.sin(time * speed) * amount;
+    d.wings.forEach((w, i) => { w.rotation.z = (i ? 0.6 : -0.6) + (i ? d.flap : -d.flap); });
+  }
+
+  /* Your plot. Points on it are measured in the plot's own frame: lz points away from the middle of town. */
+  let myPlot = -1;
+  const ownDragons = [], plotPets = [], flyers = [];
+  const PLOT_HALF = PLOT / 2 - 0.4;
+  function plotLocal(i, x, z) { const q = plots[i], dx = x - q.x, dz = z - q.z; return { lx: dx * Math.sin(q.phi) - dz * Math.cos(q.phi), lz: dx * Math.cos(q.phi) + dz * Math.sin(q.phi) }; }
+  function plotWorld(i, lx, lz) { const q = plots[i]; return { x: q.x + lx * Math.sin(q.phi) + lz * Math.cos(q.phi), z: q.z - lx * Math.cos(q.phi) + lz * Math.sin(q.phi) }; }
+  function plotAt(x, z) {
+    for (let i = 0; i < plots.length; i++) { const l = plotLocal(i, x, z); if (Math.abs(l.lx) < PLOT_HALF && Math.abs(l.lz) < PLOT_HALF) return i; }
+    return -1;
+  }
+  const tierOf = (kind) => EGG_TIERS.findIndex((t) => t.hatch.some((h) => h[0] === kind));
+  function addPet(kind, pop) {
+    const d = makeDragon(kind), at = { lx: (Math.random() - 0.5) * 6, lz: (Math.random() - 0.5) * 6 };
+    Object.assign(d, at, { tx: at.lx, tz: at.lz, wait: Math.random() * 2, speed: 1 + tierOf(kind) * 0.5, pop: pop ? 0 : 1, phase: Math.random() * 6 });
+    plotPets.push(d);
+  }
+  try {                                                  // what this device remembers
+    const sp = localStorage.getItem('mutation-mayhem-plot');
+    if (sp !== null && sp !== '' && +sp >= 0 && +sp < plots.length) myPlot = +sp;
+    (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k) => { if (DRAGON_KINDS[k]) ownDragons.push(k); });
+  } catch (e) { /* nothing saved, start fresh */ }
+  if (myPlot >= 0) ownDragons.slice(-24).forEach((k) => addPet(k, false));
+  function saveProgress() {
+    try { localStorage.setItem('mutation-mayhem-plot', String(myPlot)); localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons)); } catch (e) { /* not saved, still playable */ }
+  }
+
+  /* Messages, and the countdown while you carry an egg. */
+  const toastEl = $('toast'), carryEl = $('carry'), carryText = $('carryText'), carryDot = $('carryDot');
+  let toastT = 0, nagT = 0;
+  function toast(msg, secs) { toastEl.textContent = msg; toastEl.hidden = false; toastT = secs || 4.5; }
+  const carryMeshes = EGG_TIERS.map((t, i) => { const m = new THREE.Mesh(eggGeo[i], eggMat(i)); m.position.set(0, 2.2, -0.05); m.scale.set(0.6, 0.6, 0.6); m.visible = false; avatar.add(m); return m; });
+  let carrying = null, hatching = null;
+  const clock = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+  function pickUp(egg) {
+    const t = EGG_TIERS[egg.tier], home = plots[myPlot], total = Math.round(t.base + Math.hypot(egg.spot.x - home.x, egg.spot.z - home.z) * EXTRA_PER_UNIT);
+    egg.taken = true; egg.g.visible = false;
+    carrying = { egg, left: total, total, shown: -1 };
+    carryMeshes[egg.tier].visible = true;
+    carryDot.style.background = '#' + (t.shell || t.swirl[0]).toString(16).padStart(6, '0');
+    carryEl.hidden = false; carryEl.classList.remove('low');
+    toast('You found a ' + t.name + ' egg! Get it home to Plot ' + (myPlot + 1) + ' before it hatches.');
+  }
+  function stopCarrying() {
+    if (!carrying) return null;
+    const egg = carrying.egg;
+    carryMeshes[egg.tier].visible = false; carryEl.hidden = true; carrying = null;
+    return egg;
+  }
+  function pickDragon(tier) {
+    const list = EGG_TIERS[tier].hatch, sum = list.reduce((a, h) => a + h[1], 0);
+    let r = Math.random() * sum;
+    for (const [kind, w] of list) { r -= w; if (r < 0) return kind; }
+    return list[list.length - 1][0];
+  }
+  function hatchAtHome() {                                // the egg wobbles on your plot, then out pops a dragon
+    const egg = stopCarrying(), m = new THREE.Mesh(eggGeo[egg.tier], eggMat(egg.tier)), c = plotWorld(myPlot, 0, 0);
+    m.position.set(c.x, HUB.h + 0.1, c.z); scene.add(m);
+    hatching = { mesh: m, tier: egg.tier, t: 0 };
+    toast('Home in time! The egg is hatching...', 2);
+    respawnEgg(egg);
+  }
+  function hatchTooSoon() {                               // out of time: it hatches where you are, and the baby flies off
+    const egg = stopCarrying(), kind = pickDragon(egg.tier), d = makeDragon(kind);
+    const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);   // it flies off ahead of you, where you can see it go
+    d.root.position.set(p.x + fx * 1.5, p.y + 1.2, p.z + fz * 1.5); d.root.rotation.y = p.yaw;
+    flyers.push(Object.assign(d, { t: 0, dx: fx, dz: fz }));
+    toast('Too late! The egg hatched and a ' + DRAGON_KINDS[kind].name + ' dragon flew away.', 5);
+    respawnEgg(egg);
+  }
+  function dropEgg() {                                    // leaving the game: the egg goes back where it was
+    const egg = stopCarrying();
+    if (egg) placeEgg(egg, egg.spot);
+  }
+  function jumpTo(i) {
+    if (carrying) { toast('You can\'t jump to places while carrying an egg. Run!', 3); return; }
+    goTo(i);
+  }
+
+  /* Every frame while playing: claim a plot, pick up eggs, count down, and hatch at home. */
+  function eggsPlay(dt) {
+    if (!started) return;
+    if (myPlot < 0 && !p.dungeon) {
+      const i = plotAt(p.x, p.z);
+      if (i >= 0) { myPlot = i; saveProgress(); toast('Plot ' + (i + 1) + ' is yours! Find eggs around the island and bring them here to hatch.', 6); }
+    }
+    nagT -= dt;
+    if (!carrying) {
+      for (const egg of eggs) {
+        if (egg.taken || !!egg.spot.dungeon !== p.dungeon || Math.abs(p.y - egg.spot.y) > 2.2 || Math.hypot(p.x - egg.spot.x, p.z - egg.spot.z) > 1.4) continue;
+        if (myPlot < 0) { if (nagT <= 0) { toast('Claim a plot first: walk onto any plot in town. Then come back for this egg!', 5); nagT = 6; } break; }
+        pickUp(egg); break;
+      }
+      return;
+    }
+    carrying.left -= dt;
+    if (!p.dungeon && plotAt(p.x, p.z) === myPlot) { hatchAtHome(); return; }
+    if (carrying.left <= 0) { hatchTooSoon(); return; }
+    const s = Math.ceil(carrying.left);
+    if (s !== carrying.shown) {
+      carrying.shown = s;
+      carryText.textContent = EGG_TIERS[carrying.egg.tier].name + ' egg: get it home! ' + clock(s);
+      if (s <= 10) carryEl.classList.add('low');
+    }
+  }
+  /* Every frame, playing or not: eggs bob and sparkle, dragons on your plot wander, babies fly away. */
+  function eggsAnimate(dt, time) {
+    if (toastT > 0) { toastT -= dt; if (toastT <= 0) toastEl.hidden = true; }
+    const tw = (s, k) => { const v = reduced ? 1 : 0.55 + 0.45 * Math.sin(time * 4 + k); s.scale.set(v, v, v); };
+    for (const egg of eggs) {
+      if (!egg.g.visible) continue;
+      egg.g.rotation.y = reduced ? 0 : time * 0.6 + egg.phase;
+      egg.body.position.y = reduced ? 0.05 : 0.1 + Math.sin(time * 2 + egg.phase) * 0.08;
+      egg.stars.forEach(tw);
+    }
+    if (hatching) {
+      hatching.t += dt;
+      hatching.mesh.rotation.z = reduced ? 0 : Math.sin(hatching.t * 22) * 0.12 * Math.min(1, hatching.t);
+      if (hatching.t > 1.6) {
+        scene.remove(hatching.mesh);
+        const kind = pickDragon(hatching.tier);
+        ownDragons.push(kind); saveProgress(); addPet(kind, true);
+        toast('You hatched a ' + DRAGON_KINDS[kind].name + ' dragon! (' + EGG_TIERS[hatching.tier].name + ')', 5);
+        hatching = null;
+      }
+    }
+    for (const d of plotPets) {                          // wander about the plot; rarer dragons walk faster
+      if (myPlot < 0) break;
+      let moving = false;
+      if (d.wait > 0) d.wait -= dt;
+      else {
+        const dx = d.tx - d.lx, dz = d.tz - d.lz, dist = Math.hypot(dx, dz);
+        if (dist < 0.1) { d.wait = 1 + Math.random() * 3; d.tx = (Math.random() - 0.5) * 2 * (PLOT_HALF - 1); d.tz = (Math.random() - 0.5) * 2 * (PLOT_HALF - 1); }
+        else {
+          const st = Math.min(dist, d.speed * dt), q = plots[myPlot];
+          d.lx += dx / dist * st; d.lz += dz / dist * st; moving = true;
+          d.heading = Math.atan2(-(dx * Math.sin(q.phi) + dz * Math.cos(q.phi)), -(-dx * Math.cos(q.phi) + dz * Math.sin(q.phi)));   // face the way it walks
+        }
+      }
+      const w = plotWorld(myPlot, d.lx, d.lz);
+      if (d.heading !== undefined) d.root.rotation.y = d.heading;
+      d.pop = Math.min(1, d.pop + dt * 2.5);
+      const sc = 0.75 * (d.pop < 1 ? 0.3 + 0.7 * d.pop + Math.sin(d.pop * Math.PI) * 0.25 : 1);
+      d.root.scale.set(sc, sc, sc);
+      d.root.position.set(w.x, HUB.h + 0.1 + (moving && !reduced ? Math.abs(Math.sin(time * 9 + d.phase)) * 0.06 : 0), w.z);
+      flapWings(d, 2, reduced ? 0 : 0.12, time + d.phase);
+      d.stars.forEach(tw);
+    }
+    for (let i = flyers.length - 1; i >= 0; i--) {       // up, away, and gone
+      const d = flyers[i];
+      d.t += dt;
+      d.root.position.set(d.root.position.x + d.dx * 5 * dt, d.root.position.y + (1.5 + d.t * 2.5) * dt, d.root.position.z + d.dz * 5 * dt);
+      flapWings(d, 16, reduced ? 0 : 0.7, time);
+      d.stars.forEach(tw);
+      if (d.t > 4) { scene.remove(d.root); flyers.splice(i, 1); }
+    }
+  }
+
   /* ---------- The avatar shop (the blue stall) ---------- */
   const BLUE = shops[1], shopOut = { x: Math.cos(BLUE.phi), z: Math.sin(BLUE.phi) };          // which way the stall faces
   const shopFront = { x: BLUE.x + shopOut.x * 4.2, z: BLUE.z + shopOut.z * 4.2 };              // where a customer stands
@@ -2088,6 +2453,7 @@ const World = (function () {
   function leave() {
     if (!started) return;
     closeShop(); shopBtn.hidden = true; avatar.visible = false;
+    dropEgg(); toastEl.hidden = true;
     started = false; isAdmin = false;
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
@@ -2110,7 +2476,7 @@ const World = (function () {
     if (!started) { if (e.code === 'Enter' || e.key === 'Enter') start(document.body.classList.contains('touch')); return; }
     if (shopping) { if (e.code === 'Escape') closeShop(); return; }           // the shop's own buttons take the keys
     if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openShop(); return; }
-    if (e.code.startsWith('Digit')) { goTo(+e.code.slice(5) - 1); return; }
+    if (e.code.startsWith('Digit')) { jumpTo(+e.code.slice(5) - 1); return; }
     keys.add(e.code);
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   });
@@ -2168,7 +2534,7 @@ const World = (function () {
     b.type = 'button';
     const k = document.createElement('span'); k.className = 'num'; k.textContent = String(i + 1);
     b.appendChild(k); b.appendChild(document.createTextNode(pl.name));
-    b.addEventListener('click', () => { if (!started) start(document.body.classList.contains('touch')); goTo(i); b.blur(); });
+    b.addEventListener('click', () => { if (!started) start(document.body.classList.contains('touch')); jumpTo(i); b.blur(); });
     placeBox.appendChild(b);
   });
 
@@ -2219,6 +2585,7 @@ const World = (function () {
     const bob = reduced ? 0 : Math.sin(bobT) * (swimming ? 0.09 : 0.045) + (swimming ? Math.sin(time * 1.6) * 0.06 : 0);
     camY += (p.y + EYE - camY) * Math.min(1, dt * 16);
     walking = moving && p.onGround;
+    eggsPlay(dt);
     placeCamera(dt, bob);
   }
   /* The camera follows behind the avatar outdoors. In the cave and the dungeon, where there is no
@@ -2243,6 +2610,7 @@ const World = (function () {
     if (walking) stepT += dt * (running ? 14 : 9.5);
     const sw = reduced ? 0 : Math.sin(stepT) * 0.75 * stride;
     legL.rotation.x = sw; legR.rotation.x = -sw; armL.rotation.x = -sw * 0.8; armR.rotation.x = sw * 0.8;
+    if (carrying) armL.rotation.x = armR.rotation.x = -2.95;         // holding the egg up over your head
   }
 
   /* ---------- HUD: where you are, and the minimap ---------- */
@@ -2267,7 +2635,7 @@ const World = (function () {
   function showZone() {
     const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : '';
     if (tip !== hint) { hint = tip; hintEl.textContent = tip; }
-    const atShop = started && !shopping && !p.dungeon && !p.inCave && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6;
+    const atShop = started && !shopping && !carrying && !p.dungeon && !p.inCave && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6;
     if (shopBtn.hidden === atShop) shopBtn.hidden = !atShop;      // the "open the shop" button shows only at the blue stall
     const z = zoneName();
     if (z === zone) return;
@@ -2297,6 +2665,11 @@ const World = (function () {
     mapCtx.drawImage(mapBase, 0, 0, size, size);
     mapCtx.fillStyle = 'rgba(255,255,255,0.9)';
     places.forEach((pl) => { mapCtx.beginPath(); mapCtx.arc(toMap(pl.x, size), toMap(pl.z, size), size * 0.014, 0, 6.3); mapCtx.fill(); });
+    if (myPlot >= 0) {                                    // your plot: a yellow square
+      const q = plots[myPlot], r = size * 0.03;
+      mapCtx.fillStyle = '#ffd23f'; mapCtx.strokeStyle = '#0d2f37'; mapCtx.lineWidth = size * 0.012;
+      mapCtx.fillRect(toMap(q.x, size) - r, toMap(q.z, size) - r, r * 2, r * 2); mapCtx.strokeRect(toMap(q.x, size) - r, toMap(q.z, size) - r, r * 2, r * 2);
+    }
     mapCtx.save();
     mapCtx.translate(toMap(p.x, size), toMap(p.z, size));
     mapCtx.rotate(Math.atan2(-Math.cos(p.yaw), -Math.sin(p.yaw)));
@@ -2341,13 +2714,15 @@ const World = (function () {
     if (!reduced) flameMat.color.setScalar(0.86 + 0.14 * Math.sin(time * 11) * Math.sin(time * 6.3));   // torches flicker
     clouds.rotation.y += dt * 0.004;
     keeperPose(dt, time);
+    eggsAnimate(dt, time);
     if (frame % 3 === 0) drawMap();
     if (frame % 10 === 0) showZone();
     frame++;
     renderer.render(scene, camera);
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
-    AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons };
+    AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate };
   requestAnimationFrame(tick);
 })();
 </script>

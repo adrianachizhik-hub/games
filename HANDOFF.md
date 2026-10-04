@@ -48,7 +48,17 @@ Players hatch dragons from eggs. Each egg tier hatches one of two colours. Every
 | Mythic (name not confirmed) | shiny gold, twinkles | gold or ruby |
 | Prismatic (name not confirmed) | swirly rainbow, twinkles | diamond or jade |
 
-Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scales and twinkle stars around them. Still open: where eggs come from, how hatching works, the odds of each colour, and the names of the top two tiers.
+Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scales and twinkle stars around them. Prismatic hatches diamond 60%, jade 40% ("jade is last in order, so a little rarer"); every other egg is 50/50.
+
+**Built (section "Dragon eggs" in `index.html`):**
+- The first plot you walk onto in town becomes yours (yellow square on the minimap). Only one plot per player for now.
+- Eggs are hidden around the island, rarer ones in harder places: Common on beaches and meadows (6 out at once), Rare deep in the jungle and desert (4), Legendary high in the mountains near the peak (3), Mythic inside the crystal cave (2), Prismatic down in the mine (1). Spots are picked once from their own random stream (`W.rng(4142)`), so plants did not move. A collected egg turns up again somewhere else, away from you.
+- Walk into an egg to carry it (held over your head, countdown at the bottom). Time = the tier's `base` seconds (30, 24, 20, 17, 15) plus 1 second per 7 units from the egg to your plot. Adriana's "rarer dragons are faster" was read as "rarer eggs hatch sooner"; she has not confirmed this.
+- Bring it into your plot: it wobbles and hatches, and the dragon lives on your plot and wanders about (rarer ones walk faster). Run out of time: it hatches where you are and the baby flies away.
+- No jumping to places (1 to 8 or the buttons) while carrying, and the avatar shop button hides (the shop would pause the clock). Leave puts a carried egg back.
+- The harness checks all of this, and runs from every hiding place to the plot to show each can be reached and brought home in time.
+
+Still open: the names of the top two tiers (Mythic and Prismatic are placeholders), whether dragons should follow you, and the starter dog, cat and parrot.
 
 ### The build order we agreed on
 
@@ -175,17 +185,18 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 ### Saved on the device (`localStorage`)
 - `mutation-mayhem-name`: the player's display name.
 - `mutation-mayhem-avatar`: the `AV` object as JSON.
+- `mutation-mayhem-plot`: the index (0 to 6) of the plot you claimed.
+- `mutation-mayhem-dragons`: the dragons you have hatched, as a JSON list of colour names.
 
 ## 8. What is not built, and open questions
 
 **Not built**
-- Pets of any kind: choosing a starter, pets following you, pets living on plots.
-- Claiming a plot.
+- The starter pets (dog, cat, parrot) and pets following you. Dragons from eggs do live on your plot (see "Dragons and eggs").
 - The red, green, and yellow shops. Their purposes are undecided, though one is presumably the pet shop.
 - Coins, prices, buying.
 - Mutation blocks, mutations, rarities.
 - Any admin command.
-- Saving game progress (only the name and avatar are saved).
+- Saving coins and other progress (the name, avatar, plot and dragons are saved).
 - Multiplayer. This needs a server, in every version of the plan.
 - App Store packaging.
 
