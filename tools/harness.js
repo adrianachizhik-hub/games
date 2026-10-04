@@ -90,7 +90,11 @@ const document = { getElementById: (id) => els[id] || (els[id] = el(id)), create
 let raf = null;
 const wl = {};
 const window = { THREE, matchMedia: () => ({ matches: false }), addEventListener(n, f) { (wl[n] = wl[n] || []).push(f); }, fire(n, e) { (wl[n] || []).forEach((f) => f(e)); }, innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1 };
-const sandbox = { window, document, THREE, performance: { now: () => 0 }, requestAnimationFrame: (f) => { raf = f; }, console, Math, Float32Array, Uint8Array, Uint16Array, Uint8ClampedArray, Map, Set, Infinity };
+// SAVED=1: a device that has played before, with a claimed plot and some dragons already saved.
+// Without it the device starts fresh, and at the very end the harness runs itself again with SAVED=1.
+const store = process.env.SAVED !== '1' ? {} : { 'mutation-mayhem-plot': '2', 'mutation-mayhem-dragons': JSON.stringify(['green', 'ruby', 'blue']) };
+const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+const sandbox = { localStorage, window, document, THREE, performance: { now: () => 0 }, requestAnimationFrame: (f) => { raf = f; }, console, Math, Float32Array, Uint8Array, Uint16Array, Uint8ClampedArray, Map, Set, Infinity };
 vm.createContext(sandbox);
 vm.runInContext(worldSrc + '\nthis.World = World;', sandbox);
 vm.runInContext(renderSrc, sandbox);
@@ -284,6 +288,15 @@ I.keeper.armR.rotation.z = 2.4; o = []; flat(K, new Matrix4(), o); shots.push({ 
 fs.writeFileSync('avatar.json', JSON.stringify(shots));
 console.log('figures dumped:', shots.length);
 
+// ---- a device that has played before: saved plot and dragons come back, and you can ride one ----
+if (process.env.SAVED === '1') {
+  console.log('saved progress: plot', I.myPlot() + 1, '| dragons', JSON.stringify(I.ownDragons), '| on the plot', I.plotPets.map((d) => d.kind).join(','));
+  if (I.myPlot() !== 2 || I.plotPets.length !== 3) throw new Error('saved plot or dragons did not come back');
+  els.start.fire('click', ev({ pointerType: 'mouse' })); I.goTo(7); I.mount(I.plotPets[1]); I.update(1 / 60, 0); raf(30000); raf(30016);
+  console.log('ride a saved dragon: riding', I.riding().kind);
+  I.dismount(true); process.exit(0);
+}
+
 // ---- dragon eggs: claim a plot, find eggs, carry them home, hatch ----
 const E = I.EGG_TIERS, said = () => JSON.stringify(els.toast.hidden ? '' : els.toast.textContent);
 const tick = (secs) => { for (let f = 0; f < secs * 60; f++) { I.update(1 / 60, f / 60); I.eggsAnimate(1 / 60, f / 60); } };
@@ -378,3 +391,62 @@ if (!I.admin() && !els.radar.hidden) throw new Error('radar shown to a non-admin
 if (I.admin() && els.radar.hidden) throw new Error('radar not shown to an admin');
 els.leave.fire('click', ev({ detail: 1 })); raf(9100); raf(9116); raf(9132);
 console.log('after Leave: radar on', I.radarOn(), '| button', JSON.stringify(radarBtn.textContent), '| label shown', !els.radar.hidden);
+
+// ---- riding dragons ----
+{
+els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear();
+const frameN = (n = 1) => { for (let k = 0; k < n; k++) { I.update(1 / 60, 0); I.eggsAnimate(1 / 60, 0); } };
+const screenOf = (x, y, z) => {                        // where a point shows on screen: the click maths run backwards
+  const o = I.camera.position, t = Math.tan(70 * Math.PI / 360), W0 = 1280, H0 = 720;
+  let dx = x - o.x, dy = y - o.y, dz = z - o.z;
+  const cy = Math.cos(I.p.yaw), sy = Math.sin(I.p.yaw), cp = Math.cos(I.p.pitch), sp = Math.sin(I.p.pitch);
+  [dx, dz] = [dx * cy - dz * sy, dx * sy + dz * cy];
+  [dy, dz] = [dy * cp + dz * sp, -dy * sp + dz * cp];
+  return { x: (dx / -dz / (t * W0 / H0) + 1) / 2 * W0, y: (1 - dy / -dz / t) / 2 * H0 };
+};
+const click = (pt) => { els.view.fire('pointerdown', ev({ pointerType: 'mouse', pointerId: 5, clientX: pt.x, clientY: pt.y })); els.view.fire('pointerup', ev({ pointerType: 'mouse', pointerId: 5, clientX: pt.x, clientY: pt.y })); };
+const tapJump = () => { window.fire('keydown', ev({ code: 'Space' })); frameN(1); window.fire('keyup', ev({ code: 'Space' })); frameN(1); };
+I.goTo(7); const at = I.plotWorld(I.myPlot(), 0, -4); I.p.x = at.x; I.p.z = at.z; I.p.pitch = -0.3; frameN(2);
+const pet = I.plotPets.find((d) => !d.homing);
+I.p.yaw = Math.atan2(-(pet.root.position.x - I.p.x), -(pet.root.position.z - I.p.z)); I.update(1 / 60, 0);
+console.log('on my plot with', I.plotPets.length, 'dragons | hint', JSON.stringify(els.hint.textContent || '(updates every 10 frames)'));
+click({ x: 30, y: 30 }); console.log('click the sky                : riding', !!I.riding());
+const sp0 = screenOf(pet.root.position.x, pet.root.position.y + 0.6, pet.root.position.z);
+click(sp0); console.log('click the', pet.kind.padEnd(7), 'dragon     : riding', I.riding() && I.riding().kind, '| clicked at', sp0.x.toFixed(0), sp0.y.toFixed(0), '| message', said());
+const rd = I.riding(), rsp = rd && screenOf(rd.root.position.x, rd.root.position.y + 0.6, rd.root.position.z);
+if (!rd) throw new Error('clicking the dragon did not mount it');   // (another dragon standing in front gets it instead, which is fine)
+const pet2 = rd;
+let x0 = I.p.x, z0 = I.p.z; I.keys.add('KeyW'); frameN(60); I.keys.clear(); raf(20000); raf(20016);
+console.log('ride forward 1 s             : moved', Math.hypot(I.p.x - x0, I.p.z - z0).toFixed(1), '(walking does 9.5) | dragon under me', Math.hypot(pet2.root.position.x - I.p.x, pet2.root.position.z - I.p.z) < 1e-6, '| sitting', (I.avatar.position.y - I.p.y).toFixed(2), 'above it | dragon size', I.riding().root.scale.x.toFixed(2));
+tapJump(); frameN(40);
+console.log('jump once                    : riding', !!I.riding(), '| flying', I.flying(), '| dragon flying home', !!pet2.homing);
+if (I.riding()) throw new Error('one jump should get you off');
+I.p.x += 30; frameN(60 * 12);
+console.log('12 s later                   : dragon home', !pet2.homing && I.plotAt(pet2.root.position.x, pet2.root.position.z) === I.myPlot());
+I.goTo(7); I.p.x = at.x; I.p.z = at.z; frameN(2); I.mount(pet2);
+tapJump(); frameN(8); tapJump();
+console.log('jump twice                   : flying', I.flying(), '| riding', !!I.riding());
+if (!I.flying()) throw new Error('two jumps should take off');
+const y0 = I.p.y; window.fire('keydown', ev({ code: 'Space' })); frameN(180); window.fire('keyup', ev({ code: 'Space' }));
+console.log('hold jump 3 s                : climbed', (I.p.y - y0).toFixed(1), '| above ground', (I.p.y - W.bil(W.HT, I.p.x, I.p.z)).toFixed(1));
+x0 = I.p.x; z0 = I.p.z; I.keys.add('KeyW'); frameN(60); I.keys.clear();
+console.log('fly forward 1 s              : moved', Math.hypot(I.p.x - x0, I.p.z - z0).toFixed(1));
+tapJump(); console.log('one jump while flying        : still riding', !!I.riding(), '| flying', I.flying());
+let n2 = 0; while (I.flying() && n2++ < 60 * 40) frameN(1);
+console.log('let go and glide             : landed after', (n2 / 60).toFixed(1), 's | riding', !!I.riding(), '| on ground', I.p.onGround);
+tapJump(); frameN(40); console.log('jump once on the ground      : riding', !!I.riding());
+// too far away, the cave, and jumping to a place
+I.goTo(7); frameN(2); pet2.homing = false; const far = I.plotPets[0]; I.p.x = far.root.position.x + 14; I.p.z = far.root.position.z; I.p.y = 6.3;
+I.p.yaw = Math.atan2(-(far.root.position.x - I.p.x), -(far.root.position.z - I.p.z)); I.p.pitch = -0.2; I.update(1 / 60, 0);
+click(screenOf(far.root.position.x, far.root.position.y + 0.6, far.root.position.z)); console.log('click a dragon 14 away       : riding', !!I.riding(), '| message', said());
+I.mount(far); I.p.inCave = true; I.p.inLid = true; frameN(1); console.log('ride into the cave           : riding', !!I.riding(), '| message', said()); I.p.inCave = I.p.inLid = false;
+I.goTo(7); frameN(1); I.mount(far); window.fire('keydown', ev({ code: 'Digit1' })); window.fire('keyup', ev({ code: 'Digit1' }));
+console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.zoneName(), '| dragon back on its plot', I.plotAt(far.root.position.x, far.root.position.z) === I.myPlot() || far.lx === 0);
+}
+
+// ---- and once more, as a device with saved progress ----
+if (process.env.SAVED !== '1') {
+  const r = require('child_process').spawnSync(process.execPath, [__filename, file], { env: Object.assign({}, process.env, { SAVED: '1' }), encoding: 'utf8' });
+  console.log('\n== again with saved progress ==\n' + r.stdout.split('\n').filter((l) => /saved progress|ride a saved/.test(l)).join('\n') + (r.status ? '\n' + r.stderr : ''));
+  if (r.status) process.exit(r.status);
+}

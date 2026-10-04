@@ -2220,6 +2220,7 @@ const World = (function () {
 
   /* Your plot. Points on it are measured in the plot's own frame: lz points away from the middle of town. */
   let myPlot = -1;
+  let riding = null, flying = false, tapT = 0, jumpWas = false, jumpTapped = false;   // riding (below); jumpTapped: a tap is kept even if it falls between two frames
   const ownDragons = [], plotPets = [], flyers = [];
   const PLOT_HALF = PLOT / 2 - 0.4;
   function plotLocal(i, x, z) { const q = plots[i], dx = x - q.x, dz = z - q.z; return { lx: dx * Math.sin(q.phi) - dz * Math.cos(q.phi), lz: dx * Math.cos(q.phi) + dz * Math.sin(q.phi) }; }
@@ -2233,6 +2234,8 @@ const World = (function () {
     const d = makeDragon(kind), at = { lx: (Math.random() - 0.5) * 6, lz: (Math.random() - 0.5) * 6 };
     Object.assign(d, at, { tx: at.lx, tz: at.lz, wait: Math.random() * 2, speed: 1 + tierOf(kind) * 0.5, pop: pop ? 0 : 1, phase: Math.random() * 6 });
     plotPets.push(d);
+    const extra = plotPets.findIndex((q) => q !== riding);   // only the newest 24 roam the plot, to keep the game quick
+    if (plotPets.length > 24 && extra >= 0) scene.remove(plotPets.splice(extra, 1)[0].root);
   }
   try {                                                  // what this device remembers
     const sp = localStorage.getItem('mutation-mayhem-plot');
@@ -2293,6 +2296,7 @@ const World = (function () {
   }
   function jumpTo(i) {
     if (carrying) { toast('You can\'t jump to places while carrying an egg. Run!', 3); return; }
+    if (riding) dismount(true);
     goTo(i);
   }
 
@@ -2345,6 +2349,17 @@ const World = (function () {
     }
     for (const d of plotPets) {                          // wander about the plot; rarer dragons walk faster
       if (myPlot < 0) break;
+      if (d.ridden) continue;
+      if (d.homing) {                                     // flying back to the plot after you got off
+        const c = plotWorld(myPlot, 0, 0), rp = d.root.position, dx = c.x - rp.x, dz = c.z - rp.z, dist = Math.hypot(dx, dz);
+        const cruise = Math.max(W.bil(HT, rp.x, rp.z), 0) + 7, aim = dist < 8 ? HUB.h + 0.1 : Math.max(cruise, HUB.h + 6);
+        const st = Math.min(dist, 12 * dt);
+        rp.set(rp.x + (dist > 0 ? dx / dist * st : 0), rp.y + Math.max(-6 * dt, Math.min(8 * dt, aim - rp.y)), rp.z + (dist > 0 ? dz / dist * st : 0));
+        if (dist > 0.3) { d.heading = Math.atan2(-dx, -dz); d.root.rotation.y = d.heading; }
+        flapWings(d, 9, reduced ? 0 : 0.55, time);
+        if (dist < 0.3 && Math.abs(rp.y - HUB.h - 0.1) < 0.05) { d.homing = false; d.lx = d.lz = d.tx = d.tz = 0; d.wait = 1; }
+        continue;
+      }
       let moving = false;
       if (d.wait > 0) d.wait -= dt;
       else {
@@ -2373,6 +2388,95 @@ const World = (function () {
       d.stars.forEach(tw);
       if (d.t > 4) { scene.remove(d.root); flyers.splice(i, 1); }
     }
+  }
+
+  /* ---------- Riding your dragons ---------- */
+  /* Click or tap one of your dragons to climb on. It walks where you steer, faster than running
+     (rarer dragons are faster). Jump twice quickly to take off; while flying, hold Jump to climb and
+     let go to glide down. Jump once on the ground to hop off: the dragon then flies home to your plot.
+     Dragons are too big for the cave, so riding stops at its mouth. */
+  const RIDE_REACH = 10, RIDE_SIZE = 1.45;              // how close you must be to climb on, and how big it grows to carry you
+  const rideSpeed = (run) => { const t = tierOf(riding.kind); return flying ? (18 + t * 3) * (run ? 1.4 : 1) : (12 + t * 1.5) * (run ? 1.45 : 1); };
+  function mount(d) {
+    riding = d; d.ridden = true; d.homing = false; flying = false; tapT = 0;
+    p.x = d.root.position.x; p.z = d.root.position.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true;
+    if (d.heading !== undefined) p.yaw = d.heading;
+    toast('You\'re riding your ' + DRAGON_KINDS[d.kind].name + ' dragon! Jump twice to fly. Jump once to get off.', 5);
+  }
+  function dismount(home) {                              // home: put it straight back on the plot, with no flight
+    const d = riding;
+    if (!d) return;
+    riding = null; flying = false; tapT = 0; d.ridden = false; d.rideScale = 0; d.root.scale.set(0.75, 0.75, 0.75);   // back to pet size
+    const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);   // step off to the right
+    if (!home) { p.x += rx * 1.4; p.z += rz * 1.4; pushOut(); settle(); p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true; }
+    const onPlot = myPlot >= 0 && plotAt(d.root.position.x, d.root.position.z) === myPlot;
+    if (home || onPlot) {
+      const l = onPlot && !home ? plotLocal(myPlot, d.root.position.x, d.root.position.z) : { lx: 0, lz: 0 };
+      d.lx = l.lx; d.lz = l.lz; d.tx = l.lx; d.tz = l.lz; d.wait = 1;
+    } else d.homing = true;                              // fly back to the plot by itself
+  }
+  /* What did the click or tap land on? A ray from the camera through that point, tested against each dragon. */
+  function clickAt(cx, cy) {
+    if (!started || shopping || riding || myPlot < 0) return;
+    const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight, t = Math.tan(camera.fov ? camera.fov * Math.PI / 360 : 0.61);
+    let dx = (cx / w * 2 - 1) * t * (w / h), dy = (1 - cy / h * 2) * t, dz = -1;
+    const cp = Math.cos(p.pitch), sp = Math.sin(p.pitch), cyw = Math.cos(p.yaw), syw = Math.sin(p.yaw);
+    [dy, dz] = [dy * cp - dz * sp, dy * sp + dz * cp];   // tilt by the pitch, then turn by the yaw (the camera turns YXZ)
+    [dx, dz] = [dx * cyw + dz * syw, -dx * syw + dz * cyw];
+    const len = Math.hypot(dx, dy, dz), o = camera.position;
+    let best = null, bt = Infinity;
+    for (const d of plotPets) {
+      if (d.homing) continue;
+      const ox = d.root.position.x - o.x, oy = d.root.position.y + 0.6 - o.y, oz = d.root.position.z - o.z;
+      const along = (ox * dx + oy * dy + oz * dz) / len, miss = ox * ox + oy * oy + oz * oz - along * along;
+      if (along > 0 && miss < 0.9 * 0.9 && along < bt) { bt = along; best = d; }
+    }
+    if (!best) return;
+    if (Math.hypot(best.root.position.x - p.x, best.root.position.z - p.z) > RIDE_REACH) { toast('Walk closer to your dragon to ride it.', 3); return; }
+    mount(best);
+  }
+  const presses = new Map();                              // a click or tap is a press that hardly moved
+  canvas.addEventListener('pointerdown', (e) => presses.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() }));
+  canvas.addEventListener('pointerup', (e) => {
+    const q = presses.get(e.pointerId);
+    presses.delete(e.pointerId);
+    if (!q || e.pointerId === joy.id) return;            // not the walking circle
+    if (Math.hypot(e.clientX - q.x, e.clientY - q.y) < 10 && performance.now() - q.t < 500) clickAt(e.clientX, e.clientY);
+  });
+  /* Jumping while riding: a second jump soon after the first takes off; a single jump gets off. */
+  function rideJump(dt, down, pressed) {
+    if (flying) return;
+    if (pressed) {
+      if (tapT > 0) { flying = true; tapT = 0; p.vy = 6; p.onGround = false; return; }
+      tapT = 0.35;
+      if (p.onGround) { p.vy = 7; p.onGround = false; }   // the dragon hops
+    }
+    if (tapT > 0) { tapT -= dt; if (tapT <= 0 && !flying) dismount(false); }
+  }
+  function flyStep(dt, down) {                             // hold Jump to climb, let go to glide down
+    p.vy += ((down ? 9 : -3) - p.vy) * Math.min(1, dt * 4);
+    p.y = Math.min(130, p.y + p.vy * dt);
+    const g = standing(p.x, p.z);
+    if (p.y <= g) { p.y = g; p.vy = 0; flying = false; p.onGround = true; }
+  }
+  function poseRider(dt) {                               // sit the avatar on the dragon's back, and move the dragon with you
+    const d = riding;
+    if (!d) { legL.rotation.z = legR.rotation.z = 0; return; }
+    d.rideScale = Math.min(RIDE_SIZE, (d.rideScale || 0.75) + dt * 2);   // it grows to riding size when you climb on
+    d.root.scale.set(d.rideScale, d.rideScale, d.rideScale);
+    avatar.position.y = p.y + d.rideScale - 0.78;                         // sit on its back
+    legL.rotation.set(-0.35, 0, -0.6); legR.rotation.set(-0.35, 0, 0.6);   // legs either side
+    armL.rotation.x = armR.rotation.x = carrying ? -2.95 : -0.8;
+    d.root.position.set(p.x, p.y + (walking && !flying && !reduced ? Math.abs(Math.sin(stepT * 0.7)) * 0.06 : 0), p.z);
+    d.root.rotation.y = p.yaw; d.heading = p.yaw;
+    rideT += dt;
+    flapWings(d, flying ? 9 : 2, reduced ? 0 : flying ? 0.55 : 0.12, rideT);
+  }
+  let rideT = 0;
+  function rideHint() {
+    if (riding) return flying ? 'Hold Jump to fly higher. Land to get off.' : 'Jump twice to fly. Jump once to get off.';
+    if (myPlot >= 0 && plotPets.length && plotAt(p.x, p.z) === myPlot) return (document.body.classList.contains('touch') ? 'Tap' : 'Click') + ' a dragon to ride it';
+    return '';
   }
 
   /* ---------- The avatar shop (the blue stall) ---------- */
@@ -2504,7 +2608,7 @@ const World = (function () {
   function leave() {
     if (!started) return;
     closeShop(); shopBtn.hidden = true; avatar.visible = false;
-    dropEgg(); toastEl.hidden = true;
+    dropEgg(); dismount(true); toastEl.hidden = true;
     started = false; isAdmin = false; setRadar(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
@@ -2528,6 +2632,7 @@ const World = (function () {
     if (shopping) { if (e.code === 'Escape') closeShop(); return; }           // the shop's own buttons take the keys
     if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openShop(); return; }
     if (e.code.startsWith('Digit')) { jumpTo(+e.code.slice(5) - 1); return; }
+    if (e.code === 'Space' && !e.repeat) jumpTapped = true;
     keys.add(e.code);
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   });
@@ -2576,7 +2681,7 @@ const World = (function () {
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  jumpBtn.addEventListener('pointerdown', (e) => { touchJump = true; e.preventDefault(); });
+  jumpBtn.addEventListener('pointerdown', (e) => { touchJump = true; jumpTapped = true; e.preventDefault(); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach((n) => jumpBtn.addEventListener(n, () => { touchJump = false; }));
 
   const placeBox = $('places');
@@ -2606,20 +2711,25 @@ const World = (function () {
     if (mag > 0.05) {
       const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.93;
       running = run;
-      const sp = (run ? 17 : 9.5) * (swimming ? 0.6 : 1) * Math.min(1, mag) * dt / mag;
+      const sp = (riding ? rideSpeed(run) : run ? 17 : 9.5) * (swimming ? 0.6 : 1) * Math.min(1, mag) * dt / mag;
       const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
       const dx = (fx * f + rx * s) * sp, dz = (fz * f + rz * s) * sp;
       if (p.dungeon) { climbing = dungeonMove(dx, dz); moving = true; }
       else {
         if (tryMove(dx, dz)) moving = true;
         else { const a = tryMove(dx, 0), b = tryMove(0, dz); moving = a || b; }
-        if (!p.inCave) { pushOut(); settle(); }
+        if (!p.inCave) { if (!(flying && p.y - standing(p.x, p.z) > 2.5)) pushOut(); settle(); }   // high up on a dragon, trees can't reach you
       }
     }
     if (!p.dungeon && p.inCave && Math.hypot(p.x - DG.x, p.z - DG.z) < 1.9) enterDungeon();   // into the pond, and through it
-    if ((keys.has('Space') || touchJump) && p.onGround) { p.vy = 10; p.onGround = false; }
+    if (riding && (p.inCave || p.dungeon)) { dismount(false); toast('Dragons are too big for the cave! Yours flew home.', 4); }
+    const jumpDown = keys.has('Space') || touchJump, jumpPress = jumpTapped || (jumpDown && !jumpWas);
+    jumpWas = jumpDown; jumpTapped = false;
+    if (riding) rideJump(dt, jumpDown, jumpPress);
+    else if ((jumpDown || jumpPress) && p.onGround) { p.vy = 10; p.onGround = false; }
     const g = p.dungeon ? DG.floor : standing(p.x, p.z);
-    if (climbing) {                                       // up the ladder
+    if (flying) flyStep(dt, jumpDown);
+    else if (climbing) {                                       // up the ladder
       p.vy = 0; p.onGround = false; p.y += 5.5 * dt;
       if (p.y > DG.top - 1.9) leaveDungeon();
     } else if (p.onGround && p.y - g < 0.8) { p.y = g; p.vy = 0; }
@@ -2634,7 +2744,7 @@ const World = (function () {
     }
     if (moving && p.onGround && !reduced) bobT += dt * (swimming ? 5 : 11);
     const bob = reduced ? 0 : Math.sin(bobT) * (swimming ? 0.09 : 0.045) + (swimming ? Math.sin(time * 1.6) * 0.06 : 0);
-    camY += (p.y + EYE - camY) * Math.min(1, dt * 16);
+    camY += (p.y + EYE + (riding ? 1.3 : 0) - camY) * Math.min(1, dt * 16);
     walking = moving && p.onGround;
     eggsPlay(dt);
     placeCamera(dt, bob);
@@ -2642,7 +2752,7 @@ const World = (function () {
   /* The camera follows behind the avatar outdoors. In the cave and the dungeon, where there is no
      room behind you, it slides forward into the avatar's head and you see through its eyes. */
   function placeCamera(dt, bob) {
-    camD += ((p.inCave || p.dungeon ? 0 : CAM_BACK) - camD) * Math.min(1, dt * 5);
+    camD += ((p.inCave || p.dungeon ? 0 : riding ? CAM_BACK + 2.3 : CAM_BACK) - camD) * Math.min(1, dt * 5);
     avatar.visible = camD > 1.3;
     if (camD < 0.05) { camera.position.set(p.x, camY + bob, p.z); return; }
     const cp = Math.cos(p.pitch), vx = -Math.sin(p.yaw) * cp, vy = Math.sin(p.pitch), vz = -Math.cos(p.yaw) * cp;   // the way the view points
@@ -2662,6 +2772,7 @@ const World = (function () {
     const sw = reduced ? 0 : Math.sin(stepT) * 0.75 * stride;
     legL.rotation.x = sw; legR.rotation.x = -sw; armL.rotation.x = -sw * 0.8; armR.rotation.x = sw * 0.8;
     if (carrying) armL.rotation.x = armR.rotation.x = -2.95;         // holding the egg up over your head
+    poseRider(dt);
   }
 
   /* ---------- HUD: where you are, and the minimap ---------- */
@@ -2684,9 +2795,9 @@ const World = (function () {
   const hintEl = $('hint');
   let hint = '';
   function showZone() {
-    const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : '';
+    const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : started ? rideHint() : '';
     if (tip !== hint) { hint = tip; hintEl.textContent = tip; }
-    const atShop = started && !shopping && !carrying && !p.dungeon && !p.inCave && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6;
+    const atShop = started && !shopping && !carrying && !riding && !p.dungeon && !p.inCave && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6;
     if (shopBtn.hidden === atShop) shopBtn.hidden = !atShop;      // the "open the shop" button shows only at the blue stall
     const z = zoneName();
     if (z === zone) return;
@@ -2788,7 +2899,8 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg };
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg,
+    riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();
 </script>

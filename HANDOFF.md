@@ -58,6 +58,8 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 - No jumping to places (1 to 8 or the buttons) while carrying, and the avatar shop button hides (the shop would pause the clock). Leave puts a carried egg back.
 - The harness checks all of this, and runs from every hiding place to the plot to show each can be reached and brought home in time.
 
+**Riding (section "Riding your dragons"):** click or tap one of your dragons (within 10 units) to climb on; it grows to riding size (`RIDE_SIZE`). It walks where you steer, faster than running, rarer ones faster. Jump twice quickly (within 0.35 s) to take off; while flying, hold Jump to climb and let go to glide down. One jump on the ground gets you off, and the dragon flies home to your plot. Riding stops at the cave (too big). Jumping to a place or Leave sends it straight home. Jump taps are remembered between frames (`jumpTapped`) so quick double-taps work on slow devices. Only your 24 newest dragons roam the plot; all are saved.
+
 Still open: the names of the top two tiers (Mythic and Prismatic are placeholders), whether dragons should follow you, and the starter dog, cat and parrot.
 
 ### The build order we agreed on
@@ -228,6 +230,8 @@ ADMIN_NAME=... ADMIN_CODE=... MODE=admin node tools/harness.js index.html
 ```
 
 It walks through every place, falls into the dungeon, wanders it, climbs out, tests every key, the touch controls, sign-in, the admin panel, Leave, the camera, and the avatar shop. It throws on the first error. It also writes `new-map.json`, `town.json`, and `avatar.json`, which are shape dumps that can be drawn as pictures. Do not commit those three files.
+
+The harness plays on a fresh device, then runs itself again with `SAVED=1` as a device that already has a plot and dragons saved: code that runs while the page loads must not touch anything declared further down (a `riding` check in `addPet` broke loading once).
 
 When you add a feature, extend the harness to cover it. If you add a DOM method or a three.js class the page did not use before, the fake needs it too.
 
