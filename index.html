@@ -570,6 +570,44 @@
     user-select: text;
   }
   #name::placeholder, #code::placeholder { color: rgba(13, 47, 55, 0.6); }
+  /* "Are you sure this is your name?" the first time a name is used */
+  #confirm {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgba(13, 47, 55, 0.6);
+  }
+  #confirm[hidden] { display: none; }
+  #confirm .card {
+    width: min(100%, 24rem);
+    padding: 22px 22px 24px;
+    text-align: center;
+    color: var(--edge);
+    background: #fff8e6;
+    border: 4px solid var(--edge);
+    border-radius: 20px;
+    box-shadow: 0 7px 0 var(--edge);
+  }
+  #confirmQ { margin: 0; font-size: 1.35rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+  #confirm .warn { margin: 8px 0 0; font-size: 1.05rem; color: #b8392a; font-weight: 600; }
+  #confirm .row { display: flex; gap: 12px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+  #confirm button {
+    font: inherit;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--edge);
+    border: 4px solid var(--edge);
+    border-radius: 16px;
+    padding: 9px 22px;
+    box-shadow: 0 5px 0 var(--edge);
+    cursor: pointer;
+  }
+  #confirmBack { background: #fff; }
+  #confirmSure { background: #ffd23f; }
+  #confirm button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--edge); }
+  #confirm button:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
   #code { background: #ffe58a; }            /* the admin code box, only shown for the admin name */
   @media (max-height: 470px) {              /* a phone held sideways: tighten everything so the cover fits */
     .cover { padding-top: 4px; }
@@ -665,6 +703,13 @@
     <div class="grow"></div>
     <p class="how for-mouse">Use the arrow keys or W A S D: up walks forward, left and right turn. Space jumps, Shift runs.</p>
     <p class="how for-touch">Use the circle in the bottom left to walk and the Jump button in the bottom right to jump. Drag anywhere else to look around.</p>
+  </div>
+</div>
+<div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirmQ" hidden>
+  <div class="card">
+    <p id="confirmQ">Are you sure <b id="confirmName"></b> is your name?</p>
+    <p class="warn">You can't change it later.</p>
+    <div class="row"><button id="confirmBack" type="button">Back</button><button id="confirmSure" type="button">I'm sure</button></div>
   </div>
 </div>
 <div id="fail" hidden>
@@ -2043,7 +2088,16 @@ const World = (function () {
   /* The player's name, typed on the front cover and remembered on this device. */
   const nameEl = $('name');
   let playerName = 'Player';
-  try { const saved = localStorage.getItem('mutation-mayhem-name'); if (saved) nameEl.value = saved.slice(0, 16); } catch (e) { /* no storage: just start blank */ }
+  /* The first time someone plays with a name, they're asked if they're sure; after that the name is theirs for good.
+     (Leaving the name empty plays as "Player" and locks nothing. The admin name is never locked.) */
+  let lockedName = '';
+  try {
+    const saved = localStorage.getItem('mutation-mayhem-name');
+    if (saved) nameEl.value = saved.slice(0, 16);
+    if (saved && localStorage.getItem('mutation-mayhem-name-locked') === '1') lockedName = saved.slice(0, 16);
+  } catch (e) { /* no storage: just start blank */ }
+  const confirmEl = $('confirm');
+  let confirmTouch = false;
   /* Admins. One special name asks for a code, and the right code starts the game as an admin.
      The name and code are kept here only as scrambled numbers, so they can't be read straight
      off this page. That hides them from a quick look; it is not real security. Before admins
@@ -2593,9 +2647,23 @@ const World = (function () {
     for (const egg of eggs) { if (egg.taken) continue; const d = Math.hypot(egg.spot.x - p.x, egg.spot.z - p.z); if (d < bd) { bd = d; best = egg; } }
     return best && { egg: best, dist: bd };
   }
-  function start(fromTouch) {
-    if (started) return;
+  function start(fromTouch, sure) {
+    if (started || (!confirmEl.hidden && !sure)) return;   // still waiting for an answer to "are you sure?"
     const typed = typedName();
+    if (!isAdminName()) {
+      if (lockedName && typed.toLowerCase() !== lockedName.toLowerCase()) {
+        nameEl.value = lockedName;
+        codeMsg.textContent = 'Your name is ' + lockedName + '. Names can\'t be changed.'; codeMsg.hidden = false;
+        return;
+      }
+      if (!lockedName && typed && !sure) {                 // the first time: ask before it sticks
+        $('confirmName').textContent = typed; confirmTouch = fromTouch;
+        confirmEl.hidden = false; codeMsg.hidden = true;
+        $('confirmBack').focus();
+        return;
+      }
+    }
+    confirmEl.hidden = true;
     if (isAdminName()) {
       if (scramble(typed.toLowerCase() + '#' + codeEl.value.trim()) !== ADMIN_KEY) {
         codeMsg.textContent = codeEl.value ? 'That code is not right. Try again.' : 'Type the admin code to play.';
@@ -2606,13 +2674,17 @@ const World = (function () {
     }
     started = true;
     playerName = (isAdmin ? typed.charAt(0).toUpperCase() + typed.split('@')[0].slice(1) : typed) || 'Player';   // an admin shows as the part before the @
+    if (!isAdmin && lockedName) playerName = lockedName;   // the name as it was first chosen
     const who = $('who');
     who.textContent = playerName;
     nameMyPlot();
     adminEl.hidden = !isAdmin;                            // only admins get the arrow
     if (isAdmin) setRadar(true);                          // admins start with the egg radar on
     if (isAdmin) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Admin'; who.appendChild(badge); }
-    try { localStorage.setItem('mutation-mayhem-name', playerName === 'Player' ? '' : playerName); } catch (e) { /* not saved, still playable */ }
+    try {
+      if (!(isAdmin && lockedName)) localStorage.setItem('mutation-mayhem-name', playerName === 'Player' ? '' : playerName);   // an admin never replaces a locked name
+      if (!isAdmin && sure && playerName !== 'Player') { localStorage.setItem('mutation-mayhem-name-locked', '1'); lockedName = playerName; }
+    } catch (e) { if (!isAdmin && sure && playerName !== 'Player') lockedName = playerName; }
     nameEl.blur();
     intro.hidden = true;
     blink();                                              // fade from the cover's flying view down to the beach
@@ -2621,6 +2693,8 @@ const World = (function () {
     canvas.focus();
   }
   $('start').addEventListener('click', (e) => start(e.pointerType === 'touch' || document.body.classList.contains('touch')));
+  $('confirmSure').addEventListener('click', () => start(confirmTouch, true));
+  $('confirmBack').addEventListener('click', () => { confirmEl.hidden = true; nameEl.focus(); });
   /* Leave: back to the front cover. The next Play starts fresh on the beach, and an admin has to sign in again. */
   function leave() {
     if (!started) return;
@@ -2645,7 +2719,11 @@ const World = (function () {
 
   window.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (!started) { if (e.code === 'Enter' || e.key === 'Enter') start(document.body.classList.contains('touch')); return; }
+    if (!started) {
+      if (!confirmEl.hidden) { if (e.code === 'Escape') { confirmEl.hidden = true; nameEl.focus(); } return; }   // its buttons take Enter
+      if (e.code === 'Enter' || e.key === 'Enter') { e.preventDefault(); start(document.body.classList.contains('touch')); }   // preventDefault: the same Enter must not also press the question's Back button
+      return;
+    }
     if (shopping) { if (e.code === 'Escape') closeShop(); return; }           // the shop's own buttons take the keys
     if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openShop(); return; }
     if (e.code.startsWith('Digit')) { jumpTo(+e.code.slice(5) - 1); return; }

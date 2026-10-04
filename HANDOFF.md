@@ -187,6 +187,7 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 
 ### Saved on the device (`localStorage`)
 - `mutation-mayhem-name`: the player's display name.
+- `mutation-mayhem-name-locked`: `'1'` once the player answered "I'm sure" to "Are you sure <name> is your name? You can't change it later." (asked the first time a name is used, Back or I'm sure). After that the name box is filled in and any other name is refused with "Your name is X. Names can't be changed." (capitals don't matter). An empty name plays as "Player" and locks nothing. The admin name skips the question, is never locked, and never replaces a locked name. Clearing the site's data in the browser is the only way to unlock, which Adriana has not been told how to do.
 - `mutation-mayhem-avatar`: the `AV` object as JSON.
 - `mutation-mayhem-plot`: the index (0 to 6) of the plot you claimed.
 - `mutation-mayhem-dragons`: the dragons you have hatched, as a JSON list of colour names.

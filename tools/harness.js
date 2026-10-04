@@ -122,7 +122,7 @@ const AN = process.env.ADMIN_NAME || '', AC = process.env.ADMIN_CODE || '';
 let MODE = process.env.MODE || 'other';
 if (MODE !== 'other' && !(AN && AC)) { console.log('ADMIN_NAME and ADMIN_CODE are not set: skipping the admin sign-in checks'); MODE = 'other'; }
 const flip = (s) => s.replace(/[a-z]/gi, (c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase())), st = () => 'started ' + document.body.classList.contains('playing') + ' | admin ' + I.admin() + ' | name ' + JSON.stringify(I.name()) + ' | tag ' + JSON.stringify(document.getElementById('who').textContent) + ' badge ' + JSON.stringify((document.getElementById('who').children[0] || {}).textContent) + ' | code box hidden ' + els.code.hidden + ' | message ' + JSON.stringify(els.codeMsg.hidden ? '' : els.codeMsg.textContent);
-els.code.hidden = true; els.codeMsg.hidden = true; els.admin.hidden = true;
+els.code.hidden = true; els.codeMsg.hidden = true; els.admin.hidden = true; document.getElementById("confirm").hidden = true;   // hidden in the markup, as in the page
 if (MODE === 'admin') {
   els.name.value = AN.slice(0, -1); els.name.fire('input', ev({})); console.log('typing, one letter short :', st());
   els.name.value = flip(AN); els.name.fire('input', ev({})); console.log('admin name typed         :', st());
@@ -135,7 +135,14 @@ if (MODE === 'admin') {
   els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('Play with the plain name  :', st());
 } else {
   els.name.value = '  Sam   the  Great and Powerful '; els.name.fire('input', ev({})); els.code.value = '1234';
-  els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('Play as someone else     :', st());
+  els.start.fire('click', ev({ pointerType: 'mouse' }));
+  console.log('Play, first time         : started', document.body.classList.contains('playing'), '| "are you sure" shown', !els.confirm.hidden, '| asks about', JSON.stringify(document.getElementById('confirmName').textContent));
+  if (els.confirm.hidden || document.body.classList.contains('playing')) throw new Error('should ask before using a new name');
+  window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); console.log('Enter while asked        : started', document.body.classList.contains('playing'));
+  document.getElementById('confirmBack').fire('click', ev({})); console.log('Back                     : started', document.body.classList.contains('playing'), '| question shown', !els.confirm.hidden, '| name box', JSON.stringify(els.name.value));
+  els.start.fire('click', ev({ pointerType: 'mouse' })); document.getElementById('confirmSure').fire('click', ev({}));
+  console.log('Play, I\'m sure          :', st(), '| name locked', store['mutation-mayhem-name-locked'] === '1', 'as', JSON.stringify(store['mutation-mayhem-name']));
+  if (!document.body.classList.contains('playing') || store['mutation-mayhem-name-locked'] !== '1') throw new Error('I\'m sure should start and lock the name');
 }
 function moved(setup, frames = 60) { I.goTo(6); I.p.yaw = 0; const x0 = I.p.x, z0 = I.p.z; setup(); for (let f = 0; f < frames; f++) I.update(1 / 60, f / 60); return { dx: +(I.p.x - x0).toFixed(1), dz: +(I.p.z - z0).toFixed(1), turned: +(I.p.yaw).toFixed(2), air: !I.p.onGround }; }
 for (const combo of [['ArrowUp'], ['ArrowDown'], ['ArrowLeft'], ['ArrowRight'], ['ArrowUp', 'ArrowLeft'], ['ArrowUp', 'ArrowRight'], ['KeyW'], ['KeyA'], ['KeyD'], ['KeyS'], ['KeyQ'], ['KeyE'], ['Space']]) {
@@ -218,7 +225,11 @@ I.p.dungeon = true; I.p.y = DG.floor; I.p.x = DG.x; I.p.z = DG.z + 5; window.fir
 console.log('before leaving :', S());
 els.leave.fire('click', ev({ detail: 1 })); console.log('after Leave    :', S(), '| keys held', I.keys.size, '| panel open', els.admin.classList.contains('open'));
 const x0 = I.p.x; raf(5000); raf(5016); console.log('on the cover the player stays put:', (I.p.x === x0), '| camera looks at', JSON.stringify(allCams[0].lookedAt));
-els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('Play again     :', S());
+els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('Play again     :', S(), '| asked again', !els.confirm.hidden);
+els.leave.fire('click', ev({ detail: 1 })); els.name.value = 'Somebody Else'; els.name.fire('input', ev({})); els.start.fire('click', ev({ pointerType: 'mouse' }));
+console.log('try another name: started', document.body.classList.contains('playing'), '| name box put back to', JSON.stringify(els.name.value), '| message', JSON.stringify(els.codeMsg.hidden ? '' : els.codeMsg.textContent), '| asked', !els.confirm.hidden);
+if (document.body.classList.contains('playing')) throw new Error('a locked name was changed');
+els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('Play with own name again:', S());
 
 // ---- third-person camera and the avatar ----
 const cam = I.camera, dist = () => Math.hypot(cam.position.x - I.p.x, cam.position.z - I.p.z);
