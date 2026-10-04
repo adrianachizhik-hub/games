@@ -368,6 +368,10 @@ if (!radarBtn) throw new Error('no egg radar button');
 I.goTo(6); tick(0.1);
 const near = I.nearestEgg(); let brute = Infinity; I.eggs.forEach((e) => { if (!e.taken) brute = Math.min(brute, Math.hypot(e.spot.x - I.p.x, e.spot.z - I.p.z)); });
 console.log('nearest egg from the Meadow:', I.EGG_TIERS[near.egg.tier].name, near.dist.toFixed(1), '| checked against every egg', Math.abs(near.dist - brute) < 1e-9);
+raf(8900); raf(8916); raf(8932);
+console.log('just signed in (admin ' + I.admin() + '): radar on', I.radarOn(), '| label shown', !els.radar.hidden);
+if (I.radarOn() !== I.admin()) throw new Error('the radar should start on for admins only');
+if (I.admin()) { radarBtn.fire('click', ev({ detail: 1 })); raf(8950); raf(8966); console.log('admin switches it off: label shown', !els.radar.hidden); if (!els.radar.hidden) throw new Error('radar label still shown'); }
 radarBtn.fire('click', ev({ detail: 1 })); raf(9000); raf(9016); raf(9032); raf(9048);
 console.log('radar button clicked (admin ' + I.admin() + '): button', JSON.stringify(radarBtn.textContent), '| label shown', !els.radar.hidden, '| label', JSON.stringify(els.radar.textContent));
 if (!I.admin() && !els.radar.hidden) throw new Error('radar shown to a non-admin');

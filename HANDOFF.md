@@ -165,7 +165,7 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 ### Admin panel
 - Admins get a yellow arrow tab on the right edge under the minimap. It slides a panel in ("Admin commands").
 - New commands go inside `#adminCommands` as buttons; the "No commands yet" note hides itself when that element has children.
-- **Egg radar** (asked for on 4 October 2026, the first command): a button that turns on and off. While on, the minimap draws a dashed line to the nearest egg with a pulsing ring on it, and a yellow label under the minimap says which kind it is, how far, and "in the cave" or "in the mine". It turns off on Leave. To test admin features without the real name and code, run the harness on a copy of `index.html` where `start()` sets `isAdmin = true`; never commit that copy.
+- **Egg radar** (asked for on 4 October 2026, the first command): a button that turns on and off. While on, the minimap draws a dashed line to the nearest egg with a pulsing ring on it, and a yellow label under the minimap says which kind it is, how far, and "in the cave" or "in the mine". It switches on by itself when an admin signs in, and off on Leave. To test admin features without the real name and code, run the harness on a copy of `index.html` where `start()` sets `isAdmin = true`; never commit that copy.
 
 ### Playing
 - **Camera:** behind the avatar outdoors (`CAM_BACK = 5.2`). In the cave and dungeon it slides into the avatar's head (first person), because there is no room behind you. It is kept above the ground and the sea.

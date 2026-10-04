@@ -2489,6 +2489,7 @@ const World = (function () {
     const who = $('who');
     who.textContent = playerName;
     adminEl.hidden = !isAdmin;                            // only admins get the arrow
+    if (isAdmin) setRadar(true);                          // admins start with the egg radar on
     if (isAdmin) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Admin'; who.appendChild(badge); }
     try { localStorage.setItem('mutation-mayhem-name', playerName === 'Player' ? '' : playerName); } catch (e) { /* not saved, still playable */ }
     nameEl.blur();
