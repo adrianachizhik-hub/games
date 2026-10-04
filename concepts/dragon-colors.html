@@ -9,11 +9,13 @@ const sun = new THREE.DirectionalLight(0xfff2dc, 0.7); sun.position.set(-4, 8, -
 const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
 const block = (parent, mat, w, h, d, x, y, z, rx, ry, rz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); parent.add(m); return m; };
 const joint = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), lam(0xf3dca0)); ground.rotation.x = -Math.PI / 2; scene.add(ground);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), lam(0xc9b48a)); ground.rotation.x = -Math.PI / 2; scene.add(ground);
 
 /* One dragon. "c" is its colours: body, dark (legs, wing bones), belly, spike, wing, wing2. */
 function makeDragon(c) {
-  const G = lam(c.body), DG = lam(c.dark), BELLY = lam(c.belly), SPIKE = lam(c.spike), WING = lam(c.wing), WINGD = lam(c.wing2),
+  const shine = c.gem || c.metal, mk = (col) => shine ? new THREE.MeshPhongMaterial({ color: col, specular: c.gem ? 0xffffff : 0xfff0d0, shininess: c.gem ? 80 : 45,
+      emissive: new THREE.Color(col).multiplyScalar(c.gem ? 0.32 : 0.08) }) : lam(col);
+  const G = mk(c.body), DG = mk(c.dark), BELLY = mk(c.belly), SPIKE = mk(c.spike), WING = mk(c.wing), WINGD = mk(c.wing2),
         EYEW = lam(0xffffff), EYE = lam(0x1d2a2e), HORN = lam(0xf6efe0), NOSE = lam(c.dark);
   const dragon = new THREE.Group();
   block(dragon, G, 0.7, 0.6, 1.0, 0, 0.75, 0);
@@ -42,6 +44,23 @@ function makeDragon(c) {
     block(w, WINGD, 0.6, 0.04, 0.3, 0.42 * s, -0.03, 0.55);
     block(w, DG, 0.08, 0.06, 0.46, 0.88 * s, 0, 0.2);
   });
+  if (c.gem) {   // sparkles: little bright diamonds stuck on the scales
+    const SP = new THREE.MeshBasicMaterial({ color: 0xffffff }), SP2 = new THREE.MeshBasicMaterial({ color: c.glint });
+    let seed = 7; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 40; i++) {
+      const side = r(), sz = 0.035 + r() * 0.05, m = i % 3 ? SP : SP2;
+      if (side < 0.45) block(dragon, m, sz, sz, sz, (r() - 0.5) * 0.66, 0.5 + r() * 0.52, -0.36 - r() * 0.15 + (side < 0.2 ? 0 : 0) , Math.PI / 4, 0, Math.PI / 4);
+      else if (side < 0.8) block(dragon, m, sz, sz, sz, (r() < 0.5 ? -1 : 1) * 0.36, 0.5 + r() * 0.5, (r() - 0.5) * 0.9, Math.PI / 4, 0, Math.PI / 4);
+      else block(head, m, sz, sz, sz, (r() < 0.5 ? -1 : 1) * 0.29, -0.1 + r() * 0.3, -0.2 + r() * 0.4, Math.PI / 4, 0, Math.PI / 4);
+    }
+  }
+  if (c.gem) {
+    const ST = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    [[-0.55, 1.5, -0.2, 1], [0.6, 1.25, 0.1, 0.8], [-0.2, 1.85, 0.3, 0.6], [0.5, 0.55, -0.5, 0.7], [-0.6, 0.7, 0.4, 0.55]].forEach(([x, y, z, k]) => {
+      const st = joint(dragon, x, y, z); st.rotation.y = 1.0;   // face the camera
+      block(st, ST, 0.035 * k, 0.32 * k, 0.01, 0, 0, 0); block(st, ST, 0.32 * k, 0.035 * k, 0.01, 0, 0, 0); block(st, ST, 0.09 * k, 0.09 * k, 0.012, 0, 0, 0, 0, 0, Math.PI / 4);
+    });
+  }
   dragon.scale.setScalar(0.85);
   return dragon;
 }
@@ -59,11 +78,24 @@ const kinds = [
   { body: 0xd8433a, dark: 0xa02e27, belly: 0xf6c56b, spike: 0xf6c93b, wing: 0x3a2f33, wing2: 0x2a2226 },   // red
   { body: 0x8a5ad6, dark: 0x6440a8, belly: 0xf5c4e1, spike: 0x4fd1c5, wing: 0xef6fae, wing2: 0xcc4f90 },   // purple
   { body: 0x3f7fd6, dark: 0x2c5fa8, belly: 0xd6f0fa, spike: 0x7fe0f0, wing: 0xe9eef6, wing2: 0xc4ccd8 },   // blue
-  { body: 0xe8be45, dark: 0xb88d22, belly: 0xfff4d6, spike: 0xffffff, wing: 0x5bc0f0, wing2: 0x3a98d0 }    // gold (rare idea)
+  { metal: 1, body: 0xa8642c, dark: 0x6e421d, belly: 0xd9a066, spike: 0xf0c060, wing: 0x8a5426, wing2: 0x6a3e1a },   // bronze
+  { metal: 1, body: 0xaab4c2, dark: 0x6f7988, belly: 0xe2e8f0, spike: 0x5f8fd0, wing: 0x8f99a8, wing2: 0x737d8c },   // silver
+  { metal: 1, body: 0xe8be45, dark: 0xb88d22, belly: 0xfff4d6, spike: 0xffffff, wing: 0x5bc0f0, wing2: 0x3a98d0 }    // gold
 ];
-kinds.forEach((k, i) => { const d = makeDragon(k); d.position.set(4.0 - i * 2.0, 0, 0); d.rotation.y = -1.0; scene.add(d); });
-const egg = makeEgg(0xf3ead2, 0x3fae6a); egg.position.set(-6.0, 0, -0.3); scene.add(egg);
-const cam = new THREE.PerspectiveCamera(24, W / Hh, 0.1, 100); cam.position.set(-0.6, 3.6, -15.5); cam.lookAt(-0.9, 0.8, 0);
+const gems = [
+  { gem: 1, body: 0xe8115f, dark: 0xa80c48, belly: 0xff8fb3, spike: 0xffd0e0, wing: 0xff3b7f, wing2: 0xc81050, glint: 0xffb0cc },   // ruby
+  { gem: 1, body: 0xc6ecff, dark: 0x86c4ea, belly: 0xffffff, spike: 0x8fe8ff, wing: 0xbfe8ff, wing2: 0x8fd0f5, glint: 0x8fe8ff },   // diamond
+  { gem: 1, body: 0x00b874, dark: 0x008554, belly: 0xa8f0c8, spike: 0xe8fff2, wing: 0x3fe0a8, wing2: 0x18b880, glint: 0xc8ffe8 }    // jade
+];
+const SET = location.hash === '#gems' ? 'gems' : 'colors';
+if (SET === 'colors') {
+  kinds.forEach((k, i) => { const d = makeDragon(k); d.position.set(6.0 - i * 2.0, 0, 0); d.rotation.y = -1.0; scene.add(d); });
+  var cam = new THREE.PerspectiveCamera(24, W / Hh, 0.1, 100); cam.position.set(-0.4, 3.8, -16.5); cam.lookAt(-0.1, 0.75, 0);
+} else {
+  gems.forEach((k, i) => { const d = makeDragon(k); d.position.set(2.2 - i * 2.2, 0, 0); d.rotation.y = -0.9; scene.add(d); });
+  const egg = makeEgg(0xf3ead2, 0xe8115f); egg.position.set(-4.1, 0, -0.3); scene.add(egg);
+  var cam = new THREE.PerspectiveCamera(24, W / Hh, 0.1, 100); cam.position.set(-0.6, 3.0, -11.5); cam.lookAt(-0.9, 0.75, 0);
+}
 renderer.render(scene, cam);
 document.title = 'done';
 </script></body></html>
