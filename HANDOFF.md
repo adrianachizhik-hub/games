@@ -51,14 +51,14 @@ Players hatch dragons from eggs. Each egg tier hatches one of two colours. Every
 Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scales and twinkle stars around them. Prismatic hatches diamond 60%, jade 40% ("jade is last in order, so a little rarer"); every other egg is 50/50.
 
 **Built (section "Dragon eggs" in `index.html`):**
-- The first plot you walk onto in town becomes yours (yellow square on the minimap). Only one plot per player for now.
+- The first plot you walk onto in town becomes yours (yellow square on the minimap), and its sign is repainted as "<name>'s Plot" (`paintSign`, `nameMyPlot`; long names shrink and split onto two lines). Only one plot per player for now.
 - Eggs are hidden around the island, rarer ones in harder places: Common on beaches and meadows (6 out at once), Rare deep in the jungle and desert (4), Legendary high in the mountains near the peak (3), Mythic inside the crystal cave (2), Prismatic down in the mine (1). Spots are picked once from their own random stream (`W.rng(4142)`), so plants did not move. A collected egg turns up again somewhere else, away from you.
 - Walk into an egg to carry it (held over your head, countdown at the bottom). Time = the tier's `base` seconds (30, 24, 20, 17, 15) plus 1 second per 7 units from the egg to your plot. Adriana's "rarer dragons are faster" was read as "rarer eggs hatch sooner"; she has not confirmed this.
 - Bring it into your plot: it wobbles and hatches, and the dragon lives on your plot and wanders about (rarer ones walk faster). Run out of time: it hatches where you are and the baby flies away.
 - No jumping to places (1 to 8 or the buttons) while carrying, and the avatar shop button hides (the shop would pause the clock). Leave puts a carried egg back.
 - The harness checks all of this, and runs from every hiding place to the plot to show each can be reached and brought home in time.
 
-**Riding (section "Riding your dragons"):** click or tap one of your dragons (within 10 units) to climb on; it grows to riding size (`RIDE_SIZE`). It walks where you steer, faster than running, rarer ones faster. Jump twice quickly (within 0.35 s) to take off; while flying, hold Jump to climb and let go to glide down. One jump on the ground gets you off, and the dragon flies home to your plot. Riding stops at the cave (too big). Jumping to a place or Leave sends it straight home. Jump taps are remembered between frames (`jumpTapped`) so quick double-taps work on slow devices. Only your 24 newest dragons roam the plot; all are saved.
+**Riding (section "Riding your dragons"):** click or tap one of your dragons (within 10 units) to climb on; it grows to riding size (`RIDE_SIZE`). It walks where you steer, much faster than running (18 + 2 per tier on the ground, 30 + 5 per tier flying, Shift adds half again), rarer ones faster. Jump twice quickly (within 0.35 s) to take off; while flying, hold Jump to climb and let go to glide down. One jump on the ground gets you off, and the dragon flies home to your plot. Riding stops at the cave (too big). Jumping to a place or Leave sends it straight home. Jump taps are remembered between frames (`jumpTapped`) so quick double-taps work on slow devices. Only your 24 newest dragons roam the plot; all are saved.
 
 Still open: the names of the top two tiers (Mythic and Prismatic are placeholders), whether dragons should follow you, and the starter dog, cat and parrot.
 
@@ -206,7 +206,6 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 **Promised to her for later**
 - Once pets and coins exist, make sure progress is saved before Leave, or add a confirmation.
 - Add prices to the avatar shop when coins exist.
-- Use the player's name on their plot's sign.
 - The artifact link is still titled "Isla Verde". She was offered a rename to "Mutation Mayhem" and has not answered.
 
 **Questions only she can answer**

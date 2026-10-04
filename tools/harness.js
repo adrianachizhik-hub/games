@@ -75,7 +75,7 @@ const THREE = {
 };
 function ctx2d(canvas) {
   return { createRadialGradient: () => ({ addColorStop() {} }), createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
-    putImageData(img) { images.push(img); }, fillText(t) { (canvas.texts = canvas.texts || []).push(t); }, strokeRect() {}, drawImage() {}, setLineDash() {}, fillRect() {}, beginPath() {}, arc() {}, fill() {}, save() {}, translate() {}, rotate() {}, moveTo() {}, lineTo() {}, closePath() {}, stroke() {}, restore() {} };
+    putImageData(img) { images.push(img); }, fillText(t) { (canvas.texts = canvas.texts || []).push(t); }, measureText(t) { const m = /(\d+)px/.exec(this.font || ''); return { width: String(t).length * 0.55 * (m ? +m[1] : 30) }; }, strokeRect() {}, drawImage() {}, setLineDash() {}, fillRect() {}, beginPath() {}, arc() {}, fill() {}, save() {}, translate() {}, rotate() {}, moveTo() {}, lineTo() {}, closePath() {}, stroke() {}, restore() {} };
 }
 function el(id) {
   const cls = new Set();
@@ -293,7 +293,8 @@ if (process.env.SAVED === '1') {
   console.log('saved progress: plot', I.myPlot() + 1, '| dragons', JSON.stringify(I.ownDragons), '| on the plot', I.plotPets.map((d) => d.kind).join(','));
   if (I.myPlot() !== 2 || I.plotPets.length !== 3) throw new Error('saved plot or dragons did not come back');
   els.start.fire('click', ev({ pointerType: 'mouse' })); I.goTo(7); I.mount(I.plotPets[1]); I.update(1 / 60, 0); raf(30000); raf(30016);
-  console.log('ride a saved dragon: riding', I.riding().kind);
+  console.log('ride a saved dragon: riding', I.riding().kind, '| sign on the saved plot', JSON.stringify(I.signLabels[2]));
+  if (I.signLabels[2] !== I.name() + "'s Plot") throw new Error('saved plot sign not named');
   I.dismount(true); process.exit(0);
 }
 
@@ -312,6 +313,8 @@ if (I.carrying()) throw new Error('picked up an egg without a plot');
 I.goTo(7); const home = I.plotWorld(2, 0, 3); I.p.x = home.x; I.p.z = home.z; tick(0.2);
 console.log('walk onto Plot 3         : my plot', I.myPlot() + 1, '| message', said());
 if (I.myPlot() !== 2) throw new Error('plot not claimed');
+console.log('Plot 3 sign now says       :', JSON.stringify(I.signLabels[2]), '| Plot 4 still says', JSON.stringify(I.signLabels[3]));
+if (I.signLabels[2] !== I.name() + "'s Plot") throw new Error('the claimed plot does not show the owner name');
 const p4 = I.plotWorld(3, 0, 0); I.p.x = p4.x; I.p.z = p4.z; tick(0.2);
 console.log('walk onto Plot 4 as well : my plot still', I.myPlot() + 1);
 stand(common.spot); tick(0.1);

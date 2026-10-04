@@ -1354,6 +1354,28 @@ const World = (function () {
      local +z points away from the middle. Shops face outward, plots open inward. */
   const HUB = W.HUB, PLOT = 11, PLOT_R = 23.5, SHOP_R = 9;
   const plots = [], shops = [];
+  /* The sign labels live in one picture, 256 by 128 pixels each, four to a row: 0 to 6 the plots, 7 "Shop", 8 "Avatars".
+     A claimed plot's sign is painted again with its owner's name. Long labels shrink, then split onto two lines. */
+  const signCv = document.createElement('canvas'), signG = signCv.getContext('2d'), signLabels = [];
+  signCv.width = 1024; signCv.height = 384;
+  let signTex = null;
+  function paintSign(c, text) {
+    const x = (c % 4) * 256, y = Math.floor(c / 4) * 128, font = (px) => '600 ' + px + 'px "Trebuchet MS", "Segoe UI", sans-serif', fits = (t) => signG.measureText(t).width <= 236;
+    signLabels[c] = text;
+    signG.fillStyle = '#f3e6c0'; signG.fillRect(x, y, 256, 128);
+    signG.fillStyle = '#10343c'; signG.textAlign = 'center'; signG.textBaseline = 'middle';
+    let px = c === 8 ? 58 : 68;
+    signG.font = font(px);
+    while (px > 40 && !fits(text)) signG.font = font(px -= 2);
+    if (fits(text) || text.indexOf(' ') < 0) signG.fillText(text, x + 128, y + 68, 236);
+    else {                                               // two lines: everything but the last word, then the last word
+      const cut = text.lastIndexOf(' '), a = text.slice(0, cut), b = text.slice(cut + 1);
+      px = 54; signG.font = font(px);
+      while (px > 20 && !(fits(a) && fits(b))) signG.font = font(px -= 2);
+      signG.fillText(a, x + 128, y + 42, 236); signG.fillText(b, x + 128, y + 94, 236);
+    }
+    if (signTex) signTex.needsUpdate = true;
+  }
   (function buildTown() {
     const y0 = HUB.h, parts = [], signs = [];
     const frame = (cx, cz, phi) => M4().makeTranslation(cx, y0, cz).multiply(M4().makeRotationY(Math.PI / 2 - phi));
@@ -1391,7 +1413,7 @@ const World = (function () {
         box(F, 0.36, 1.3, 0.36, lx, 0.65, lz, POST);                     // corner posts
         const c = spot(cx, cz, phi, lx, lz); addCollider(c.x, c.z, 0.3);
       });
-      box(F, 0.16, 1.7, 0.16, 3.1, 0.85, -half - 0.9, POST);             // sign post beside the way in
+      box(F, 0.16, 1.3, 0.16, 3.1, 0.65, -half - 0.9, POST);             // sign post beside the way in, stopping under the board
       box(F, 1.9, 1, 0.14, 3.1, 1.75, -half - 0.9, POST);
       const sp = spot(cx, cz, phi, 3.1, -half - 0.98), cp = spot(cx, cz, phi, 3.1, -half - 0.9);
       signs.push({ x: sp.x, y: y0 + 1.75, z: sp.z, nx: -Math.cos(phi), nz: -Math.sin(phi), w: 1.7, h: 0.85, cell: i });
@@ -1400,15 +1422,8 @@ const World = (function () {
     }
     scene.add(new THREE.Mesh(merge(parts), plantMat));
 
-    /* The words on the signs: one small picture holding all eight labels. */
-    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 192;
-    const g = cv.getContext('2d');
-    g.fillStyle = '#f3e6c0'; g.fillRect(0, 0, 512, 192);
-    g.fillStyle = '#10343c'; g.font = '600 34px "Trebuchet MS", "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let c = 0; c < 9; c++) {
-      g.font = (c === 8 ? '600 29px' : '600 34px') + ' "Trebuchet MS", "Segoe UI", sans-serif';
-      g.fillText(c < 7 ? 'Plot ' + (c + 1) : c === 7 ? 'Shop' : 'Avatars', (c % 4) * 128 + 64, Math.floor(c / 4) * 64 + 34);
-    }
+    /* The words on the signs: one picture holding all nine labels (see paintSign). */
+    for (let c = 0; c < 9; c++) paintSign(c, c < 7 ? 'Plot ' + (c + 1) : c === 7 ? 'Shop' : 'Avatars');
     const ps = [], uv = [];
     signs.forEach((sg) => {
       const rx = sg.nz, rz = -sg.nx, hw = sg.w / 2, hh = sg.h / 2;           // rx, rz: to the reader's right
@@ -1419,7 +1434,7 @@ const World = (function () {
     const sgGeo = new THREE.BufferGeometry();
     sgGeo.setAttribute('position', new THREE.Float32BufferAttribute(ps, 3));
     sgGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    scene.add(new THREE.Mesh(sgGeo, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), side: THREE.DoubleSide })));
+    scene.add(new THREE.Mesh(sgGeo, new THREE.MeshBasicMaterial({ map: (signTex = new THREE.CanvasTexture(signCv)), side: THREE.DoubleSide })));
   })();
 
   [[W.CH_T - 4, 0x58e6ff, 5.5], [W.CH_T + 20, 0xb07cff, 6], [W.tA + 16, 0x66ffc0, 6]].forEach(([t, color, y]) => {
@@ -2243,6 +2258,7 @@ const World = (function () {
     (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k) => { if (DRAGON_KINDS[k]) ownDragons.push(k); });
   } catch (e) { /* nothing saved, start fresh */ }
   if (myPlot >= 0) ownDragons.slice(-24).forEach((k) => addPet(k, false));
+  function nameMyPlot() { if (myPlot >= 0) paintSign(myPlot, playerName + '\'s Plot'); }   // the sign says whose plot it is
   function saveProgress() {
     try { localStorage.setItem('mutation-mayhem-plot', String(myPlot)); localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons)); } catch (e) { /* not saved, still playable */ }
   }
@@ -2261,7 +2277,7 @@ const World = (function () {
     carryMeshes[egg.tier].visible = true;
     carryDot.style.background = '#' + (t.shell || t.swirl[0]).toString(16).padStart(6, '0');
     carryEl.hidden = false; carryEl.classList.remove('low');
-    toast('You found a ' + t.name + ' egg! Get it home to Plot ' + (myPlot + 1) + ' before it hatches.');
+    toast('You found a ' + t.name + ' egg! Get it home to your plot before it hatches.');
   }
   function stopCarrying() {
     if (!carrying) return null;
@@ -2305,7 +2321,7 @@ const World = (function () {
     if (!started) return;
     if (myPlot < 0 && !p.dungeon) {
       const i = plotAt(p.x, p.z);
-      if (i >= 0) { myPlot = i; saveProgress(); toast('Plot ' + (i + 1) + ' is yours! Find eggs around the island and bring them here to hatch.', 6); }
+      if (i >= 0) { myPlot = i; saveProgress(); nameMyPlot(); toast('This is now ' + playerName + '\'s Plot! Find eggs around the island and bring them here to hatch.', 6); }
     }
     nagT -= dt;
     if (!carrying) {
@@ -2353,7 +2369,7 @@ const World = (function () {
       if (d.homing) {                                     // flying back to the plot after you got off
         const c = plotWorld(myPlot, 0, 0), rp = d.root.position, dx = c.x - rp.x, dz = c.z - rp.z, dist = Math.hypot(dx, dz);
         const cruise = Math.max(W.bil(HT, rp.x, rp.z), 0) + 7, aim = dist < 8 ? HUB.h + 0.1 : Math.max(cruise, HUB.h + 6);
-        const st = Math.min(dist, 12 * dt);
+        const st = Math.min(dist, 20 * dt);
         rp.set(rp.x + (dist > 0 ? dx / dist * st : 0), rp.y + Math.max(-6 * dt, Math.min(8 * dt, aim - rp.y)), rp.z + (dist > 0 ? dz / dist * st : 0));
         if (dist > 0.3) { d.heading = Math.atan2(-dx, -dz); d.root.rotation.y = d.heading; }
         flapWings(d, 9, reduced ? 0 : 0.55, time);
@@ -2396,7 +2412,7 @@ const World = (function () {
      let go to glide down. Jump once on the ground to hop off: the dragon then flies home to your plot.
      Dragons are too big for the cave, so riding stops at its mouth. */
   const RIDE_REACH = 10, RIDE_SIZE = 1.45;              // how close you must be to climb on, and how big it grows to carry you
-  const rideSpeed = (run) => { const t = tierOf(riding.kind); return flying ? (18 + t * 3) * (run ? 1.4 : 1) : (12 + t * 1.5) * (run ? 1.45 : 1); };
+  const rideSpeed = (run) => { const t = tierOf(riding.kind); return flying ? (30 + t * 5) * (run ? 1.5 : 1) : (18 + t * 2) * (run ? 1.5 : 1); };
   function mount(d) {
     riding = d; d.ridden = true; d.homing = false; flying = false; tapT = 0;
     p.x = d.root.position.x; p.z = d.root.position.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true;
@@ -2454,7 +2470,7 @@ const World = (function () {
     if (tapT > 0) { tapT -= dt; if (tapT <= 0 && !flying) dismount(false); }
   }
   function flyStep(dt, down) {                             // hold Jump to climb, let go to glide down
-    p.vy += ((down ? 9 : -3) - p.vy) * Math.min(1, dt * 4);
+    p.vy += ((down ? 13 : -4) - p.vy) * Math.min(1, dt * 4);
     p.y = Math.min(130, p.y + p.vy * dt);
     const g = standing(p.x, p.z);
     if (p.y <= g) { p.y = g; p.vy = 0; flying = false; p.onGround = true; }
@@ -2592,6 +2608,7 @@ const World = (function () {
     playerName = (isAdmin ? typed.charAt(0).toUpperCase() + typed.split('@')[0].slice(1) : typed) || 'Player';   // an admin shows as the part before the @
     const who = $('who');
     who.textContent = playerName;
+    nameMyPlot();
     adminEl.hidden = !isAdmin;                            // only admins get the arrow
     if (isAdmin) setRadar(true);                          // admins start with the egg radar on
     if (isAdmin) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Admin'; who.appendChild(badge); }
@@ -2899,7 +2916,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();
