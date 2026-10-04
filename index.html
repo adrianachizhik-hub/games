@@ -1,0 +1,2355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mutation Mayhem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Luckiest+Guy&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sand: #f3e6c0;
+    --ink: #10343c;
+    --coral: #ef6b4f;
+    --panel: rgba(243, 230, 192, 0.93);
+    --panel-ink: #10343c;
+    --panel-edge: rgba(16, 52, 60, 0.18);
+    --page: #cfe6f2;
+    --panel-solid: #f3e6c0;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel: rgba(12, 44, 52, 0.92);
+      --panel-ink: #f3e6c0;
+      --panel-edge: rgba(243, 230, 192, 0.24);
+      --page: #0b2a31;
+      --panel-solid: #0c2c34;
+    }
+  }
+  :root[data-theme="dark"] {
+    --panel: rgba(12, 44, 52, 0.92);
+    --panel-ink: #f3e6c0;
+    --panel-edge: rgba(243, 230, 192, 0.24);
+    --page: #0b2a31;
+    --panel-solid: #0c2c34;
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--panel-ink);
+    font-family: "Fredoka", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+  /* Heads-up display */
+  .where, #map, .keys { opacity: 0; transition: opacity 0.4s; }
+  body.playing .where, body.playing #map, body.playing .keys { opacity: 1; }
+  .where {
+    position: fixed;
+    left: calc(16px + env(safe-area-inset-left, 0px));
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    max-width: calc(100% - 172px);
+    pointer-events: none;
+  }
+  .who {                                    /* the player's name, top left while playing */
+    display: inline-block;
+    margin: 0 0 8px;
+    padding: 3px 13px;
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--panel-ink);
+    font-size: 0.98rem;
+    font-weight: 600;
+  }
+  .who:empty { display: none; }
+  .who .badge {                             /* shown next to an admin's name */
+    margin-left: 8px;
+    padding: 1px 9px;
+    border-radius: 999px;
+    background: #ffd23f;
+    color: #0d2f37;
+    font-size: 0.82rem;
+  }
+  .zone {
+    margin: 0 0 10px;
+    font-size: clamp(1.7rem, 4.6vw, 2.9rem);
+    font-weight: 600;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(16, 52, 60, 0.6), 0 0 18px rgba(16, 52, 60, 0.4);
+  }
+  .zone.in { animation: zone-in 0.45s ease-out; }
+  @keyframes zone-in { from { opacity: 0; transform: translateY(8px); } }
+  .places { display: flex; flex-wrap: wrap; gap: 6px; }
+  body.playing .places { pointer-events: auto; }
+  .places button {
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--panel-ink);
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 999px;
+    padding: 5px 13px 5px 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+  }
+  .places .num {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 50%;
+    background: var(--panel-ink);
+    color: var(--panel);
+    display: inline-grid;
+    place-items: center;
+    font-size: 0.78em;
+    font-weight: 600;
+  }
+  button:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+  #map {
+    position: fixed;
+    right: calc(14px + env(safe-area-inset-right, 0px));
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    width: clamp(92px, 17vmin, 132px);
+    height: clamp(92px, 17vmin, 132px);
+    border-radius: 50%;
+    border: 3px solid var(--sand);
+    box-shadow: 0 4px 14px rgba(16, 52, 60, 0.35);
+    pointer-events: none;
+  }
+  /* The avatar shop: a button that appears at the blue stall, and the panel it opens */
+  #shopOpen {
+    position: fixed;
+    left: 50%;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    font: inherit;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0d2f37;
+    background: #ffd23f;
+    border: 4px solid #0d2f37;
+    border-radius: 16px;
+    padding: 9px 22px;
+    box-shadow: 0 5px 0 #0d2f37;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #shopOpen[hidden], #avatarShop[hidden] { display: none; }
+  #shopOpen kbd { margin-left: 8px; padding: 1px 8px; border-radius: 7px; background: #0d2f37; color: #ffd23f; font: inherit; font-size: 0.85rem; }
+  body.touch #shopOpen kbd { display: none; }
+  body.touch #shopOpen { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
+  @media (pointer: coarse) { #shopOpen kbd { display: none; } }
+  #avatarShop {
+    position: fixed;
+    right: calc(14px + env(safe-area-inset-right, 0px));
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    width: min(336px, calc(100vw - 28px));
+    overflow: auto;
+    padding: 14px 18px 0;
+    border: 4px solid #0d2f37;
+    border-radius: 20px;
+    background: var(--panel-solid);
+    color: var(--panel-ink);
+    box-shadow: 0 6px 0 #0d2f37;
+  }
+  @media (max-width: 640px) {               /* on a phone the shop is a sheet along the bottom, so the avatar shows above it */
+    #avatarShop { left: 10px; right: 10px; top: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 54vh; }
+  }
+  #avatarShop h2 { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+  #avatarShop .sub { margin: 4px 0 2px; font-size: 0.92rem; opacity: 0.8; }
+  #avatarShop h3 { margin: 11px 0 6px; font-size: 1rem; font-weight: 600; }
+  .swatches, .picks { display: flex; flex-wrap: wrap; gap: 9px; }
+  .swatches button { width: 35px; height: 35px; padding: 0; border: 3px solid #0d2f37; border-radius: 50%; cursor: pointer; }
+  .swatches button.on { box-shadow: 0 0 0 3px var(--panel-solid), 0 0 0 7px #0d2f37; }
+  .picks { gap: 7px; }
+  .picks button, #shopTurn {
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    padding: 5px 13px;
+    border: 3px solid #0d2f37;
+    border-radius: 999px;
+    background: #fff;
+    color: #0d2f37;
+    cursor: pointer;
+  }
+  .picks button.on { background: #ffd23f; font-weight: 600; }
+  #avatarShop .foot {                       /* stays in view at the bottom while the choices scroll */
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin: 12px -18px 0;
+    padding: 10px 18px 16px;
+    background: var(--panel-solid);
+  }
+  #shopDone {
+    flex: 1;
+    font: inherit;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0d2f37;
+    background: #ffd23f;
+    border: 4px solid #0d2f37;
+    border-radius: 14px;
+    padding: 8px 18px;
+    box-shadow: 0 4px 0 #0d2f37;
+    cursor: pointer;
+  }
+  #avatarShop button:focus-visible, #shopOpen:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  body.shopping .where, body.shopping #map, body.shopping .keys, body.shopping #stick, body.shopping #jump, body.shopping #leave, body.shopping #admin { display: none !important; }
+  /* Admin commands: an arrow on the right edge that slides a panel in. Only admins get it. */
+  #admin {
+    --w: min(290px, calc(100vw - 76px));
+    position: fixed;
+    right: 0;
+    top: calc(clamp(92px, 17vmin, 132px) + 34px + env(safe-area-inset-top, 0px));
+    display: flex;
+    align-items: flex-start;
+    transform: translateX(var(--w));
+    transition: transform 0.25s ease-out;
+  }
+  #admin[hidden] { display: none; }
+  #admin.open { transform: none; }
+  #adminTab {
+    width: 46px;
+    height: 58px;
+    padding: 0 0 0 4px;
+    border: 4px solid #0d2f37;
+    border-right: 0;
+    border-radius: 16px 0 0 16px;
+    background: #ffd23f;
+    color: #0d2f37;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #0d2f37;
+  }
+  #adminTab svg { display: block; margin: auto; transition: transform 0.25s; }
+  #admin.open #adminTab svg { transform: rotate(180deg); }
+  #adminTab:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  #adminPanel {
+    width: var(--w);
+    max-height: calc(100vh - clamp(92px, 17vmin, 132px) - 226px);   /* stops above the Jump button; longer lists scroll */
+    overflow: auto;
+    padding: 14px 16px 16px;
+    border: 4px solid #0d2f37;
+    border-right: 0;
+    border-radius: 0 0 0 18px;
+    background: var(--panel);
+    color: var(--panel-ink);
+    box-shadow: 0 5px 0 #0d2f37;
+    visibility: hidden;
+    transition: visibility 0s 0.25s;
+  }
+  #admin.open #adminPanel { visibility: visible; transition-delay: 0s; }
+  @media (max-height: 470px) { #adminPanel { max-height: calc(100vh - clamp(92px, 17vmin, 132px) - 96px); } }   /* a phone on its side: let the open panel cover Jump */
+  #adminPanel h2 { margin: 0 0 10px; font-size: 1.25rem; font-weight: 600; line-height: 1.1; }
+  #adminCommands { display: grid; gap: 8px; }
+  #adminPanel .none { display: none; margin: 0; font-size: 0.98rem; line-height: 1.45; opacity: 0.85; }
+  #adminCommands:empty + .none { display: block; }
+  .keys {
+    position: fixed;
+    left: calc(16px + env(safe-area-inset-left, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    max-width: 64ch;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(16, 52, 60, 0.9);
+    pointer-events: none;
+  }
+
+  /* Touch controls */
+  #stick {
+    position: fixed;
+    left: calc(22px + env(safe-area-inset-left, 0px));
+    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+    width: 124px;
+    height: 124px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.75);
+    background: rgba(16, 52, 60, 0.26);
+    display: none;
+    pointer-events: none;
+  }
+  #stick.on { background: rgba(16, 52, 60, 0.4); }
+  #knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.88);
+    transform: translate(-50%, -50%);
+  }
+  #leave {                                  /* back to the front cover; sits in the bottom right corner */
+    position: fixed;
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    display: none;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    background: #d9483b;
+    border: 3px solid #0d2f37;
+    border-radius: 14px;
+    padding: 6px 18px;
+    box-shadow: 0 4px 0 #0d2f37;
+    cursor: pointer;
+  }
+  body.playing #leave { display: block; }
+  #leave:active { transform: translateY(3px); box-shadow: 0 1px 0 #0d2f37; }
+  #leave:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  #jump {
+    position: fixed;
+    right: calc(22px + env(safe-area-inset-right, 0px));
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));   /* above the Leave button */
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.75);
+    background: rgba(16, 52, 60, 0.3);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    display: none;
+    touch-action: none;
+  }
+  .for-touch { display: none; }
+  body.touch.playing #jump, body.touch.playing #stick { display: block; }
+  body.touch .keys, body.touch .places .num, body.touch .for-mouse { display: none; }
+  body.touch .places button { padding-left: 13px; }
+  body.touch .for-touch { display: block; }
+  @media (pointer: coarse) {
+    .keys, .places .num, .for-mouse { display: none; }
+    .places button { padding-left: 13px; }
+    .for-touch { display: block; }
+  }
+
+  /* Front cover: the game's name over a slow flight around the island */
+  #intro, #fail {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  }
+  #intro {
+    --edge: #0d2f37;
+    justify-items: center;
+    text-align: center;
+    overflow: hidden auto;
+    background: linear-gradient(rgba(9, 38, 46, 0.55), rgba(9, 38, 46, 0.12) 40%, rgba(9, 38, 46, 0) 62%, rgba(9, 38, 46, 0.45));
+  }
+  #intro[hidden], #fail[hidden] { display: none; }
+  .cover {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    padding-top: min(6vh, 54px);
+  }
+  .cover .grow { flex: 1 0 20px; }          /* pushes the controls reminder to the bottom */
+  .logo {
+    margin: 0;
+    font-family: "Luckiest Guy", "Fredoka", "Trebuchet MS", "Segoe UI", sans-serif;
+    font-weight: 600;
+    font-size: min(13.5vw, 19vh, 8.6rem);
+    line-height: 0.98;
+    letter-spacing: 0.03em;
+  }
+  .logo .line { display: block; white-space: nowrap; }
+  .logo .line + .line { font-size: 1.24em; }
+  .logo b, .logo .eye {
+    display: inline-block;
+    transform: translateY(var(--y)) rotate(var(--r));
+    animation: pop 0.55s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+    animation-delay: calc(var(--i) * 45ms);
+  }
+  .logo b {                                 /* each letter has mutated its own way: its own colour, tilt and height */
+    font-weight: inherit;
+    color: var(--c);
+    text-shadow:
+      0.05em 0 var(--edge), -0.05em 0 var(--edge), 0 0.05em var(--edge), 0 -0.05em var(--edge),
+      0.037em 0.037em var(--edge), -0.037em 0.037em var(--edge), 0.037em -0.037em var(--edge), -0.037em -0.037em var(--edge),
+      0.03em 0.13em 0 var(--edge), -0.03em 0.13em 0 var(--edge), 0 0.15em 0 var(--edge);
+  }
+  .logo .eye {                              /* the O has grown into an eye */
+    position: relative;
+    width: 0.72em;
+    height: 0.72em;
+    margin: 0 0.035em;
+    border-radius: 50%;
+    border: 0.07em solid var(--edge);
+    background: #fff;
+    box-shadow: 0 0.1em 0 var(--edge);
+    overflow: hidden;
+  }
+  .logo .eye::before {
+    content: "";
+    position: absolute;
+    left: 24%; top: 26%; width: 54%; height: 54%;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--edge) 0 36%, #ff4fa8 38% 100%);
+  }
+  .logo .eye::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #9cff4a;
+    transform: translateY(-102%);
+    animation: wink 6s 2s infinite;
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(calc(var(--y) + 0.45em)) rotate(var(--r)) scale(0.3); }
+    to { opacity: 1; transform: translateY(var(--y)) rotate(var(--r)) scale(1); }
+  }
+  @keyframes wink {
+    0%, 93%, 100% { transform: translateY(-102%); }
+    96% { transform: translateY(0); }
+  }
+  .tag {
+    margin: 1.15em 0 0;
+    font-size: clamp(1.05rem, 2.5vw, 1.45rem);
+    font-weight: 500;
+    color: #fff;
+    text-shadow: 0 2px 6px rgba(9, 38, 46, 0.95), 0 0 2px rgba(9, 38, 46, 0.8);
+  }
+  .cover .how {
+    max-width: 34rem;
+    margin: 0;
+    padding: 9px 16px;
+    border-radius: 14px;
+    background: var(--panel);
+    color: var(--panel-ink);
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+  #fail { background: var(--page); align-items: center; justify-items: center; }
+  .card {
+    background: var(--panel);
+    color: var(--panel-ink);
+    border-radius: 24px;
+    padding: 26px 28px 26px;
+    max-width: 29rem;
+    box-shadow: 0 18px 50px rgba(16, 52, 60, 0.4);
+  }
+  .card h1 { margin: 0 0 10px; font-size: clamp(2.3rem, 8vw, 3.5rem); line-height: 0.95; font-weight: 600; }
+  .card p { margin: 0 0 12px; font-size: 1.03rem; line-height: 1.5; }
+  .card .how { font-size: 0.95rem; opacity: 0.86; margin-bottom: 18px; }
+  #start {
+    margin-top: 20px;
+    font-family: "Luckiest Guy", "Fredoka", "Trebuchet MS", "Segoe UI", sans-serif;
+    font-size: clamp(1.6rem, 4.6vw, 2.3rem);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    color: var(--edge);
+    background: #ffd23f;
+    border: 4px solid var(--edge);
+    border-radius: 18px;
+    padding: 13px 48px 9px;
+    box-shadow: 0 7px 0 var(--edge);
+    cursor: pointer;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  #start:hover { transform: translateY(-2px); box-shadow: 0 9px 0 var(--edge); }
+  #start:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--edge); }
+  #start:focus-visible, #name:focus-visible, #code:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+  #code[hidden], #codeMsg[hidden] { display: none; }
+  #code:not([hidden]) ~ .how { display: none; }   /* make room: the controls reminder steps aside for the code box */
+  #codeMsg {
+    margin: 12px 0 0;
+    padding: 5px 14px;
+    border-radius: 12px;
+    background: rgba(13, 47, 55, 0.88);
+    color: #fff;
+    font-size: 0.98rem;
+    font-weight: 500;
+  }
+  #name, #code {                            /* the name box under Play */
+    margin-top: 18px;
+    width: min(100%, 17rem);
+    font: inherit;
+    font-size: 1.15rem;
+    font-weight: 500;
+    text-align: center;
+    color: var(--edge);
+    background: #fff;
+    border: 4px solid var(--edge);
+    border-radius: 16px;
+    padding: 9px 14px;
+    box-shadow: 0 5px 0 var(--edge);
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  #name::placeholder, #code::placeholder { color: rgba(13, 47, 55, 0.6); }
+  #code { background: #ffe58a; }            /* the admin code box, only shown for the admin name */
+  @media (max-height: 470px) {              /* a phone held sideways: tighten everything so the cover fits */
+    .cover { padding-top: 4px; }
+    .logo { font-size: min(13.5vw, 14.5vh); }
+    .tag { margin-top: 0.5em; font-size: 1rem; }
+    #start { margin-top: 10px; font-size: 1.4rem; padding: 9px 40px 6px; box-shadow: 0 5px 0 var(--edge); }
+    #name { margin-top: 12px; padding: 5px 12px; font-size: 1rem; border-width: 3px; box-shadow: 0 4px 0 var(--edge); }
+    .cover .grow { flex-basis: 10px; }
+    .cover .how { padding: 6px 14px; font-size: 0.84rem; }
+    #code { margin-top: 10px; padding: 5px 12px; font-size: 1rem; border-width: 3px; box-shadow: 0 4px 0 var(--edge); }
+  }
+  .hint {
+    margin: 10px 0 0;
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(16, 52, 60, 0.95);
+  }
+  #blink {
+    position: fixed;
+    inset: 0;
+    background: #06171b;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.7s ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #blink { transition: none; }
+    .zone.in { animation: none; }
+    .where, #map, .keys { transition: none; }
+    .logo b, .logo .eye, .logo .eye::after { animation: none; }
+    #start { transition: none; }
+    #admin, #adminTab svg, #adminPanel { transition: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view" tabindex="0" aria-label="A 3D island you can walk around"></canvas>
+<div id="blink"></div>
+
+<div class="where">
+  <p class="who" id="who"></p>
+  <p class="zone" id="zone" aria-live="polite"></p>
+  <div class="places" id="places" role="group" aria-label="Jump to a place"></div>
+  <p class="hint" id="hint" aria-live="polite"></p>
+</div>
+<canvas id="map" width="264" height="264" aria-hidden="true"></canvas>
+<p class="keys">Up and down arrows (or W and S) walk. Left and right arrows (or A and D) turn. Space jumps, hold Shift to run. Hold the mouse button and drag to look up and down. Keys 1 to 8 jump between places. Walk up to the blue stall in town to change your avatar.</p>
+
+<div id="stick"><div id="knob"></div></div>
+<button id="jump" type="button">Jump</button>
+<button id="leave" type="button">Leave</button>
+
+<div id="admin" hidden>
+  <button id="adminTab" type="button" aria-expanded="false" aria-controls="adminPanel" aria-label="Open admin commands">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg>
+  </button>
+  <div id="adminPanel" role="region" aria-label="Admin commands">
+    <h2>Admin commands</h2>
+    <div id="adminCommands"></div>
+    <p class="none">No commands yet. Restocking shops, giving coins and the others will go here.</p>
+  </div>
+</div>
+
+<button id="shopOpen" type="button" hidden>Open the avatar shop<kbd>Enter</kbd></button>
+<div id="avatarShop" role="dialog" aria-label="Avatar shop" hidden>
+  <h2>Avatar shop</h2>
+  <p class="sub">Everything is free for now.</p>
+  <h3 id="avSkinT">Skin</h3><div class="swatches" id="avSkin" role="group" aria-labelledby="avSkinT"></div>
+  <h3 id="avHairT">Hair</h3><div class="picks" id="avHair" role="group" aria-labelledby="avHairT"></div>
+  <h3 id="avHairCT">Hair color</h3><div class="swatches" id="avHairC" role="group" aria-labelledby="avHairCT"></div>
+  <h3 id="avShirtT">Shirt</h3><div class="swatches" id="avShirt" role="group" aria-labelledby="avShirtT"></div>
+  <h3 id="avPantsT">Pants</h3><div class="swatches" id="avPants" role="group" aria-labelledby="avPantsT"></div>
+  <h3 id="avHeadT">On your head</h3><div class="picks" id="avHead" role="group" aria-labelledby="avHeadT"></div>
+  <h3 id="avBackT">On your back</h3><div class="picks" id="avBack" role="group" aria-labelledby="avBackT"></div>
+  <div class="foot"><button id="shopTurn" type="button">Turn around</button><button id="shopDone" type="button">Done</button></div>
+</div>
+
+<div id="intro">
+  <div class="cover">
+    <h1 class="logo" aria-label="Mutation Mayhem">
+      <span class="line" aria-hidden="true"><b style="--c:#6bff5e;--r:-7deg;--y:0.02em;--i:0">M</b><b style="--c:#9cff4a;--r:4deg;--y:-0.05em;--i:1">U</b><b style="--c:#c8ff3d;--r:-3deg;--y:0.04em;--i:2">T</b><b style="--c:#6bff5e;--r:6deg;--y:-0.02em;--i:3">A</b><b style="--c:#9cff4a;--r:-5deg;--y:0.05em;--i:4">T</b><b style="--c:#c8ff3d;--r:3deg;--y:-0.04em;--i:5">I</b><span class="eye" style="--r:-4deg;--y:0.01em;--i:6"></span><b style="--c:#6bff5e;--r:7deg;--y:-0.03em;--i:7">N</b></span>
+      <span class="line" aria-hidden="true"><b style="--c:#ff4fa8;--r:5deg;--y:-0.03em;--i:8">M</b><b style="--c:#ff8a3d;--r:-6deg;--y:0.04em;--i:9">A</b><b style="--c:#ffd23f;--r:3deg;--y:-0.05em;--i:10">Y</b><b style="--c:#ff4fa8;--r:-4deg;--y:0.03em;--i:11">H</b><b style="--c:#b98bff;--r:7deg;--y:-0.02em;--i:12">E</b><b style="--c:#ff8a3d;--r:-5deg;--y:0.05em;--i:13">M</b></span>
+    </h1>
+    <p class="tag">Collect pets and hunt for mutations on Isla Verde</p>
+    <button id="start" type="button">Play</button>
+    <input id="name" type="text" maxlength="16" placeholder="Enter your name" aria-label="Your name" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="go">
+    <input id="code" type="password" inputmode="numeric" maxlength="8" placeholder="Admin code" aria-label="Admin code" autocomplete="off" enterkeyhint="go" hidden>
+    <p id="codeMsg" role="alert" hidden></p>
+    <div class="grow"></div>
+    <p class="how for-mouse">Use the arrow keys or W A S D: up walks forward, left and right turn. Space jumps, Shift runs.</p>
+    <p class="how for-touch">Use the circle in the bottom left to walk and the Jump button in the bottom right to jump. Drag anywhere else to look around.</p>
+  </div>
+</div>
+<div id="fail" hidden>
+  <div class="card">
+    <h1>The island didn't load</h1>
+    <p>It needs WebGL and the three.js library, and one of them isn't available here. Reload the page, or open it in another browser.</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ---------- World generation (pure math, no rendering) ---------- */
+const World = (function () {
+  const imul = Math.imul;
+  function h2(x, y) {
+    let n = (imul(x, 374761393) + imul(y, 668265263)) | 0;
+    n = imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  }
+  const sm = (t) => t * t * (3 - 2 * t);
+  function vnoise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = sm(x - ix), fy = sm(y - iy);
+    const a = h2(ix, iy), b = h2(ix + 1, iy), c = h2(ix, iy + 1), d = h2(ix + 1, iy + 1);
+    return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+  }
+  function fbm(x, y, o) {
+    let s = 0, a = 0.5, n = 0;
+    for (let i = 0; i < o; i++) { s += a * vnoise(x, y); n += a; x = x * 2.03 + 17.1; y = y * 2.03 + 9.7; a *= 0.5; }
+    return s / n;
+  }
+  function smoothstep(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+  const lerp = (a, b, t) => a + (b - a) * t;
+  function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = imul(a ^ (a >>> 15), 1 | a);
+      t = (t + imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* Landmarks. The main peak (C), the waterfall basin (B) and the river all sit
+     on one axis U, which keeps the cave, falls and river lined up. The peak is
+     out by the north-west coast, with smaller peaks strung along the same shore. */
+  const U = { x: 0.64, z: 0.7684 };
+  const P = { x: -0.7684, z: 0.64 };
+  const C = { x: -U.x * 106, z: -U.z * 106 };
+  const B = { x: C.x + 50 * U.x, z: C.z + 50 * U.z };
+  const CH_T = 64;                       // where the big cave chamber sits along the axis
+  const RIVER_BEND = 0.0016;
+  const TH0 = Math.atan2(C.z, C.x);      // compass direction of the range
+  /* Each peak: angle away from the main one, distance from the middle, height, spread. */
+  const PEAKS = [[0, 106, 38, 2500], [-0.62, 112, 31, 1300], [0.6, 110, 32, 1400], [-1.12, 114, 24, 1000], [1.1, 112, 27, 1100]]
+    .map(([da, r, h, w]) => ({ x: Math.cos(TH0 + da) * r, z: Math.sin(TH0 + da) * r, h, w }));
+
+  function axisPoint(t, lat) { return { x: B.x - U.x * t + P.x * lat, z: B.z - U.z * t + P.z * lat }; }
+  function axisCoords(x, z) {
+    const dx = x - B.x, dz = z - B.z;
+    return { t: -(dx * U.x + dz * U.z), lat: dx * P.x + dz * P.z, dB: Math.hypot(dx, dz), ang: Math.atan2(dz, dx) };
+  }
+  function coastS(x, z) {
+    const r = Math.hypot(x, z), th = Math.atan2(z, x);
+    let dth = Math.abs(th - TH0); if (dth > Math.PI) dth = 2 * Math.PI - dth;
+    const R = 150 + 44 * (fbm(Math.cos(th) * 1.2 + 3.1, Math.sin(th) * 1.2 + 7.7, 3) - 0.5)
+      + 14 * Math.exp(-dth * dth / 1.3);                 // extra land under the mountains
+    return 1 - r / R;
+  }
+  function basinRadius(ang) { return 22 + 5 * (vnoise(Math.cos(ang) * 2 + 20, Math.sin(ang) * 2 + 20) - 0.5); }
+  const RB_AXIS = basinRadius(Math.atan2(-U.z, -U.x));   // basin radius where the waterfall is
+  const PLUNGE = axisPoint(RB_AXIS - 4, 0);              // plunge pool under the falls
+  const POOL = axisPoint(CH_T, caveOffset(CH_T) + 3.5);  // the little pond in the cave chamber
+  /* The flat sand circle for the plots and shops. It sits as near the middle of
+     the island as the river allows: x, z, radius and ground height. */
+  const HUB = { x: 26, z: -26, r: 33, h: 6.3 };
+  function mountainAt(x, z) {                            // the peaks blended into one range
+    let s = 0;
+    for (const pk of PEAKS) {
+      const dx = x - pk.x, dz = z - pk.z, m = pk.h * Math.exp(-(dx * dx + dz * dz) / pk.w);
+      s += m * m * m * m;
+    }
+    return Math.sqrt(Math.sqrt(s));
+  }
+  function caveOffset(t) { return 8 * Math.sin((t - 24) * 0.075); }
+  function caveWidth(t) { const e = (t - CH_T) / 11.5; return 3.3 + 0.6 * smoothstep(25, 34, t) + 6.8 * Math.exp(-e * e); }
+  /* How far the river sits to the side of the axis, tr steps downstream of the
+     basin. It wiggles, and bends south so that it cuts the south in half. */
+  function riverLat(tr) { const q = Math.max(0, tr); return 12 * Math.sin(q * 0.045) + RIVER_BEND * q * q; }
+  /* The south of the island, which the river splits in two:
+     jungle on the west bank, desert on the east bank. */
+  function southF(x, z) {
+    return smoothstep(0.05, 0.45, (x * 0.35 + z * 0.94) / 60 + (fbm(x * 0.02 + 50, z * 0.02 + 50, 3) - 0.5) * 1.2);
+  }
+  function bankF(x, z) { const a = axisCoords(x, z); return smoothstep(-7, 7, a.lat - riverLat(-a.t)); }
+  function jungleF(x, z) { return southF(x, z) * bankF(x, z); }
+  function desertF(x, z) { return southF(x, z) * (1 - bankF(x, z)); }
+
+  /* Height of the outer surface (what you see from outside, cave not yet carved). */
+  function topHeight(x, z) {
+    const s = coastS(x, z);
+    const a = axisCoords(x, z);
+    let h;
+    if (s <= 0) {
+      h = -14 * smoothstep(0, 0.45, -s);
+    } else {
+      h = 1.7 * smoothstep(0, 0.13, s) + 4.2 * smoothstep(0.1, 0.5, s);
+      h += (fbm(x * 0.022 + 11, z * 0.022 + 5, 4) - 0.5) * 9 * smoothstep(0.1, 0.35, s);
+      const mt = mountainAt(x, z);
+      const rug = (fbm(x * 0.05 + 3, z * 0.05 + 8, 4) - 0.5) * 11 * Math.min(1, mt / 22);
+      h += (mt + rug) * smoothstep(0, 0.14, s);
+      // sand dunes on the desert bank
+      const df = desertF(x, z) * smoothstep(0.1, 0.3, s);
+      if (df > 0) {
+        const wv = x * 0.8 + z * 0.6 + 26 * fbm(x * 0.012 + 80, z * 0.012 + 80, 2);
+        const crest = 1 - Math.abs(Math.sin(wv * 0.11));
+        h += df * 3 * crest * crest;
+      }
+      // stream bed on top of the mountain that feeds the waterfall
+      if (a.t > 10 && a.t < 52) h -= 1.5 * (1 - smoothstep(2.2, 5, Math.abs(a.lat))) * (1 - smoothstep(44, 50, a.t));
+      // the basin the waterfall drops into
+      const rb = basinRadius(a.ang);
+      const cut = smoothstep(rb, rb + 4, a.dB);
+      if (cut < 1) {
+        const dQ = Math.hypot(x - PLUNGE.x, z - PLUNGE.z);
+        const fl = Math.min(lerp(-1.9, 0.9, smoothstep(10, 16, a.dB)), lerp(-1.6, 0.9, smoothstep(3, 6.5, dQ)));
+        h = lerp(Math.min(fl, h), h, cut);
+      }
+    }
+    const hubK = 1 - smoothstep(HUB.r, HUB.r + 8, Math.hypot(x - HUB.x, z - HUB.z));
+    if (hubK > 0) h = lerp(h, HUB.h, hubK);              // level the ground for the town circle
+    // river from the basin to the sea
+    const tr = -a.t;
+    if (tr > 4) {
+      const latR = a.lat - riverLat(tr);
+      const ch = (1 - smoothstep(3.2, 9.5, Math.abs(latR))) * smoothstep(4, 12, tr);
+      if (ch > 0) h = lerp(h, Math.min(h, -1.3), ch);
+    }
+    return h;
+  }
+  function caveFloor(x, z) {
+    const a = axisCoords(x, z);
+    const dp = Math.hypot(x - POOL.x, z - POOL.z);
+    return 1.1 + 0.5 * vnoise(x * 0.21 + 2, z * 0.21 + 2) - 2.4 * (1 - smoothstep(2, 5.5, dp));
+  }
+  function caveK(x, z) {
+    const a = axisCoords(x, z);
+    if (a.t < 14 || a.t > 134) return 0;
+    const lat = Math.abs(a.lat - caveOffset(a.t)), w = caveWidth(a.t);
+    return (1 - smoothstep(w, w + 2.2, lat)) * smoothstep(14, 20, a.t) * (1 - smoothstep(128, 134, a.t));
+  }
+  /* Height you actually walk on (cave tunnel carved out). */
+  function groundHeight(x, z, top) {
+    const k = caveK(x, z);
+    if (k <= 0) return top;
+    const f = caveFloor(x, z);
+    return top <= f ? top : lerp(top, f, k);
+  }
+  function caveCeil(x, z, top) {
+    const a = axisCoords(x, z);
+    const lat = Math.abs(a.lat - caveOffset(a.t)), w = caveWidth(a.t);
+    const e = (a.t - CH_T) / 11, q = lat / w;
+    const ch = Math.max(1.5, 6.5 + 6 * Math.exp(-e * e) + 1.5 * vnoise(x * 0.3, z * 0.3) - 1.8 * q * q);
+    return Math.min(top - 0.4, caveFloor(x, z) + ch);
+  }
+
+  /* Sample everything onto a grid once. */
+  const SIZE = 480, N = 240, CELL = SIZE / N, V = N + 1, HALF = SIZE / 2;
+  const HT = new Float32Array(V * V), H = new Float32Array(V * V), CE = new Float32Array(V * V);
+  const lid = new Uint8Array(N * N);
+  let tA = Infinity, tB = -Infinity;
+  for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+    const x = -HALF + i * CELL, z = -HALF + j * CELL, k = j * V + i;
+    const top = topHeight(x, z);
+    HT[k] = top; H[k] = groundHeight(x, z, top); CE[k] = caveCeil(x, z, top);
+  }
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = -HALF + (i + 0.5) * CELL, z = -HALF + (j + 0.5) * CELL;
+    const a = axisCoords(x, z);
+    if (a.t < 14 || a.t > 134) continue;
+    if (Math.abs(a.lat - caveOffset(a.t)) > caveWidth(a.t) + 3.4) continue;
+    let ok = true;
+    for (let dj = 0; dj < 2 && ok; dj++) for (let di = 0; di < 2; di++) {
+      const vx = -HALF + (i + di) * CELL, vz = -HALF + (j + dj) * CELL;
+      if (HT[(j + dj) * V + i + di] - caveFloor(vx, vz) < 5) { ok = false; break; }
+    }
+    if (!ok) continue;
+    lid[j * N + i] = 1;
+    if (Math.abs(a.lat - caveOffset(a.t)) < 2) { tA = Math.min(tA, a.t); tB = Math.max(tB, a.t); }
+  }
+  function bil(A, x, z) {
+    let gx = (x + HALF) / CELL, gz = (z + HALF) / CELL;
+    gx = Math.min(N - 0.001, Math.max(0, gx)); gz = Math.min(N - 0.001, Math.max(0, gz));
+    const i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j, k = j * V + i;
+    return A[k] * (1 - fx) * (1 - fz) + A[k + 1] * fx * (1 - fz) + A[k + V] * (1 - fx) * fz + A[k + V + 1] * fx * fz;
+  }
+  function lidAt(x, z) {
+    const i = Math.floor((x + HALF) / CELL), j = Math.floor((z + HALF) / CELL);
+    return i >= 0 && j >= 0 && i < N && j < N && lid[j * N + i] === 1;
+  }
+  /* 0 at a cave mouth, 1 a few steps inside. Used to darken the cave. */
+  function caveDepth(x, z) {
+    const a = axisCoords(x, z);
+    return smoothstep(0, 9, Math.min(a.t - tA, tB - a.t));
+  }
+  return {
+    vnoise, fbm, smoothstep, lerp, rng, C, U, P, B, CH_T, POOL, HUB, PEAKS, axisPoint, axisCoords, coastS, mountainAt,
+    riverLat, southF, jungleF, desertF,
+    caveOffset, caveWidth, caveDepth, RB_AXIS, SIZE, N, CELL, V, HALF, HT, H, CE, lid, bil, lidAt,
+    get tA() { return tA; }, get tB() { return tB; }
+  };
+})();
+</script>
+<script>
+/* ---------- Rendering, player and HUD ---------- */
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  function fail() { $('fail').hidden = false; $('intro').hidden = true; }
+  if (!window.THREE) { fail(); return; }
+
+  const W = World, { N, V, HALF, CELL, H, HT, CE, lid, lerp, smoothstep } = W;
+  const R = W.rng(20261004);
+  const canvas = $('view');
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); }
+  catch (e) { fail(); return; }
+  const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2));   // keep phones smooth
+
+  const HORIZON = 0xcfe6f2;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(HORIZON);
+  scene.fog = new THREE.Fog(HORIZON, 140, 720);
+  const camera = new THREE.PerspectiveCamera(70, 1, 0.15, 2400);
+  camera.rotation.order = 'YXZ';
+
+  /* ---------- Light and sky ---------- */
+  scene.add(new THREE.HemisphereLight(0xdcefff, 0x8b7b5c, 0.62));
+  const SUN = new THREE.Vector3(0.5, 0.72, 0.4).normalize();
+  const sun = new THREE.DirectionalLight(0xfff1d0, 0.72);
+  sun.position.copy(SUN).multiplyScalar(100);
+  scene.add(sun);
+
+  function dotTexture(inner, outer) {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, inner); gr.addColorStop(1, outer);
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  }
+
+  const skyGroup = new THREE.Group();
+  (function buildSky() {
+    const geo = new THREE.SphereGeometry(1600, 24, 16);
+    const pa = geo.attributes.position, cols = new Float32Array(pa.count * 3);
+    const zen = new THREE.Color(0x3d8fdd), hor = new THREE.Color(HORIZON), c = new THREE.Color();
+    for (let i = 0; i < pa.count; i++) {
+      const k = Math.pow(Math.max(0, pa.getY(i) / 1600), 0.55);
+      c.copy(hor).lerp(zen, k);
+      cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    skyGroup.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false })));
+    const disc = new THREE.Mesh(new THREE.SphereGeometry(46, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff7d6, fog: false }));
+    disc.position.copy(SUN).multiplyScalar(1450);
+    skyGroup.add(disc);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture('rgba(255,244,200,0.75)', 'rgba(255,244,200,0)'), fog: false, depthWrite: false, transparent: true }));
+    glow.scale.set(620, 620, 1);
+    glow.position.copy(SUN).multiplyScalar(1400);
+    skyGroup.add(glow);
+    scene.add(skyGroup);
+  })();
+
+  /* ---------- Terrain colours ---------- */
+  function slopeY(A, i, j) {
+    const i0 = Math.max(0, i - 1), i1 = Math.min(N, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(N, j + 1);
+    const dx = (A[j * V + i1] - A[j * V + i0]) / ((i1 - i0) * CELL), dz = (A[j1 * V + i] - A[j0 * V + i]) / ((j1 - j0) * CELL);
+    return 1 / Math.sqrt(1 + dx * dx + dz * dz);
+  }
+  function meadowF(x, z) { return (1 - W.southF(x, z)) * (1 - smoothstep(4, 14, W.mountainAt(x, z))); }
+  function surfaceColor(x, z, h, ny, out, o) {
+    const n = W.vnoise(x * 0.33 + 7, z * 0.33 + 3);
+    let r, g, b;
+    if (h < -0.25) {                                   // sea bed, sand fading to deep blue
+      const k = Math.pow(Math.min(1, -h / 9), 0.6);
+      r = lerp(0.80, 0.09, k); g = lerp(0.75, 0.25, k); b = lerp(0.56, 0.36, k);
+    } else {
+      const dry = smoothstep(-0.25, 0.9, h);           // wet sand to dry sand
+      r = lerp(0.72, 0.89, dry); g = lerp(0.65, 0.81, dry); b = lerp(0.47, 0.59, dry);
+      const jf = W.jungleF(x, z), mf = meadowF(x, z), df = W.desertF(x, z);
+      let gr = lerp(0.31, 0.13, jf), gg = lerp(0.57, 0.39, jf), gb = lerp(0.23, 0.15, jf);
+      gr = lerp(gr, 0.49, mf); gg = lerp(gg, 0.70, mf); gb = lerp(gb, 0.28, mf);
+      if (df > 0) {                                    // orange dune sand in the desert
+        const dn = W.vnoise(x * 0.07 + 40, z * 0.07 + 12);
+        gr = lerp(gr, lerp(0.94, 0.84, dn), df); gg = lerp(gg, lerp(0.70, 0.58, dn), df); gb = lerp(gb, lerp(0.40, 0.30, dn), df);
+      }
+      const gk = smoothstep(1.5 + n * 0.5, 2.3 + n * 0.5, h);
+      r = lerp(r, gr, gk); g = lerp(g, gg, gk); b = lerp(b, gb, gk);
+      const rk = Math.max(smoothstep(0.80, 0.62, ny), smoothstep(25, 31, h + n * 3)) * smoothstep(0.6, 1.6, h);
+      const rv = 0.86 + 0.28 * n;                      // rock on steep or high ground, red in the desert
+      r = lerp(r, lerp(0.50, 0.68, df) * rv, rk); g = lerp(g, lerp(0.47, 0.43, df) * rv, rk); b = lerp(b, lerp(0.44, 0.30, df) * rv, rk);
+      const hub = 1 - smoothstep(W.HUB.r - 1.5, W.HUB.r + 3.5, Math.hypot(x - W.HUB.x, z - W.HUB.z));
+      if (hub > 0) { const sv = 0.96 + 0.08 * n; r = lerp(r, 0.91 * sv, hub); g = lerp(g, 0.83 * sv, hub); b = lerp(b, 0.61 * sv, hub); }   // the town's sand
+      const sn = smoothstep(34.5, 37.5, h + n * 2.5) * smoothstep(0.5, 0.72, ny);
+      r = lerp(r, 0.96, sn); g = lerp(g, 0.97, sn); b = lerp(b, 1.0, sn);
+    }
+    const jt = 0.94 + 0.12 * W.vnoise(x * 1.7 + 31, z * 1.7 + 13);
+    out[o] = r * jt; out[o + 1] = g * jt; out[o + 2] = b * jt;
+  }
+  function caveTint(x, z, out, o, dk) {                // blend a colour toward dark cave rock
+    const cv = 0.8 + 0.4 * W.vnoise(x * 0.5, z * 0.5);
+    out[o] = lerp(out[o], 0.13 * cv, dk); out[o + 1] = lerp(out[o + 1], 0.12 * cv, dk); out[o + 2] = lerp(out[o + 2], 0.165 * cv, dk);
+  }
+
+  const pos = new Float32Array(V * V * 3), col = new Float32Array(V * V * 3);
+  const NY = new Float32Array(V * V), SH = new Float32Array(V * V).fill(1);
+  for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+    const k = j * V + i, x = -HALF + i * CELL, z = -HALF + j * CELL, carved = HT[k] - H[k];
+    pos[k * 3] = x; pos[k * 3 + 1] = H[k]; pos[k * 3 + 2] = z;
+    NY[k] = slopeY(carved < 0.3 ? HT : H, i, j);
+    surfaceColor(x, z, H[k], NY[k], col, k * 3);
+    if (carved > 0.3) { const dk = W.caveDepth(x, z) * smoothstep(0.3, 2, carved); if (dk > 0) caveTint(x, z, col, k * 3, dk); }
+  }
+
+  /* ---------- Plants, rocks and other scenery ---------- */
+  const colliders = new Map();
+  function addCollider(x, z, r) {
+    const key = Math.floor(x / 8) + ',' + Math.floor(z / 8);
+    let a = colliders.get(key); if (!a) colliders.set(key, a = []);
+    a.push(x, z, r);
+  }
+  function shade(x, z, rad, amt) {                     // fake shadow baked into the ground colour
+    const i0 = Math.max(0, Math.floor((x - rad + HALF) / CELL)), i1 = Math.min(N, Math.ceil((x + rad + HALF) / CELL));
+    const j0 = Math.max(0, Math.floor((z - rad + HALF) / CELL)), j1 = Math.min(N, Math.ceil((z + rad + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const d = Math.hypot(-HALF + i * CELL - x, -HALF + j * CELL - z);
+      if (d < rad) SH[j * V + i] = Math.max(0.58, SH[j * V + i] * (1 - amt * (1 - d / rad)));
+    }
+  }
+  function probe(x, z) {
+    if (W.lidAt(x, z)) return null;
+    if (Math.hypot(x - W.HUB.x, z - W.HUB.z) < W.HUB.r + 3) return null;      // keep the town circle clear
+    const h = W.bil(H, x, z);
+    if (W.bil(HT, x, z) - h > 0.1) return null;
+    const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL);
+    return { h, ny: NY[j * V + i] };
+  }
+  function scatter(count, spacing, test) {
+    const out = [], used = new Set();
+    for (let n = 0; n < count * 60 && out.length < count; n++) {
+      const x = (R() - 0.5) * 400, z = (R() - 0.5) * 400, q = probe(x, z);
+      if (!q) continue;
+      const key = Math.round(x / spacing) + ',' + Math.round(z / spacing);
+      if (used.has(key)) continue;
+      const it = test(x, z, q.h, q.ny);
+      if (!it) continue;
+      used.add(key); out.push(it);
+    }
+    return out;
+  }
+  const tint = (lo, hi) => { const v = lo + R() * (hi - lo); return [v * (0.95 + R() * 0.1), v, v * (0.92 + R() * 0.12)]; };
+  const spin = () => R() * Math.PI * 2;
+
+  const palms = scatter(130, 4, (x, z, h, ny) => {
+    if (h < 0.8 || h > 2.7 || ny < 0.93) return null;
+    const s = 0.8 + R() * 0.6;
+    addCollider(x, z, 0.4); shade(x, z, 4.5, 0.22);
+    return { x, y: h - 0.15, z, sx: s, sy: s * (0.9 + R() * 0.4), sz: s, ry: spin(), c: tint(0.9, 1.12) };
+  });
+  const jungleTrees = scatter(300, 5.2, (x, z, h, ny) => {
+    if (h < 2.4 || h > 18 || ny < 0.8 || W.jungleF(x, z) < 0.55) return null;
+    const s = 0.75 + R() * 0.8, w = s * (0.85 + R() * 0.4);
+    addCollider(x, z, 0.55 * w); shade(x, z, 5.5 * w, 0.34);
+    return { x, y: h - 0.25, z, sx: w, sy: s * (0.85 + R() * 0.6), sz: w, ry: spin(), c: tint(0.82, 1.15) };
+  });
+  const bushes = scatter(280, 2.6, (x, z, h, ny) => {
+    if (h < 1.9 || h > 20 || ny < 0.75 || W.jungleF(x, z) < 0.35) return null;
+    const s = 0.6 + R() * 0.9;
+    return { x, y: h - 0.05, z, sx: s, sy: s * (0.8 + R() * 0.5), sz: s, ry: spin(), c: tint(0.8, 1.2) };
+  });
+  /* More jungle plants: giant trees, banana plants, bamboo, ferns and bright flowers. */
+  const giantTrees = scatter(44, 12, (x, z, h, ny) => {
+    if (h < 2.6 || h > 16 || ny < 0.85 || W.jungleF(x, z) < 0.7) return null;
+    const s = 0.85 + R() * 0.5;
+    addCollider(x, z, 0.85 * s); shade(x, z, 8 * s, 0.3);
+    return { x, y: h - 0.3, z, sx: s, sy: s * (0.9 + R() * 0.3), sz: s, ry: spin(), c: tint(0.85, 1.1) };
+  });
+  const bananas = scatter(150, 3.4, (x, z, h, ny) => {
+    if (h < 2.2 || h > 17 || ny < 0.8 || W.jungleF(x, z) < 0.5) return null;
+    const s = 0.8 + R() * 0.7;
+    return { x, y: h - 0.1, z, sx: s, sy: s * (0.9 + R() * 0.3), sz: s, ry: spin(), c: tint(0.88, 1.15) };
+  });
+  const bamboo = scatter(64, 6, (x, z, h, ny) => {
+    if (h < 2.2 || h > 16 || ny < 0.85 || W.jungleF(x, z) < 0.5) return null;
+    const s = 0.8 + R() * 0.6;
+    addCollider(x, z, 0.45 * s); shade(x, z, 2.5 * s, 0.2);
+    return { x, y: h - 0.1, z, sx: s, sy: s * (0.85 + R() * 0.4), sz: s, ry: spin(), c: tint(0.9, 1.12) };
+  });
+  const ferns = scatter(360, 2, (x, z, h, ny) => {
+    if (h < 2 || h > 18 || ny < 0.75 || W.jungleF(x, z) < 0.4) return null;
+    const s = 0.7 + R() * 0.9;
+    return { x, y: h - 0.05, z, sx: s, sy: s, sz: s, ry: spin(), c: tint(0.8, 1.2) };
+  });
+  const BLOOMS = [[1, 0.22, 0.3], [1, 0.42, 0.75], [1, 0.58, 0.12], [0.78, 0.4, 1], [1, 0.9, 0.3]];
+  const blossoms = scatter(280, 1.6, (x, z, h, ny) => {
+    if (h < 2.1 || h > 17 || ny < 0.8 || W.jungleF(x, z) < 0.45) return null;
+    const s = 0.9 + R() * 0.8;
+    return { x, y: h - 0.05, z, sx: s, sy: s, sz: s, ry: spin(), c: BLOOMS[(R() * BLOOMS.length) | 0] };
+  });
+
+  /* Desert: cactus, dry scrub, red rocks and tall stone pillars. */
+  const cacti = scatter(100, 7, (x, z, h, ny) => {
+    if (h < 2.2 || ny < 0.8 || W.desertF(x, z) < 0.6) return null;
+    const s = 0.8 + R() * 0.8;
+    addCollider(x, z, 0.45 * s); shade(x, z, 1.8 * s, 0.16);
+    return { x, y: h - 0.1, z, sx: s, sy: s * (0.85 + R() * 0.4), sz: s, ry: spin(), c: tint(0.88, 1.12) };
+  });
+  const barrels = scatter(170, 3, (x, z, h, ny) => {
+    if (h < 2.1 || ny < 0.8 || W.desertF(x, z) < 0.5) return null;
+    const s = 0.6 + R() * 0.8;
+    return { x, y: h - 0.05, z, sx: s, sy: s, sz: s, ry: spin(), c: tint(0.88, 1.12) };
+  });
+  const dryBushes = scatter(200, 2.6, (x, z, h, ny) => {
+    if (h < 2 || ny < 0.75 || W.desertF(x, z) < 0.45) return null;
+    const s = 0.7 + R() * 0.9;
+    return { x, y: h - 0.05, z, sx: s, sy: s, sz: s, ry: spin(), c: tint(0.85, 1.15) };
+  });
+  const redRocks = scatter(120, 4, (x, z, h, ny) => {
+    if (h < 2 || W.desertF(x, z) < 0.5) return null;
+    const s = 0.4 + R() * R() * 2;
+    if (s > 1.3) addCollider(x, z, s * 0.75);
+    return { x, y: h - 0.2 * s, z, sx: s * (0.8 + R() * 0.6), sy: s * (0.6 + R() * 0.5), sz: s * (0.8 + R() * 0.6), rx: R(), ry: spin(), rz: R(), c: tint(0.85, 1.12) };
+  });
+  const pillars = scatter(14, 22, (x, z, h, ny) => {
+    if (h < 2.4 || ny < 0.88 || W.desertF(x, z) < 0.8) return null;
+    const s = 0.8 + R() * 0.7;
+    addCollider(x, z, 2.2 * s); shade(x, z, 5 * s, 0.25);
+    return { x, y: h - 0.4, z, sx: s, sy: s * (0.8 + R() * 0.6), sz: s, ry: spin(), c: tint(0.9, 1.1) };
+  });
+
+  const pines = scatter(440, 4, (x, z, h, ny) => {
+    if (h < 7 || h > 33.5 || ny < 0.7 || W.mountainAt(x, z) < 6 || W.jungleF(x, z) > 0.6 || W.desertF(x, z) > 0.3) return null;
+    const a = W.axisCoords(x, z);
+    if (a.t > 8 && a.t < 54 && Math.abs(a.lat) < 6) return null;           // keep the stream bed clear
+    const s = 0.9 + R() * 1.1, snow = smoothstep(27, 33, h) * 0.55, c = tint(0.85, 1.1);
+    addCollider(x, z, 0.3 * s); shade(x, z, 2.6 * s, 0.25);
+    return { x, y: h - 0.15, z, sx: s, sy: s * (0.9 + R() * 0.35), sz: s, ry: spin(), c: [lerp(c[0], 1.9, snow), lerp(c[1], 1.5, snow), lerp(c[2], 1.9, snow)] };
+  });
+  const meadowTrees = scatter(55, 9, (x, z, h, ny) => {
+    if (h < 2.6 || ny < 0.85 || meadowF(x, z) < 0.6) return null;
+    const s = 0.8 + R() * 0.7;
+    addCollider(x, z, 0.4 * s); shade(x, z, 4.2 * s, 0.3);
+    return { x, y: h - 0.15, z, sx: s, sy: s * (0.9 + R() * 0.3), sz: s, ry: spin(), c: tint(0.9, 1.12) };
+  });
+  const PETALS = [[1, 0.86, 0.22], [1, 0.47, 0.56], [0.97, 0.97, 1], [0.76, 0.52, 1], [1, 0.62, 0.2]];
+  const flowers = scatter(1000, 1.2, (x, z, h, ny) => {
+    if (h < 2.3 || ny < 0.85 || meadowF(x, z) < 0.5) return null;
+    const s = 0.7 + R() * 0.8;
+    return { x, y: h, z, sx: s, sy: s, sz: s, ry: spin(), c: PETALS[(R() * PETALS.length) | 0] };
+  });
+  const rocks = scatter(380, 3, (x, z, h, ny) => {
+    const mt = W.mountainAt(x, z);
+    if (h < -1.2) return null;
+    if (!((mt > 9 && R() < 0.7) || (h < 1.6 && R() < 0.35) || R() < 0.06)) return null;
+    const s = 0.4 + R() * R() * 2.2;
+    if (s > 1.3) addCollider(x, z, s * 0.75);
+    return { x, y: h - 0.2 * s, z, sx: s * (0.8 + R() * 0.6), sy: s * (0.6 + R() * 0.5), sz: s * (0.8 + R() * 0.6), rx: R(), ry: spin(), rz: R(), c: tint(0.75, 1.1) };
+  });
+  [[47, -2.6, 1.5], [47.5, 2.2, 1.2], [49, 0, 1.9]].forEach(([t, lat, s]) => {      // rocks at the spring
+    const q = W.axisPoint(t, lat);
+    rocks.push({ x: q.x, y: W.bil(HT, q.x, q.z) + 0.1, z: q.z, sx: s, sy: s * 0.8, sz: s, rx: 0.4, ry: t, rz: 0.2, c: [0.9, 0.9, 0.92] });
+  });
+
+  /* Crystals inside the cave, clustered in the big chamber. */
+  const crystals = [];
+  const GLOW = [[0.35, 0.95, 1.0], [0.75, 0.5, 1.0], [0.4, 1.0, 0.75], [1.0, 0.5, 0.85]];
+  for (let n = 0; n < 36; n++) {
+    const t = R() < 0.45 ? W.CH_T + (R() - 0.5) * 18 : lerp(W.tA + 5, W.tB - 5, R());
+    const side = R() < 0.5 ? -1 : 1, w = W.caveWidth(t);
+    const base = W.axisPoint(t, W.caveOffset(t) + side * w * (0.55 + R() * 0.35));
+    const c = GLOW[(R() * GLOW.length) | 0], count = 2 + ((R() * 4) | 0);
+    for (let q = 0; q < count; q++) {
+      const x = base.x + (R() - 0.5) * 1.4, z = base.z + (R() - 0.5) * 1.4, s = 0.5 + R() * 1.1;
+      crystals.push({ x, y: W.bil(H, x, z) - 0.15, z, sx: s * 0.8, sy: s, sz: s * 0.8, rx: (R() - 0.5) * 0.9, ry: spin(), rz: (R() - 0.5) * 0.9, c });
+    }
+  }
+
+  /* ---------- Geometry helpers ---------- */
+  const M4 = () => new THREE.Matrix4();
+  function xf(px, py, pz, sx, sy, sz, rx, ry, rz) {
+    return M4().compose(new THREE.Vector3(px, py, pz),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)),
+      new THREE.Vector3(sx, sy, sz));
+  }
+  function merge(parts) {                               // several shapes into one flat-shaded mesh
+    const ps = [], cs = [];
+    for (const part of parts) {
+      const g = part.g.index ? part.g.toNonIndexed() : part.g.clone();
+      if (part.m) g.applyMatrix4(part.m);
+      const a = g.attributes.position.array, c = new THREE.Color(part.color);
+      const amt = part.jitter === undefined ? 0.22 : part.jitter;
+      for (let i = 0; i < a.length; i += 9) {
+        const jt = 1 + (R() - 0.5) * amt;
+        for (let k = 0; k < 9; k += 3) { ps.push(a[i + k], a[i + k + 1], a[i + k + 2]); cs.push(c.r * jt, c.g * jt, c.b * jt); }
+      }
+    }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(ps, 3));
+    out.setAttribute('color', new THREE.Float32BufferAttribute(cs, 3));
+    out.computeVertexNormals();
+    return out;
+  }
+  function frond(px, py, pz, angle, droop, len, width, color) {
+    const m = M4().makeTranslation(px, py, pz)
+      .multiply(M4().makeRotationY(angle))
+      .multiply(M4().makeRotationZ(-(Math.PI / 2 + droop)))
+      .multiply(M4().makeScale(0.12, 1, 1))
+      .multiply(M4().makeTranslation(0, len / 2, 0));
+    return { g: new THREE.ConeGeometry(width, len, 4), color, m };
+  }
+  const ico = (d) => new THREE.IcosahedronGeometry(1, d);
+
+  function palmGeo() {
+    const parts = [];
+    let px = 0, py = 0;
+    for (let i = 0; i < 5; i++) {
+      const hh = 1.5, lean = 0.06 + i * 0.07;
+      parts.push({ g: new THREE.CylinderGeometry(0.2 - i * 0.02, 0.25 - i * 0.02, hh * 1.08, 6), color: 0x9a7a4e,
+        m: xf(px + Math.sin(lean) * hh / 2, py + Math.cos(lean) * hh / 2, 0, 1, 1, 1, 0, 0, -lean) });
+      px += Math.sin(lean) * hh; py += Math.cos(lean) * hh;
+    }
+    for (let i = 0; i < 9; i++)
+      parts.push(frond(px, py, 0, i / 9 * Math.PI * 2 + (i % 2) * 0.2, 0.25 + (i % 3) * 0.22, 3.5 - (i % 3) * 0.3, 0.62, i % 2 ? 0x3f9d4a : 0x2f8a40));
+    for (let i = 0; i < 3; i++)
+      parts.push({ g: ico(0), color: 0x5a4026, m: xf(px + Math.cos(i * 2.1) * 0.25, py - 0.28, Math.sin(i * 2.1) * 0.25, 0.2, 0.2, 0.2) });
+    return merge(parts);
+  }
+  function jungleGeo() {
+    return merge([
+      { g: new THREE.CylinderGeometry(0.28, 0.5, 8, 6), color: 0x5d4a33, m: xf(0, 4, 0, 1, 1, 1) },
+      { g: ico(1), color: 0x1f7d36, m: xf(0, 8.8, 0, 3.7, 2.3, 3.7) },
+      { g: ico(0), color: 0x2a9140, m: xf(1.9, 10.2, 0.9, 2.5, 1.7, 2.5, 0.4, 0.7, 0) },
+      { g: ico(0), color: 0x176a2c, m: xf(-1.7, 9.7, -1.2, 2.4, 1.6, 2.4, 0.2, 1.9, 0.5) },
+      { g: ico(0), color: 0x238638, m: xf(-0.6, 7.6, 2.0, 1.9, 1.2, 1.9, 0.9, 0.3, 0) }
+    ]);
+  }
+  function bushGeo() {
+    const parts = [
+      { g: ico(0), color: 0x2c8a3c, m: xf(0, 0.45, 0, 1.1, 0.7, 1.1) },
+      { g: ico(0), color: 0x37993f, m: xf(0.7, 0.4, 0.3, 0.7, 0.55, 0.7, 0.5, 1, 0) }
+    ];
+    for (let i = 0; i < 5; i++) parts.push(frond(-0.3, 0.3, -0.2, i * 1.26 + 0.3, -0.75 + (i % 2) * 0.3, 1.9, 0.4, 0x46a84a));
+    return merge(parts);
+  }
+  function giantTreeGeo() {                             // pokes out above the rest of the jungle
+    const parts = [
+      { g: new THREE.CylinderGeometry(0.45, 0.8, 15, 7), color: 0x6b5a45, m: xf(0, 7.5, 0, 1, 1, 1) },
+      { g: ico(1), color: 0x2f8f3c, m: xf(0, 16.2, 0, 6.2, 2.0, 6.2) },
+      { g: ico(0), color: 0x3aa046, m: xf(2.6, 17.6, 1.2, 3.2, 1.4, 3.2, 0.3, 0.8, 0) },
+      { g: ico(0), color: 0x257a33, m: xf(-2.8, 17.2, -1.6, 3.0, 1.3, 3.0, 0.2, 2.1, 0.3) }
+    ];
+    for (let i = 0; i < 4; i++) {                        // roots flaring out at the bottom
+      const a = i * Math.PI / 2 + 0.4;
+      parts.push({ g: new THREE.ConeGeometry(0.6, 3.4, 4), color: 0x5f4f3c, m: xf(Math.cos(a) * 0.8, 1.6, Math.sin(a) * 0.8, 1, 1, 1) });
+    }
+    return merge(parts);
+  }
+  function bananaGeo() {                                // short stem, big floppy leaves
+    const parts = [{ g: new THREE.CylinderGeometry(0.16, 0.24, 1.8, 6), color: 0x7fae4f, m: xf(0, 0.9, 0, 1, 1, 1) }];
+    for (let i = 0; i < 7; i++)
+      parts.push(frond(0, 1.7, 0, i * 0.9 + (i % 2) * 0.25, -0.95 + (i % 3) * 0.42, 2.8 - (i % 2) * 0.5, 0.72, i % 2 ? 0x58b84f : 0x44a348));
+    return merge(parts);
+  }
+  function bambooGeo() {                                // a clump of thin stalks with leaves near the top
+    const parts = [];
+    for (let i = 0; i < 5; i++) {
+      const a = i * 2.4, d = 0.15 + (i % 3) * 0.22, hgt = 5 + (i * 3 % 5) * 0.6, lean = 0.05 + (i % 4) * 0.035;
+      const bx = Math.cos(a) * d, bz = Math.sin(a) * d;
+      parts.push({ g: new THREE.CylinderGeometry(0.09, 0.12, hgt, 5), color: i % 2 ? 0x9fc65a : 0x86b24b,
+        m: M4().makeTranslation(bx, 0, bz).multiply(M4().makeRotationY(-a)).multiply(M4().makeRotationZ(-lean)).multiply(M4().makeTranslation(0, hgt / 2, 0)) });
+      const tx = bx + Math.cos(a) * Math.sin(lean) * hgt, ty = Math.cos(lean) * hgt, tz = bz + Math.sin(a) * Math.sin(lean) * hgt;
+      for (let q = 0; q < 2; q++) parts.push(frond(tx, ty - q * 0.8, tz, a + q * 2.1, 0.25 + q * 0.1, 1.4, 0.32, 0x5fae4a));
+    }
+    return merge(parts);
+  }
+  function fernGeo() {
+    const parts = [];
+    for (let i = 0; i < 6; i++)
+      parts.push(frond(0, 0.1, 0, i * 1.047 + (i % 2) * 0.3, -0.7 + (i % 3) * 0.25, 1.5 - (i % 2) * 0.3, 0.36, i % 2 ? 0x4fb360 : 0x3c9a4d));
+    return merge(parts);
+  }
+  function blossomGeo() {                               // white petals, coloured per plant
+    const parts = [{ g: new THREE.CylinderGeometry(0.035, 0.05, 0.5, 3), color: 0x335533, m: xf(0, 0.25, 0, 1, 1, 1) }];
+    for (let i = 0; i < 4; i++) parts.push(frond(0, 0.5, 0, i * 1.571, -0.55, 0.55, 0.32, 0xffffff));
+    parts.forEach((part) => { part.jitter = 0.1; });
+    return merge(parts);
+  }
+  function cactusGeo() {                                // tall cactus with two arms
+    const green = 0x4f9a55, dark = 0x438a4b;
+    return merge([
+      { g: new THREE.CylinderGeometry(0.34, 0.38, 3.6, 6), color: green, m: xf(0, 1.8, 0, 1, 1, 1) },
+      { g: ico(0), color: green, m: xf(0, 3.6, 0, 0.34, 0.3, 0.34) },
+      { g: new THREE.CylinderGeometry(0.2, 0.2, 0.9, 5), color: dark, m: xf(0.6, 1.7, 0, 1, 1, 1, 0, 0, Math.PI / 2) },
+      { g: new THREE.CylinderGeometry(0.2, 0.22, 1.4, 5), color: dark, m: xf(1.0, 2.3, 0, 1, 1, 1) },
+      { g: ico(0), color: dark, m: xf(1.0, 3.0, 0, 0.2, 0.2, 0.2) },
+      { g: new THREE.CylinderGeometry(0.18, 0.18, 0.8, 5), color: dark, m: xf(-0.55, 2.3, 0, 1, 1, 1, 0, 0, Math.PI / 2) },
+      { g: new THREE.CylinderGeometry(0.18, 0.2, 1.0, 5), color: dark, m: xf(-0.9, 2.7, 0, 1, 1, 1) },
+      { g: ico(0), color: dark, m: xf(-0.9, 3.2, 0, 0.18, 0.18, 0.18) }
+    ]);
+  }
+  function barrelGeo() {                                // round cactus with a pink flower on top
+    return merge([
+      { g: ico(0), color: 0x5aa35c, m: xf(0, 0.42, 0, 0.5, 0.52, 0.5) },
+      { g: ico(0), color: 0xff6fa8, m: xf(0, 0.95, 0, 0.16, 0.1, 0.16), jitter: 0.1 }
+    ]);
+  }
+  function dryBushGeo() {
+    const parts = [];
+    for (let i = 0; i < 7; i++)
+      parts.push(frond(0, 0.05, 0, i * 0.9, -0.5 - (i % 3) * 0.3, 0.9 + (i % 2) * 0.3, 0.12, i % 2 ? 0xa8905a : 0x8f7a4a));
+    return merge(parts);
+  }
+  function pillarGeo() {                                // wind-carved stone pillar
+    return merge([
+      { g: new THREE.CylinderGeometry(1.5, 2.3, 4, 7), color: 0xc27a4e, m: xf(0, 2, 0, 1, 1, 1) },
+      { g: new THREE.CylinderGeometry(1.15, 1.45, 3.4, 7), color: 0xd08a58, m: xf(0.15, 5.6, 0.1, 1, 1, 1, 0, 0.5, 0) },
+      { g: new THREE.CylinderGeometry(1.5, 1.2, 1.5, 7), color: 0xb86f47, m: xf(0.1, 8, 0, 1, 1, 1, 0, 1.1, 0) }
+    ]);
+  }
+  function pineGeo() {
+    return merge([
+      { g: new THREE.CylinderGeometry(0.14, 0.22, 1.4, 5), color: 0x5a4330, m: xf(0, 0.7, 0, 1, 1, 1) },
+      { g: new THREE.ConeGeometry(1.55, 2.3, 7), color: 0x1f5c3b, m: xf(0, 2.3, 0, 1, 1, 1) },
+      { g: new THREE.ConeGeometry(1.2, 2.0, 7), color: 0x256b45, m: xf(0, 3.6, 0, 1, 1, 1, 0, 0.4, 0) },
+      { g: new THREE.ConeGeometry(0.8, 1.8, 7), color: 0x2c7a50, m: xf(0, 4.9, 0, 1, 1, 1, 0, 0.9, 0) }
+    ]);
+  }
+  function meadowTreeGeo() {
+    return merge([
+      { g: new THREE.CylinderGeometry(0.22, 0.32, 2.6, 6), color: 0x6a5035, m: xf(0, 1.3, 0, 1, 1, 1) },
+      { g: ico(1), color: 0x66b548, m: xf(0, 4.2, 0, 2.4, 2.1, 2.4) },
+      { g: ico(0), color: 0x58a53f, m: xf(1.3, 3.4, 0.5, 1.5, 1.3, 1.5, 0.3, 0.5, 0) }
+    ]);
+  }
+  function instanced(geo, mat, items) {
+    if (!items.length) return null;
+    const mesh = new THREE.InstancedMesh(geo, mat, items.length);
+    const d = new THREE.Object3D(), c = new THREE.Color();
+    items.forEach((it, i) => {
+      d.position.set(it.x, it.y, it.z);
+      d.rotation.set(it.rx || 0, it.ry || 0, it.rz || 0);
+      d.scale.set(it.sx, it.sy, it.sz);
+      d.updateMatrix();
+      mesh.setMatrixAt(i, d.matrix);
+      c.setRGB(it.c[0], it.c[1], it.c[2]);
+      mesh.setColorAt(i, c);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.frustumCulled = false;                         // instances are spread over the whole island
+    scene.add(mesh);
+    return mesh;
+  }
+  const plantMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  instanced(palmGeo(), plantMat, palms);
+  instanced(jungleGeo(), plantMat, jungleTrees);
+  instanced(bushGeo(), plantMat, bushes);
+  instanced(giantTreeGeo(), plantMat, giantTrees);
+  instanced(bananaGeo(), plantMat, bananas);
+  instanced(bambooGeo(), plantMat, bamboo);
+  instanced(fernGeo(), plantMat, ferns);
+  instanced(blossomGeo(), plantMat, blossoms);
+  instanced(cactusGeo(), plantMat, cacti);
+  instanced(barrelGeo(), plantMat, barrels);
+  instanced(dryBushGeo(), plantMat, dryBushes);
+  instanced(merge([{ g: new THREE.DodecahedronGeometry(1, 0), color: 0xc7895c, jitter: 0.25 }]), plantMat, redRocks);
+  instanced(pillarGeo(), plantMat, pillars);
+  instanced(pineGeo(), plantMat, pines);
+  instanced(meadowTreeGeo(), plantMat, meadowTrees);
+  instanced(merge([{ g: ico(0), color: 0xffffff, m: xf(0, 0.28, 0, 0.24, 0.2, 0.24), jitter: 0.1 }]), plantMat, flowers);
+  instanced(merge([{ g: new THREE.DodecahedronGeometry(1, 0), color: 0x8f8a84, jitter: 0.25 }]), plantMat, rocks);
+  instanced(merge([{ g: new THREE.ConeGeometry(0.38, 1.7, 5), color: 0xffffff, m: xf(0, 0.85, 0, 1, 1, 1), jitter: 0.5 }]),
+    new THREE.MeshBasicMaterial({ vertexColors: true }), crystals);
+  /* ---------- The town circle: seven empty plots around four shops ---------- */
+  /* Everything here is placed on a "frame": a spot on the circle, turned so its
+     local +z points away from the middle. Shops face outward, plots open inward. */
+  const HUB = W.HUB, PLOT = 11, PLOT_R = 23.5, SHOP_R = 9;
+  const plots = [], shops = [];
+  (function buildTown() {
+    const y0 = HUB.h, parts = [], signs = [];
+    const frame = (cx, cz, phi) => M4().makeTranslation(cx, y0, cz).multiply(M4().makeRotationY(Math.PI / 2 - phi));
+    const spot = (cx, cz, phi, lx, lz) => ({ x: cx + lx * Math.sin(phi) + lz * Math.cos(phi), z: cz - lx * Math.cos(phi) + lz * Math.sin(phi) });
+    const box = (F, w, h, d, x, y, z, color, rx) => parts.push({ g: new THREE.BoxGeometry(w, h, d), color, m: F.clone().multiply(xf(x, y, z, 1, 1, 1, rx || 0, 0, 0)), jitter: 0.1 });
+
+    /* Four shop stalls in the middle, each with a different roof colour. They are empty for now. */
+    const ROOFS = [0xd9483b, 0x3f7fd6, 0x4faa4f, 0xe7b930], CREAM = 0xe8d9b5;
+    for (let i = 0; i < 4; i++) {
+      const phi = i * Math.PI / 2, cx = HUB.x + Math.cos(phi) * SHOP_R, cz = HUB.z + Math.sin(phi) * SHOP_R, F = frame(cx, cz, phi);
+      box(F, 6.4, 0.2, 4.8, 0, 0.1, 0, 0xb58a5a);                       // floor
+      box(F, 6, 3, 0.25, 0, 1.6, -2.1, CREAM);                           // back wall
+      box(F, 0.25, 3, 4.2, -2.9, 1.6, 0, CREAM);                         // side walls
+      box(F, 0.25, 3, 4.2, 2.9, 1.6, 0, CREAM);
+      box(F, 6, 1, 0.6, 0, 0.7, 1.9, 0x9a6b3c);                          // counter along the front
+      box(F, 7.2, 0.25, 6, 0, 3.45, 0.3, ROOFS[i], 0.1);                 // roof, tipped toward the front
+      box(F, 2.2, 1, 0.16, 0, 3.92, 2.2, 0x7a5533);                      // sign board on the roof
+      const sp = spot(cx, cz, phi, 0, 2.31);
+      signs.push({ x: sp.x, y: y0 + 3.92, z: sp.z, nx: Math.cos(phi), nz: Math.sin(phi), w: 1.9, h: 0.95, cell: i === 1 ? 8 : 7 });   // the blue stall is the avatar shop
+      [-2, 0, 2].forEach((lx) => { const c = spot(cx, cz, phi, lx, 0); addCollider(c.x, c.z, 2.3); });
+      shops.push({ x: cx, z: cz, phi });
+    }
+
+    /* Seven plots in a ring: a square of grass with a low wooden edge, a gap on the side facing the shops, and a numbered sign. */
+    const EDGE = 0x9a6b3c, POST = 0x7a5533, half = PLOT / 2, side = (PLOT - 3.2) / 2;
+    for (let i = 0; i < 7; i++) {
+      const phi = -Math.PI / 2 + i * 2 * Math.PI / 7, cx = HUB.x + Math.cos(phi) * PLOT_R, cz = HUB.z + Math.sin(phi) * PLOT_R, F = frame(cx, cz, phi);
+      box(F, PLOT, 0.1, PLOT, 0, 0.05, 0, 0x6fb24a);                     // grass
+      box(F, PLOT + 0.4, 0.3, 0.4, 0, 0.15, half, EDGE);                 // far edge
+      box(F, 0.4, 0.3, PLOT + 0.4, -half, 0.15, 0, EDGE);                // the two sides
+      box(F, 0.4, 0.3, PLOT + 0.4, half, 0.15, 0, EDGE);
+      box(F, side + 0.2, 0.3, 0.4, -(1.6 + side / 2), 0.15, -half, EDGE);   // near edge, with the way in left open
+      box(F, side + 0.2, 0.3, 0.4, 1.6 + side / 2, 0.15, -half, EDGE);
+      [[-half, -half], [half, -half], [-half, half], [half, half]].forEach(([lx, lz]) => {
+        box(F, 0.36, 1.3, 0.36, lx, 0.65, lz, POST);                     // corner posts
+        const c = spot(cx, cz, phi, lx, lz); addCollider(c.x, c.z, 0.3);
+      });
+      box(F, 0.16, 1.7, 0.16, 3.1, 0.85, -half - 0.9, POST);             // sign post beside the way in
+      box(F, 1.9, 1, 0.14, 3.1, 1.75, -half - 0.9, POST);
+      const sp = spot(cx, cz, phi, 3.1, -half - 0.98), cp = spot(cx, cz, phi, 3.1, -half - 0.9);
+      signs.push({ x: sp.x, y: y0 + 1.75, z: sp.z, nx: -Math.cos(phi), nz: -Math.sin(phi), w: 1.7, h: 0.85, cell: i });
+      addCollider(cp.x, cp.z, 0.3);
+      plots.push({ x: cx, z: cz, phi });
+    }
+    scene.add(new THREE.Mesh(merge(parts), plantMat));
+
+    /* The words on the signs: one small picture holding all eight labels. */
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 192;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#f3e6c0'; g.fillRect(0, 0, 512, 192);
+    g.fillStyle = '#10343c'; g.font = '600 34px "Trebuchet MS", "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let c = 0; c < 9; c++) {
+      g.font = (c === 8 ? '600 29px' : '600 34px') + ' "Trebuchet MS", "Segoe UI", sans-serif';
+      g.fillText(c < 7 ? 'Plot ' + (c + 1) : c === 7 ? 'Shop' : 'Avatars', (c % 4) * 128 + 64, Math.floor(c / 4) * 64 + 34);
+    }
+    const ps = [], uv = [];
+    signs.forEach((sg) => {
+      const rx = sg.nz, rz = -sg.nx, hw = sg.w / 2, hh = sg.h / 2;           // rx, rz: to the reader's right
+      const u0 = (sg.cell % 4) / 4, u1 = u0 + 0.25, v1 = 1 - Math.floor(sg.cell / 4) / 3, v0 = v1 - 1 / 3;
+      const corner = (a, b) => { ps.push(sg.x + rx * hw * a, sg.y + hh * b, sg.z + rz * hw * a); uv.push(a < 0 ? u0 : u1, b < 0 ? v0 : v1); };
+      corner(-1, 1); corner(-1, -1); corner(1, 1); corner(1, 1); corner(-1, -1); corner(1, -1);
+    });
+    const sgGeo = new THREE.BufferGeometry();
+    sgGeo.setAttribute('position', new THREE.Float32BufferAttribute(ps, 3));
+    sgGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    scene.add(new THREE.Mesh(sgGeo, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), side: THREE.DoubleSide })));
+  })();
+
+  [[W.CH_T - 4, 0x58e6ff, 5.5], [W.CH_T + 20, 0xb07cff, 6], [W.tA + 16, 0x66ffc0, 6]].forEach(([t, color, y]) => {
+    const q = W.axisPoint(t, W.caveOffset(t));
+    const l = new THREE.PointLight(color, 4.2, 40, 2);
+    l.position.set(q.x, y, q.z);
+    scene.add(l);
+  });
+
+  /* ---------- Terrain mesh ---------- */
+  const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, metalness: 0 });
+  /* What the island looks like from above, kept for the minimap. */
+  const mapCol = new Float32Array(V * V * 3);
+  for (let k = 0; k < V * V; k++) {
+    const s = SH[k]; col[k * 3] *= s; col[k * 3 + 1] *= s; col[k * 3 + 2] *= s;
+    mapCol[k * 3] = col[k * 3]; mapCol[k * 3 + 1] = col[k * 3 + 1]; mapCol[k * 3 + 2] = col[k * 3 + 2];
+  }
+  (function buildTerrain() {
+    const idx = new Uint16Array(N * N * 6);
+    let o = 0;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const a = j * V + i, b = a + 1, c = a + V, d = c + 1;
+      idx[o++] = a; idx[o++] = c; idx[o++] = b; idx[o++] = b; idx[o++] = c; idx[o++] = d;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.computeVertexNormals();
+    scene.add(new THREE.Mesh(geo, groundMat));
+  })();
+
+  /* The cave roof: the outside of the mountain on top, the ceiling underneath,
+     and a wall of rock above each cave mouth. */
+  (function buildCaveRoof() {
+    const top = [], topC = [], inn = [], innC = [], tc = [0, 0, 0];
+    const vtx = (i, j) => ({ x: -HALF + i * CELL, z: -HALF + j * CELL, k: j * V + i, i, j });
+    function pushTop(v) {
+      top.push(v.x, HT[v.k], v.z);
+      surfaceColor(v.x, v.z, HT[v.k], slopeY(HT, v.i, v.j), tc, 0);
+      topC.push(tc[0], tc[1], tc[2]);
+      mapCol[v.k * 3] = tc[0]; mapCol[v.k * 3 + 1] = tc[1]; mapCol[v.k * 3 + 2] = tc[2];
+    }
+    function pushInner(v, y) {
+      const rv = 0.86 + 0.28 * W.vnoise(v.x * 0.33 + 7, v.z * 0.33 + 3);
+      tc[0] = 0.44 * rv; tc[1] = 0.42 * rv; tc[2] = 0.40 * rv;
+      caveTint(v.x, v.z, tc, 0, W.caveDepth(v.x, v.z));
+      inn.push(v.x, y, v.z); innC.push(tc[0], tc[1], tc[2]);
+    }
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      if (!lid[j * N + i]) continue;
+      const a = vtx(i, j), b = vtx(i + 1, j), c = vtx(i, j + 1), d = vtx(i + 1, j + 1);
+      [a, c, b, b, c, d].forEach(pushTop);
+      [a, b, c, b, d, c].forEach((v) => pushInner(v, CE[v.k]));
+      [[a, b, i, j - 1], [b, d, i + 1, j], [d, c, i, j + 1], [c, a, i - 1, j]].forEach(([p, q, ni, nj]) => {
+        if (ni >= 0 && nj >= 0 && ni < N && nj < N && lid[nj * N + ni]) return;
+        pushInner(p, CE[p.k]); pushInner(q, CE[q.k]); pushInner(q, HT[q.k]);
+        pushInner(p, CE[p.k]); pushInner(q, HT[q.k]); pushInner(p, HT[p.k]);
+      });
+    }
+    if (!top.length) return;
+    const tg = new THREE.BufferGeometry();
+    tg.setAttribute('position', new THREE.Float32BufferAttribute(top, 3));
+    tg.setAttribute('color', new THREE.Float32BufferAttribute(topC, 3));
+    tg.computeVertexNormals();
+    scene.add(new THREE.Mesh(tg, groundMat));
+    const ig = new THREE.BufferGeometry();
+    ig.setAttribute('position', new THREE.Float32BufferAttribute(inn, 3));
+    ig.setAttribute('color', new THREE.Float32BufferAttribute(innC, 3));
+    ig.computeVertexNormals();
+    scene.add(new THREE.Mesh(ig, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, metalness: 0, side: THREE.DoubleSide })));
+  })();
+
+  /* ---------- Water ---------- */
+  const waterGeo = new THREE.PlaneGeometry(1500, 1500, 150, 150);
+  waterGeo.rotateX(-Math.PI / 2);
+  const water = new THREE.Mesh(waterGeo, new THREE.MeshPhongMaterial({
+    color: 0x2aa7c6, specular: 0x8fd0e0, shininess: 60, transparent: true, opacity: 0.76, flatShading: true, depthWrite: false
+  }));
+  water.renderOrder = 1;
+  scene.add(water);
+  const waterArr = waterGeo.attributes.position.array;
+  function waves(time) {
+    for (let i = 0; i < waterArr.length; i += 3) {
+      const x = waterArr[i], z = waterArr[i + 2];
+      waterArr[i + 1] = Math.sin(x * 0.09 + time * 1.2) * 0.11 + Math.cos(z * 0.075 + time * 0.95) * 0.1 + Math.sin((x + z) * 0.13 + time * 1.7) * 0.05;
+    }
+    waterGeo.attributes.position.needsUpdate = true;
+  }
+  const abyss = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshBasicMaterial({ color: 0x1a4969 }));
+  abyss.rotation.x = -Math.PI / 2; abyss.position.y = -14.1;
+  scene.add(abyss);
+
+  /* ---------- Waterfall, the stream that feeds it, and mist ---------- */
+  function streakTexture(seed) {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 256;
+    const g = c.getContext('2d'), r = W.rng(seed);
+    g.fillStyle = 'rgba(150,215,240,0.55)'; g.fillRect(0, 0, 64, 256);
+    for (let i = 0; i < 70; i++) {
+      const x = r() * 64, y = r() * 256, len = 40 + r() * 120, w = 1 + r() * 3;
+      g.fillStyle = 'rgba(255,255,255,' + (0.25 + r() * 0.6).toFixed(2) + ')';
+      g.fillRect(x, y, w, len); g.fillRect(x, y - 256, w, len);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  }
+  const T_TOP = W.RB_AXIS + 4.2, FALL_D = 5.5;
+  const lip = W.axisPoint(T_TOP, 0);
+  const Y_TOP = W.bil(HT, lip.x, lip.z) + 0.7, Y_BOT = -0.15;
+  const flowing = [];
+  function ribbon(rows, cols, at, texSeed, repeatX, repeatY, speed, opacity) {
+    const ps = [], uv = [], idx = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const q = at(r / (rows - 1), c / (cols - 1));
+      ps.push(q.x, q.y, q.z); uv.push(c / (cols - 1), q.v);
+      if (r < rows - 1 && c < cols - 1) { const a = r * cols + c; idx.push(a, a + cols, a + 1, a + 1, a + cols, a + cols + 1); }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(ps, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    const tex = streakTexture(texSeed);
+    tex.repeat.set(repeatX, repeatY);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }));
+    mesh.renderOrder = 2;
+    scene.add(mesh);
+    flowing.push({ tex, speed });
+  }
+  function fallAt(push, widen) {
+    return (s, u) => {
+      const bulge = 1 - (2 * u - 1) * (2 * u - 1);
+      const q = W.axisPoint(T_TOP - (FALL_D + push) * s - 0.5 * bulge * s, (u - 0.5) * 2 * lerp(3.0, 3.8, s) * widen);
+      return { x: q.x, y: Y_TOP - (Y_TOP - Y_BOT) * s * s, z: q.z, v: 1 - s };
+    };
+  }
+  ribbon(26, 7, fallAt(0, 1), 11, 2, 3, 0.75, 0.9);
+  ribbon(26, 5, fallAt(0.6, 0.72), 29, 1.5, 2.2, 1.05, 0.55);
+  ribbon(Math.ceil(45 - T_TOP) + 1, 2, (s, u) => {
+    const t = lerp(45, T_TOP, s), c = W.axisPoint(t, 0), q = W.axisPoint(t, (u - 0.5) * 2 * lerp(3.8, 3.0, s));
+    return { x: q.x, y: W.bil(HT, c.x, c.z) + 0.7, z: q.z, v: (t - T_TOP) * 0.12 };
+  }, 47, 1.5, 1, 0.5, 0.85);
+
+  const MIST = 150;
+  const mistPos = new Float32Array(MIST * 3), mistVel = new Float32Array(MIST * 3), mistLife = new Float32Array(MIST);
+  function mistSpawn(i) {
+    const q = W.axisPoint(T_TOP - FALL_D + (R() - 0.5) * 2.5, (R() - 0.5) * 8);
+    mistPos[i * 3] = q.x; mistPos[i * 3 + 1] = 0.2; mistPos[i * 3 + 2] = q.z;
+    const out = 0.4 + R() * 1.8;
+    mistVel[i * 3] = W.U.x * out + (R() - 0.5) * 1.6; mistVel[i * 3 + 1] = 1.4 + R() * 2.6; mistVel[i * 3 + 2] = W.U.z * out + (R() - 0.5) * 1.6;
+    mistLife[i] = 0.6 + R() * 1.8;
+  }
+  for (let i = 0; i < MIST; i++) { mistSpawn(i); mistLife[i] *= R(); }
+  const mistGeo = new THREE.BufferGeometry();
+  mistGeo.setAttribute('position', new THREE.BufferAttribute(mistPos, 3));
+  const mist = new THREE.Points(mistGeo, new THREE.PointsMaterial({
+    map: dotTexture('rgba(255,255,255,0.9)', 'rgba(255,255,255,0)'), size: 3.4, transparent: true, opacity: 0.5, depthWrite: false
+  }));
+  mist.frustumCulled = false; mist.renderOrder = 3;
+  scene.add(mist);
+  function mistStep(dt) {
+    for (let i = 0; i < MIST; i++) {
+      mistLife[i] -= dt;
+      if (mistLife[i] <= 0) { mistSpawn(i); continue; }
+      mistVel[i * 3 + 1] -= 1.5 * dt;
+      mistPos[i * 3] += mistVel[i * 3] * dt; mistPos[i * 3 + 1] += mistVel[i * 3 + 1] * dt; mistPos[i * 3 + 2] += mistVel[i * 3 + 2] * dt;
+    }
+    mistGeo.attributes.position.needsUpdate = true;
+  }
+
+  /* ---------- Clouds ---------- */
+  const clouds = new THREE.Group();
+  (function buildClouds() {
+    const items = [];
+    for (let n = 0; n < 18; n++) {
+      const a = spin(), rad = 180 + R() * 800, cx = Math.cos(a) * rad, cz = Math.sin(a) * rad, cy = 130 + R() * 70, big = 0.7 + R() * 0.9;
+      for (let b = 0; b < 5; b++) {
+        items.push({ x: cx + (R() - 0.5) * 70 * big, y: cy + (R() - 0.5) * 8, z: cz + (R() - 0.5) * 40 * big,
+          sx: (22 + R() * 22) * big, sy: (8 + R() * 6) * big, sz: (16 + R() * 14) * big, ry: spin() });
+      }
+    }
+    const geo = ico(1), pa = geo.attributes.position, cc = new Float32Array(pa.count * 3);
+    for (let i = 0; i < pa.count; i++) {                 // white on top, a faint cool tint underneath
+      const k = smoothstep(-0.9, 0.4, pa.getY(i));
+      cc[i * 3] = lerp(0.90, 1, k); cc[i * 3 + 1] = lerp(0.93, 1, k); cc[i * 3 + 2] = lerp(0.98, 1, k);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(cc, 3));
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), items.length);
+    const d = new THREE.Object3D();
+    items.forEach((it, i) => { d.position.set(it.x, it.y, it.z); d.rotation.set(0, it.ry, 0); d.scale.set(it.sx, it.sy, it.sz); d.updateMatrix(); mesh.setMatrixAt(i, d.matrix); });
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.frustumCulled = false;
+    clouds.add(mesh);
+    scene.add(clouds);
+  })();
+
+  /* ---------- The dungeon under the cave pond ---------- */
+  /* A stone room below the pond. You drop in through a shaft under the pond and
+     climb back out by a ladder on the far wall, which goes up its own narrow
+     shaft. All of it sits under the cave floor, so nothing shows from above.
+     Positions are measured from the pond's middle: the room is 20 wide (x) and
+     runs from z0 to z1. "shaft" is half the width of the drop, "lad" half the
+     width of the ladder shaft. */
+  const DG = { x: W.POOL.x, z: W.POOL.z, floor: -12, ceil: -5.6, top: -1.6, hx: 10, z0: -1.7, z1: 17, shaft: 1.7, lad: 1.2 };
+  const TORCHES = [[-9.7, -8.4, 4], [-9.7, -8.4, 12.5], [9.7, -8.4, 4], [9.7, -8.4, 12.5], [-2.6, -8.4, 16.7], [2.6, -8.4, 16.7]];
+  const PILLARS = [[-5, 5.5], [5, 5.5], [-5, 12], [5, 12]];
+  const GOLD = [[-8.8, 15.8, 1.25], [8.8, 15.8, 0.95], [8.9, -0.6, 1.05]];   // piles in three of the corners: x, z, size
+  const dgBlocks = [];                                   // things to walk around down there: x, z, radius
+  const flameMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+  (function buildDungeon() {
+    const ps = [], cs = [];
+    function glow(x, y, z) {                             // torchlight, painted straight onto the stone
+      let l = 0.2;
+      for (const t of TORCHES) l += 1.5 / (1 + ((x - t[0]) * (x - t[0]) + (y - t[1]) * (y - t[1]) + (z - t[2]) * (z - t[2])) / 14);
+      l += 0.9 / (1 + (x * x + (y - DG.top) * (y - DG.top) + z * z) / 6);          // light falling down the shaft
+      return Math.min(1.25, l);
+    }
+    /* One flat panel cut into stone blocks. o is a corner, u and v its two edges. */
+    function panel(o, u, v, nu, nv, base, seed) {
+      for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) {
+        const stone = 0.8 + 0.34 * W.vnoise(a * 3.7 + seed, b * 5.3 + seed * 1.7);
+        [[a, b], [a + 1, b], [a, b + 1], [a + 1, b], [a + 1, b + 1], [a, b + 1]].forEach(([qa, qb]) => {
+          const fa = qa / nu, fb = qb / nv;
+          const x = o[0] + u[0] * fa + v[0] * fb, y = o[1] + u[1] * fa + v[1] * fb, z = o[2] + u[2] * fa + v[2] * fb;
+          const l = glow(x, y, z) * stone;
+          ps.push(DG.x + x, y, DG.z + z);
+          cs.push(base[0] * l * 1.1, base[1] * l * 0.97, base[2] * l * 0.82);
+        });
+      }
+    }
+    const F = DG.floor, T = DG.ceil, hx = DG.hx, z0 = DG.z0, z1 = DG.z1, sh = DG.shaft, len = z1 - z0, tall = T - F;
+    const WALL = [0.32, 0.305, 0.29], FLOOR = [0.4, 0.37, 0.34], ROOF = [0.3, 0.29, 0.28];
+    panel([-hx, F, z0], [2 * hx, 0, 0], [0, 0, len], 20, 19, FLOOR, 1);                 // floor
+    panel([-hx, T, z0], [hx - sh, 0, 0], [0, 0, len], 8, 19, ROOF, 2);                  // ceiling, left of the shaft
+    panel([sh, T, z0], [hx - sh, 0, 0], [0, 0, len], 8, 19, ROOF, 3);                   // ceiling, right of the shaft
+    const ld = DG.lad, lz0 = z1 - 2 * ld;                                               // the ladder shaft's footprint
+    panel([-sh, T, sh], [2 * sh, 0, 0], [0, 0, lz0 - sh], 3, 13, ROOF, 4);              // ceiling, between the two shafts
+    panel([-sh, T, lz0], [sh - ld, 0, 0], [0, 0, 2 * ld], 1, 2, ROOF, 13);              // ceiling, either side of the ladder shaft
+    panel([ld, T, lz0], [sh - ld, 0, 0], [0, 0, 2 * ld], 1, 2, ROOF, 14);
+    panel([-hx, F, z0], [2 * hx, 0, 0], [0, tall, 0], 20, 8, WALL, 5);                  // ladder wall
+    panel([-hx, F, z1], [2 * hx, 0, 0], [0, tall, 0], 20, 8, WALL, 6);                  // far wall
+    panel([-hx, F, z0], [0, 0, len], [0, tall, 0], 19, 8, WALL, 7);                     // side walls
+    panel([hx, F, z0], [0, 0, len], [0, tall, 0], 19, 8, WALL, 8);
+    const up = DG.top - T;
+    panel([-sh, T, z0], [2 * sh, 0, 0], [0, up, 0], 3, 5, WALL, 9);                     // the shaft's four sides
+    panel([-sh, T, sh], [2 * sh, 0, 0], [0, up, 0], 3, 5, WALL, 10);
+    panel([-sh, T, z0], [0, 0, 2 * sh], [0, up, 0], 3, 5, WALL, 11);
+    panel([sh, T, z0], [0, 0, 2 * sh], [0, up, 0], 3, 5, WALL, 12);
+    panel([-ld, T, z1], [2 * ld, 0, 0], [0, up, 0], 2, 5, WALL, 15);                    // the ladder shaft's sides and dark top
+    panel([-ld, T, lz0], [2 * ld, 0, 0], [0, up, 0], 2, 5, WALL, 16);
+    panel([-ld, T, lz0], [0, 0, 2 * ld], [0, up, 0], 2, 5, WALL, 17);
+    panel([ld, T, lz0], [0, 0, 2 * ld], [0, up, 0], 2, 5, WALL, 18);
+    panel([-ld, DG.top, lz0], [2 * ld, 0, 0], [0, 0, 2 * ld], 2, 2, [0.1, 0.1, 0.1], 19);
+    PILLARS.forEach(([cx, cz], n) => {
+      const w = 0.6;
+      panel([cx - w, F, cz - w], [2 * w, 0, 0], [0, tall, 0], 1, 8, WALL, 20 + n);
+      panel([cx - w, F, cz + w], [2 * w, 0, 0], [0, tall, 0], 1, 8, WALL, 30 + n);
+      panel([cx - w, F, cz - w], [0, 0, 2 * w], [0, tall, 0], 1, 8, WALL, 40 + n);
+      panel([cx + w, F, cz - w], [0, 0, 2 * w], [0, tall, 0], 1, 8, WALL, 50 + n);
+      dgBlocks.push(cx, cz, 0.95);
+    });
+    const room = new THREE.BufferGeometry();
+    room.setAttribute('position', new THREE.Float32BufferAttribute(ps, 3));
+    room.setAttribute('color', new THREE.Float32BufferAttribute(cs, 3));
+    scene.add(new THREE.Mesh(room, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+
+    /* Pond water seen from underneath, closing the top of the shaft. */
+    const lidGeo = new THREE.PlaneGeometry(2 * sh, 2 * sh);
+    lidGeo.rotateX(-Math.PI / 2);
+    const lidMesh = new THREE.Mesh(lidGeo, new THREE.MeshBasicMaterial({ color: 0x8fdcf2, side: THREE.DoubleSide }));
+    lidMesh.position.set(DG.x, DG.top, DG.z);
+    scene.add(lidMesh);
+
+    /* Ladder, torch handles and gold. */
+    const props = [], wood = 0xa9743f, ladTop = DG.top - 0.3, lz = z1 - 0.16;
+    [-0.42, 0.42].forEach((lx) => props.push({ g: new THREE.CylinderGeometry(0.07, 0.07, ladTop - F, 4), color: wood,
+      m: xf(DG.x + lx, (ladTop + F) / 2, DG.z + lz, 1, 1, 1), jitter: 0.3 }));
+    for (let y = F + 0.45; y < ladTop - 0.1; y += 0.55)
+      props.push({ g: new THREE.CylinderGeometry(0.05, 0.05, 0.84, 4), color: 0xc08a4f, m: xf(DG.x, y, DG.z + lz, 1, 1, 1, 0, 0, Math.PI / 2), jitter: 0.3 });
+    const flames = [];
+    TORCHES.forEach(([tx, ty, tz]) => {
+      const ix = tx > 5 ? -1 : tx < -5 ? 1 : 0, iz = ix ? 0 : -1;                      // which way is into the room
+      const bx = DG.x + tx + ix * 0.3, bz = DG.z + tz + iz * 0.3;
+      props.push({ g: new THREE.CylinderGeometry(0.06, 0.05, 0.8, 5), color: 0x6b4a2b, m: xf(bx, ty - 0.45, bz, 1, 1, 1, iz * 0.35, 0, -ix * 0.35) });   // leaning out from the wall
+      const fx = bx + ix * 0.14, fz = bz + iz * 0.14;
+      flames.push({ g: new THREE.ConeGeometry(0.2, 0.6, 6), color: 0xff8a1f, m: xf(fx, ty + 0.25, fz, 1, 1, 1), jitter: 0.25 });
+      flames.push({ g: new THREE.ConeGeometry(0.11, 0.36, 5), color: 0xffe066, m: xf(fx, ty + 0.16, fz, 1, 1, 1), jitter: 0.1 });
+    });
+    GOLD.forEach(([gx, gz, size]) => {
+      for (let n = 0; n < 18; n++) {
+        const a = spin(), d = Math.sqrt(R()) * 0.95 * size, nug = (0.15 + R() * 0.2) * size;
+        const y = F + nug * 0.5 + (1 - d / size) * 0.6 * size * R();                   // heaped higher in the middle
+        props.push({ g: n % 3 ? new THREE.DodecahedronGeometry(1, 0) : ico(0), color: n % 4 ? 0xffc21f : 0xffe680,
+          m: xf(DG.x + gx + Math.cos(a) * d, y, DG.z + gz + Math.sin(a) * d, nug, nug * 0.8, nug, R() * 3, R() * 3, R() * 3), jitter: 0.5 });
+      }
+      dgBlocks.push(gx, gz, 0.95 * size);
+    });
+
+    /* Rusty mine carts: two on a stretch of old track across the room, and one tipped over in the empty corner. */
+    const RUST = [0x8a4b2a, 0x733d24, 0x9a5a30], IRON = 0x4d403a, TZ = 8.75;
+    const nugget = (n) => (n % 2 ? new THREE.DodecahedronGeometry(1, 0) : ico(0));
+    function cart(Fm, load) {                             // Fm: where the cart stands. load: how many gold nuggets are in it
+      const put = (g, color, m, jitter) => props.push({ g, color, m: Fm.clone().multiply(m), jitter: jitter === undefined ? 0.4 : jitter });
+      put(new THREE.BoxGeometry(1.7, 0.14, 0.8), IRON, xf(0, 0.44, 0, 1, 1, 1));                  // frame under the tub
+      put(new THREE.BoxGeometry(2, 0.12, 1.1), RUST[1], xf(0, 0.57, 0, 1, 1, 1));                 // tub floor
+      put(new THREE.BoxGeometry(2, 0.8, 0.1), RUST[0], xf(0, 0.97, 0.55, 1, 1, 1));               // long sides
+      put(new THREE.BoxGeometry(2, 0.8, 0.1), RUST[2], xf(0, 0.97, -0.55, 1, 1, 1));
+      put(new THREE.BoxGeometry(0.1, 0.8, 1.2), RUST[1], xf(1, 0.97, 0, 1, 1, 1));                // ends
+      put(new THREE.BoxGeometry(0.1, 0.8, 1.2), RUST[0], xf(-1, 0.97, 0, 1, 1, 1));
+      [[-0.6, -0.48], [0.6, -0.48], [-0.6, 0.48], [0.6, 0.48]].forEach(([wx, wz]) =>
+        put(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 8), IRON, xf(wx, 0.28, wz, 1, 1, 1, Math.PI / 2, 0, 0)));   // wheels
+      for (let n = 0; n < load; n++) {
+        const nug = 0.13 + R() * 0.12;
+        put(nugget(n), n % 3 ? 0xffc21f : 0xffe680, xf((R() - 0.5) * 1.6, 0.75 + R() * 0.45, (R() - 0.5) * 0.8, nug, nug * 0.8, nug, R() * 3, R() * 3, R() * 3), 0.5);
+      }
+    }
+    const onFloor = (lx, y, lz) => M4().makeTranslation(DG.x + lx, F + y, DG.z + lz);
+    [-0.48, 0.48].forEach((rz) => props.push({ g: new THREE.BoxGeometry(19.7, 0.1, 0.1), color: IRON, m: onFloor(0, 0.12, TZ + rz), jitter: 0.35 }));   // rails
+    for (let sx = -9.3; sx <= 9.31; sx += 0.93) props.push({ g: new THREE.BoxGeometry(0.22, 0.07, 1.5), color: 0x5a4128, m: onFloor(sx, 0.035, TZ), jitter: 0.3 });   // sleepers
+    [-1, 1].forEach((sd) => {                             // where the track runs into the wall: a dark tunnel mouth, boarded up
+      props.push({ g: new THREE.BoxGeometry(0.12, 2.6, 2.4), color: 0x0e0d0c, m: onFloor(sd * 9.93, 1.3, TZ), jitter: 0.05 });
+      [-0.55, 0.55].forEach((tilt) => props.push({ g: new THREE.BoxGeometry(0.1, 0.24, 3), color: 0x7a5533, m: onFloor(sd * 9.84, 1.3, TZ).multiply(xf(0, 0, 0, 1, 1, 1, tilt, 0, 0)), jitter: 0.3 }));
+    });
+    cart(onFloor(-6.8, 0.17, TZ), 0);                     // an empty one
+    cart(onFloor(6.4, 0.17, TZ), 10);                     // one still loaded with gold
+    cart(onFloor(-7.6, 0.62, 0.6).multiply(M4().makeRotationY(0.5)).multiply(M4().makeRotationX(1.45)), 0);   // one on its side
+    for (let n = 0; n < 7; n++) {                         // what spilled out of it
+      const nug = 0.14 + R() * 0.12, d = 1.7 + R() * 1.3, lat = (R() - 0.5) * 1.6;
+      props.push({ g: nugget(n), color: n % 3 ? 0xffc21f : 0xffe680, jitter: 0.5,
+        m: onFloor(-7.6 + 0.48 * d + 0.88 * lat, nug * 0.5, 0.6 + 0.88 * d - 0.48 * lat).multiply(xf(0, 0, 0, nug, nug * 0.8, nug, R() * 3, R() * 3, R() * 3)) });
+    }
+    dgBlocks.push(-6.8, TZ, 1.05, 6.4, TZ, 1.05, -7.3, 1.2, 1.15);
+    scene.add(new THREE.Mesh(merge(props), new THREE.MeshBasicMaterial({ vertexColors: true })));
+    scene.add(new THREE.Mesh(merge(flames), flameMat));
+  })();
+
+  /* ---------- The player's avatar ---------- */
+  /* A blocky figure made of boxes, facing -z. Skin, shirt and pants are three paints the avatar
+     shop recolours. Head and back accessories are small models that are shown or hidden. */
+  const SKINS = [['#f8d9c0', 'light'], ['#f1c27d', 'golden'], ['#e0ac69', 'tan'], ['#c68642', 'brown'], ['#8d5524', 'dark brown'], ['#5c3a21', 'deep brown']];
+  const SHIRTS = [['#e2483d', 'red'], ['#f08a2c', 'orange'], ['#f6c93b', 'yellow'], ['#4faa4f', 'green'], ['#2fa7a0', 'teal'], ['#3f7fd6', 'blue'], ['#8a5ad6', 'purple'], ['#ef6fae', 'pink'], ['#f2f2f2', 'white'], ['#2a2f33', 'black']];
+  const PANTS = [['#2c3e63', 'navy'], ['#4a6fa5', 'blue'], ['#2a2f33', 'black'], ['#7b8088', 'grey'], ['#6b4a2b', 'brown'], ['#c2a878', 'khaki'], ['#3f7a4a', 'green'], ['#a8382f', 'red']];
+  const HAIRS = [['short', 'Short'], ['buzz', 'Buzz cut'], ['spiky', 'Spiky'], ['swoop', 'Swoop'], ['curly', 'Curly'], ['bob', 'Bob'], ['long', 'Long'],
+    ['ponytail', 'Ponytail'], ['pigtails', 'Pigtails'], ['bun', 'Bun'], ['none', 'No hair']];
+  const HAIRCOLS = [['#23201e', 'black'], ['#4a2f1d', 'dark brown'], ['#8a5a2b', 'light brown'], ['#e2b84a', 'blonde'], ['#b5462a', 'red'], ['#ef6fae', 'pink'], ['#3f7fd6', 'blue'], ['#e9e9ee', 'white']];
+  const HEADS = [['none', 'None'], ['cap', 'Cap'], ['crown', 'Crown'], ['tophat', 'Top hat'], ['ears', 'Cat ears']];
+  const BACKS = [['none', 'None'], ['sword', 'Sword'], ['skateboard', 'Skateboard'], ['backpack', 'Backpack'], ['wings', 'Wings']];
+  const CHOICES = { skin: SKINS, hair: HAIRS, hairColor: HAIRCOLS, shirt: SHIRTS, pants: PANTS, head: HEADS, back: BACKS };
+  const AV = { skin: '#e0ac69', hair: 'short', hairColor: '#4a2f1d', shirt: '#3f7fd6', pants: '#2c3e63', head: 'none', back: 'none' };   // what the player is wearing
+  try {                                                  // the last look chosen on this device
+    const saved = JSON.parse(localStorage.getItem('mutation-mayhem-avatar') || 'null') || {};
+    for (const k in CHOICES) if (CHOICES[k].some((c) => c[0] === saved[k])) AV[k] = saved[k];
+  } catch (e) { /* no saved look: start with the usual one */ }
+
+  const lam = (color) => new THREE.MeshLambertMaterial({ color });
+  const block = (parent, mat, w, h, d, x, y, z, rx, ry, rz) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); parent.add(m); return m;
+  };
+  /* One blocky person. "pt" holds its paints: skin, shirt, pants and face. The legs, arms and head
+     hang from joints, so they can swing. Used for the player and for the shopkeeper. */
+  function figure(pt) {
+    const root = new THREE.Group();
+    const joint = (x, y, z) => { const j = new THREE.Group(); j.position.set(x, y, z); root.add(j); return j; };
+    const f = { root, legL: joint(-0.18, 0.8, 0), legR: joint(0.18, 0.8, 0), armL: joint(-0.47, 1.5, 0), armR: joint(0.47, 1.5, 0), head: joint(0, 1.54, 0) };
+    block(f.legL, pt.pants, 0.32, 0.8, 0.34, 0, -0.4, 0);
+    block(f.legR, pt.pants, 0.32, 0.8, 0.34, 0, -0.4, 0);
+    block(root, pt.shirt, 0.72, 0.74, 0.4, 0, 1.17, 0);
+    [f.armL, f.armR].forEach((arm) => { block(arm, pt.shirt, 0.2, 0.42, 0.26, 0, -0.19, 0); block(arm, pt.skin, 0.18, 0.32, 0.24, 0, -0.56, 0); });
+    block(f.head, pt.skin, 0.52, 0.52, 0.52, 0, 0.26, 0);
+    block(f.head, pt.face, 0.08, 0.1, 0.03, -0.12, 0.3, -0.262);                 // eyes and a smile
+    block(f.head, pt.face, 0.08, 0.1, 0.03, 0.12, 0.3, -0.262);
+    block(f.head, pt.face, 0.2, 0.04, 0.03, 0, 0.14, -0.262);
+    scene.add(root);
+    return f;
+  }
+  const paint = { skin: lam(AV.skin), shirt: lam(AV.shirt), pants: lam(AV.pants), hair: lam(AV.hairColor), face: lam(0x1d2a2e), tie: lam(0xef6fae) };
+  const me = figure(paint), avatar = me.root, legL = me.legL, legR = me.legR, armL = me.armL, armR = me.armR, headJ = me.head;
+  avatar.visible = false;
+
+  /* Hairstyles. Each is a few blocks on the head: [width, height, depth, x, y, z, and optional tilts].
+     "up" pieces stick up above the head, so they tuck away under a hat. "tie" pieces are hair ties. */
+  const TOP = [0.57, 0.16, 0.57, 0, 0.5, 0.01], NAPE = [0.57, 0.34, 0.12, 0, 0.3, 0.24];
+  const HAIR_SHAPES = {
+    short: { on: [TOP, NAPE] },
+    buzz: { on: [[0.54, 0.07, 0.54, 0, 0.55, 0], [0.54, 0.3, 0.05, 0, 0.34, 0.27], [0.05, 0.2, 0.4, -0.27, 0.38, 0.06], [0.05, 0.2, 0.4, 0.27, 0.38, 0.06]] },
+    spiky: { on: [TOP, NAPE], up: [[0.13, 0.24, 0.13, -0.17, 0.66, -0.14, 0.25, 0, 0.3], [0.13, 0.28, 0.13, 0.02, 0.68, -0.16, 0.3, 0, 0], [0.13, 0.24, 0.13, 0.19, 0.66, -0.1, 0.2, 0, -0.3],
+      [0.13, 0.26, 0.13, -0.1, 0.67, 0.1, -0.1, 0, 0.25], [0.13, 0.26, 0.13, 0.12, 0.67, 0.12, -0.15, 0, -0.25]] },
+    swoop: { on: [TOP, NAPE, [0.46, 0.14, 0.1, -0.06, 0.45, -0.275, 0, 0, 0.2], [0.1, 0.3, 0.3, -0.29, 0.36, -0.08]] },
+    curly: { on: [[0.74, 0.3, 0.74, 0, 0.54, 0.02], [0.7, 0.36, 0.2, 0, 0.3, 0.27], [0.12, 0.34, 0.5, -0.32, 0.32, 0.04], [0.12, 0.34, 0.5, 0.32, 0.32, 0.04]], up: [[0.58, 0.14, 0.58, 0, 0.71, 0.02]] },
+    bob: { on: [TOP, [0.62, 0.52, 0.14, 0, 0.22, 0.25], [0.11, 0.48, 0.44, -0.3, 0.24, 0.03], [0.11, 0.48, 0.44, 0.3, 0.24, 0.03], [0.5, 0.1, 0.06, 0, 0.46, -0.275]] },
+    long: { on: [TOP, [0.6, 0.86, 0.13, 0, 0.05, 0.26], [0.1, 0.62, 0.3, -0.3, 0.17, 0.1], [0.1, 0.62, 0.3, 0.3, 0.17, 0.1]] },
+    ponytail: { on: [TOP, NAPE, [0.2, 0.18, 0.2, 0, 0.44, 0.37], [0.2, 0.62, 0.16, 0, 0.12, 0.49, -0.22, 0, 0]], tie: [[0.23, 0.08, 0.17, 0, 0.44, 0.34]] },
+    pigtails: { on: [TOP, NAPE, [0.15, 0.48, 0.15, -0.36, 0.12, 0.1, 0, 0, -0.18], [0.15, 0.48, 0.15, 0.36, 0.12, 0.1, 0, 0, 0.18]], tie: [[0.17, 0.07, 0.17, -0.32, 0.36, 0.1], [0.17, 0.07, 0.17, 0.32, 0.36, 0.1]] },
+    bun: { on: [TOP, NAPE, [0.27, 0.27, 0.27, 0, 0.55, 0.3]] },
+    none: { on: [] }
+  };
+  const hair = {};
+  for (const name in HAIR_SHAPES) {
+    const all = new THREE.Group(), up = new THREE.Group(), shape = HAIR_SHAPES[name];
+    (shape.on || []).forEach((q) => block(all, paint.hair, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
+    (shape.tie || []).forEach((q) => block(all, paint.tie, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
+    (shape.up || []).forEach((q) => block(up, paint.hair, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
+    all.add(up); headJ.add(all);
+    hair[name] = { all, up };
+  }
+
+  const gear = {}, GILT = 0xffc21f;
+  const bx = (w, h, d, color, x, y, z, rx, ry, rz) => ({ g: new THREE.BoxGeometry(w, h, d), color, m: xf(x, y, z, 1, 1, 1, rx || 0, ry || 0, rz || 0), jitter: 0.06 });
+  const rod = (rt, rb, h, n, color, x, y, z, rx, ry, rz) => ({ g: new THREE.CylinderGeometry(rt, rb, h, n), color, m: xf(x, y, z, 1, 1, 1, rx || 0, ry || 0, rz || 0), jitter: 0.06 });
+  const tilted = (S, list) => list.map((part) => { part.m = S.clone().multiply(part.m); return part; });   // move a whole accessory at once
+  const model = (parent, list) => { const m = new THREE.Mesh(merge(list), plantMat); m.visible = false; parent.add(m); return m; };
+  /* On the head (measured from the neck: the top of the hair is about 0.58 up). */
+  gear.cap = model(headJ, [bx(0.6, 0.2, 0.6, 0xd9483b, 0, 0.63, 0.01), bx(0.52, 0.05, 0.3, 0xb93a30, 0, 0.555, -0.42)]);
+  gear.crown = model(headJ, [
+    bx(0.56, 0.14, 0.06, GILT, 0, 0.65, -0.25), bx(0.56, 0.14, 0.06, GILT, 0, 0.65, 0.25), bx(0.06, 0.14, 0.56, GILT, -0.25, 0.65, 0), bx(0.06, 0.14, 0.56, GILT, 0.25, 0.65, 0),
+    bx(0.1, 0.09, 0.04, 0xe2483d, 0, 0.65, -0.29)
+  ].concat([[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25], [0, -0.25], [0, 0.25]].map(([cx, cz]) => ({ g: new THREE.ConeGeometry(0.07, 0.17, 4), color: GILT, m: xf(cx, 0.8, cz, 1, 1, 1), jitter: 0.06 }))));
+  gear.tophat = model(headJ, [rod(0.4, 0.4, 0.05, 12, 0x23262b, 0, 0.6, 0), rod(0.26, 0.26, 0.46, 12, 0x23262b, 0, 0.85, 0), rod(0.268, 0.268, 0.09, 12, 0xd9483b, 0, 0.68, 0)]);
+  gear.ears = model(headJ, [-0.18, 0.18].reduce((list, ex) => list.concat([
+    { g: new THREE.ConeGeometry(0.13, 0.26, 4), color: 0x3b2516, m: xf(ex, 0.7, 0.03, 1, 1, 1), jitter: 0.06 },
+    { g: new THREE.ConeGeometry(0.07, 0.15, 4), color: 0xf5a3c0, m: xf(ex, 0.67, -0.04, 1, 1, 1), jitter: 0.04 }]), []));
+  /* On the back (the shirt's back is at z = 0.2). */
+  gear.sword = model(avatar, tilted(xf(0.05, 1.22, 0.28, 1, 1, 1, 0, 0, 0.62), [
+    bx(0.1, 1.0, 0.035, 0xd5dbe0, 0, -0.32, 0), bx(0.34, 0.07, 0.07, GILT, 0, 0.21, 0), bx(0.08, 0.26, 0.07, 0x6b4a2b, 0, 0.37, 0), bx(0.12, 0.08, 0.09, GILT, 0, 0.53, 0)]));
+  gear.skateboard = model(avatar, tilted(xf(0, 1.16, 0.3, 1, 1, 1, 0, 0, -0.3), [
+    bx(0.3, 1.05, 0.05, 0xf08a2c, 0, 0, 0), bx(0.3, 0.12, 0.055, 0x2fa7a0, 0, 0.2, 0), bx(0.26, 0.05, 0.05, 0x8a9096, 0, 0.34, 0.05), bx(0.26, 0.05, 0.05, 0x8a9096, 0, -0.34, 0.05)]
+    .concat([[-0.12, 0.34], [0.12, 0.34], [-0.12, -0.34], [0.12, -0.34]].map(([wx, wy]) => rod(0.06, 0.06, 0.06, 8, 0xf2f2f2, wx, wy, 0.1, 0, 0, Math.PI / 2)))));
+  gear.backpack = model(avatar, [bx(0.52, 0.58, 0.24, 0x4faa4f, 0, 1.18, 0.32), bx(0.36, 0.24, 0.08, 0x3d8a3f, 0, 1.06, 0.47), bx(0.54, 0.1, 0.26, 0x3d8a3f, 0, 1.47, 0.32)]);
+  gear.wings = model(avatar, [-1, 1].reduce((list, sd) => list.concat([
+    bx(0.62, 0.26, 0.04, 0xffffff, sd * 0.42, 1.42, 0.3, 0, sd * 0.35, sd * 0.45),
+    bx(0.5, 0.22, 0.04, 0xf1f5f8, sd * 0.36, 1.18, 0.29, 0, sd * 0.3, sd * 0.2),
+    bx(0.32, 0.2, 0.04, 0xffffff, sd * 0.27, 0.98, 0.28, 0, sd * 0.25, 0)]), []));
+  function dress(save) {                                 // put on whatever AV says
+    paint.skin.color.set(AV.skin); paint.shirt.color.set(AV.shirt); paint.pants.color.set(AV.pants); paint.hair.color.set(AV.hairColor);
+    for (const k in gear) gear[k].visible = k === AV.head || k === AV.back;
+    const hat = AV.head === 'cap' || AV.head === 'crown' || AV.head === 'tophat';
+    for (const k in hair) { hair[k].all.visible = k === AV.hair; hair[k].up.visible = !hat; }
+    if (save) { try { localStorage.setItem('mutation-mayhem-avatar', JSON.stringify(AV)); } catch (e) { /* not saved, still wearing it */ } }
+  }
+  dress(false);
+
+  /* ---------- The avatar shop's keeper ---------- */
+  /* A stylish girl behind the counter of the blue stall: pink jacket, purple skirt, white boots,
+     a beret, sunglasses, gold jewellery and a long high ponytail with pink tips. */
+  const keeper = figure({ skin: lam('#c68642'), shirt: lam('#ff4fa8'), pants: lam('#23262b'), face: paint.face });
+  (function styleKeeper() {
+    const k = keeper, white = lam('#f7f3ee'), gold = lam('#ffc21f'), purple = lam('#7a3cff'), teal = lam('#2fa7a0'), dark = lam('#2b1b3a'), pink = lam('#ff8fc7'), black = lam('#15181b');
+    block(k.root, white, 0.24, 0.7, 0.03, 0, 1.17, -0.205);                     // white top showing under the open jacket
+    block(k.root, gold, 0.3, 0.04, 0.03, 0, 1.46, -0.215);                      // necklace
+    block(k.root, gold, 0.75, 0.07, 0.43, 0, 0.87, 0);                          // belt
+    block(k.root, purple, 0.86, 0.3, 0.54, 0, 0.7, 0);                          // skirt
+    [k.legL, k.legR].forEach((leg) => block(leg, white, 0.37, 0.36, 0.41, 0, -0.62, -0.01));   // boots
+    block(k.armL, teal, 0.32, 0.24, 0.13, -0.03, -0.9, 0);                      // handbag
+    block(k.armL, gold, 0.05, 0.2, 0.05, -0.03, -0.72, 0);
+    block(k.armR, gold, 0.21, 0.05, 0.27, 0, -0.43, 0);                         // bracelet
+    block(k.head, dark, 0.57, 0.16, 0.57, 0, 0.5, 0.01);                        // hair, with strands framing the face
+    block(k.head, dark, 0.57, 0.34, 0.12, 0, 0.3, 0.24);
+    block(k.head, dark, 0.09, 0.42, 0.1, -0.28, 0.3, -0.2);
+    block(k.head, dark, 0.09, 0.42, 0.1, 0.28, 0.3, -0.2);
+    block(k.head, dark, 0.46, 0.13, 0.08, 0.05, 0.45, -0.275, 0, 0, -0.18);     // swept fringe
+    const tail = new THREE.Group();                                               // the high ponytail
+    tail.position.set(0, 0.56, 0.34); tail.rotation.x = -0.4; k.head.add(tail);
+    block(tail, gold, 0.24, 0.08, 0.2, 0, 0, 0.04);
+    block(tail, dark, 0.2, 0.74, 0.17, 0, -0.38, 0.06);
+    block(tail, pink, 0.2, 0.22, 0.17, 0, -0.86, 0.06);
+    block(k.head, black, 0.5, 0.12, 0.03, 0, 0.31, -0.286);                     // sunglasses, gold along the top
+    block(k.head, gold, 0.52, 0.03, 0.035, 0, 0.375, -0.286);
+    block(k.head, gold, 0.05, 0.13, 0.05, -0.28, 0.13, 0.02);                   // earrings
+    block(k.head, gold, 0.05, 0.13, 0.05, 0.28, 0.13, 0.02);
+    block(k.head, teal, 0.6, 0.1, 0.58, 0.05, 0.63, 0, 0, 0, -0.14);            // beret, tipped to one side
+    block(k.head, teal, 0.06, 0.08, 0.06, 0.05, 0.71, 0);
+  })();
+
+  /* ---------- Player ---------- */
+  const EYE = 1.65, SWIM = -1.05, MAX_SLOPE = 1.6;
+  const p = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: 0, onGround: true, inLid: false, inCave: false, dungeon: false };
+  const CAM_BACK = 5.2;                                  // how far behind the avatar the camera sits outdoors
+  let shopping = false, walking = false, running = false, camD = CAM_BACK, stride = 0, stepT = 0;
+  function caveMode(x, z) {                              // would the player be inside the cave here?
+    if (!W.lidAt(x, z)) return false;
+    return p.inLid ? p.inCave : p.y < W.bil(CE, x, z) - 0.3;
+  }
+  function ground(x, z) { return W.bil(W.lidAt(x, z) && !caveMode(x, z) ? HT : H, x, z); }
+  function standing(x, z) { return Math.max(ground(x, z), SWIM); }
+  function settle() {
+    const l = W.lidAt(p.x, p.z);
+    if (l && !p.inLid) p.inCave = p.y < W.bil(CE, p.x, p.z) - 0.3;
+    if (!l) p.inCave = false;
+    p.inLid = l;
+  }
+  function tryMove(dx, dz) {
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-6) return true;
+    const nx = p.x + dx, nz = p.z + dz;
+    if (Math.hypot(nx, nz) > 225) return false;
+    if (p.onGround) {
+      const g0 = standing(p.x, p.z), gp = standing(p.x + dx / len * 0.7, p.z + dz / len * 0.7);
+      if ((gp - g0) / 0.7 > MAX_SLOPE) return false;
+    } else if (standing(nx, nz) > p.y + 0.2) return false;
+    p.x = nx; p.z = nz;
+    settle();
+    return true;
+  }
+  function pushOut() {                                   // keep the player out of tree trunks and boulders
+    const cx = Math.floor(p.x / 8), cz = Math.floor(p.z / 8);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      const arr = colliders.get((cx + a) + ',' + (cz + b));
+      if (!arr) continue;
+      for (let i = 0; i < arr.length; i += 3) {
+        const dx = p.x - arr[i], dz = p.z - arr[i + 1], rr = arr[i + 2] + 0.35, d = Math.hypot(dx, dz);
+        if (d < rr && d > 1e-4) { p.x = arr[i] + dx / d * rr; p.z = arr[i + 1] + dz / d * rr; }
+      }
+    }
+  }
+  const yawToward = (dx, dz) => Math.atan2(-dx, -dz);
+
+  /* ---------- Places you can jump to ---------- */
+  function shoreFrom(dx, dz) {                           // walk in from the sea until there is dry sand
+    for (let r = 215; r > 0; r -= 0.5) if (W.bil(H, dx * r, dz * r) > 1.15) return { x: dx * r, z: dz * r };
+    return { x: 0, z: 0 };
+  }
+  let peak = 0;
+  for (let k = 1; k < HT.length; k++) if (HT[k] > HT[peak]) peak = k;
+  const beach = shoreFrom(0.35, 0.9368), chamber = W.axisPoint(W.CH_T + 13, W.caveOffset(W.CH_T + 13)), pool = W.POOL;
+  const fallsView = { x: W.B.x + W.U.x * 16 - W.P.x * 7, z: W.B.z + W.U.z * 16 - W.P.z * 7 };
+  const jungleSpot = W.axisPoint(-118, W.riverLat(118) + 34), desertSpot = W.axisPoint(-124, W.riverLat(124) - 46);
+  const MEADOW = { x: 62, z: -40 };
+  const peakSpot = { x: -HALF + (peak % V) * CELL, z: -HALF + Math.floor(peak / V) * CELL };
+  const places = [
+    { name: 'Beach', x: beach.x, z: beach.z, yaw: yawToward(W.B.x - beach.x, W.B.z - beach.z), pitch: 0.04 },
+    { name: 'Jungle', x: jungleSpot.x, z: jungleSpot.z, yaw: yawToward(-W.P.x - W.U.x * 0.6, -W.P.z - W.U.z * 0.6), pitch: 0.05 },
+    { name: 'Desert', x: desertSpot.x, z: desertSpot.z, yaw: yawToward(W.C.x - desertSpot.x, W.C.z - desertSpot.z), pitch: 0.03 },
+    { name: 'Waterfall', x: fallsView.x, z: fallsView.z, yaw: yawToward(lip.x - fallsView.x, lip.z - fallsView.z), pitch: 0.42 },
+    { name: 'Cave', x: chamber.x, z: chamber.z, yaw: yawToward(pool.x - chamber.x, pool.z - chamber.z), pitch: 0.06, cave: true },
+    { name: 'Peak', x: peakSpot.x, z: peakSpot.z, yaw: yawToward(W.U.x, W.U.z), pitch: -0.2 },
+    { name: 'Meadow', x: MEADOW.x, z: MEADOW.z, yaw: yawToward(W.C.x - MEADOW.x, W.C.z - MEADOW.z), pitch: 0.1 },
+    { name: 'Town', x: HUB.x, z: HUB.z + HUB.r - 2.5, yaw: yawToward(0, -1), pitch: 0 }
+  ];
+  let camY = 0;
+  function goTo(i) {
+    const pl = places[i];
+    if (!pl) return;
+    if (shopping) closeShop();
+    p.x = pl.x; p.z = pl.z; p.yaw = pl.yaw; p.pitch = pl.pitch; p.vy = 0; p.onGround = true;
+    p.dungeon = false;
+    camD = pl.cave ? 0 : CAM_BACK;
+    p.inLid = W.lidAt(p.x, p.z); p.inCave = !!pl.cave && p.inLid;
+    p.y = standing(p.x, p.z);
+    pushOut();
+    camY = p.y + EYE;
+  }
+
+  /* ---------- Getting into and out of the dungeon ---------- */
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const blinkEl = $('blink');
+  function blink() {                                     // a quick fade from dark, to cover a jump in position
+    blinkEl.style.transition = 'none'; blinkEl.style.opacity = '1';
+    void blinkEl.offsetWidth;
+    blinkEl.style.transition = ''; blinkEl.style.opacity = '0';
+  }
+  function enterDungeon() {                              // the pond floor gives way
+    const s = DG.shaft - 0.4;
+    p.x = DG.x + clamp(p.x - DG.x, -s, s); p.z = DG.z + clamp(p.z - DG.z, -s, s);
+    p.dungeon = true; p.inCave = false; p.inLid = false; p.onGround = false; p.vy = Math.min(p.vy, 0);
+  }
+  function leaveDungeon() {                              // top of the ladder: back beside the pond
+    p.x = DG.x - W.P.x * 5.2; p.z = DG.z - W.P.z * 5.2;
+    p.dungeon = false; p.inLid = W.lidAt(p.x, p.z); p.inCave = p.inLid;
+    p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true;
+    p.yaw = yawToward(DG.x - p.x, DG.z - p.z); p.pitch = -0.25;
+    camY = p.y + EYE;
+    blink();
+  }
+  /* Walk inside the dungeon. Returns true while the player is pushing into the ladder. */
+  function dungeonMove(dx, dz) {
+    const m = 0.4, s = DG.shaft - m;
+    let lx = p.x - DG.x + dx, lz = p.z - DG.z + dz;
+    if (p.y + 1.9 > DG.ceil) {                             // head is up inside one of the shafts
+      if (lz > DG.z1 - 4) { lx = clamp(lx, m - DG.lad, DG.lad - m); lz = clamp(lz, DG.z1 - 2 * DG.lad + m, DG.z1 - m); }
+      else { lx = clamp(lx, -s, s); lz = clamp(lz, DG.z0 + m, s); }
+    } else {
+      lx = clamp(lx, -DG.hx + m, DG.hx - m); lz = clamp(lz, DG.z0 + m, DG.z1 - m);
+      for (let i = 0; i < dgBlocks.length; i += 3) {
+        const ox = lx - dgBlocks[i], oz = lz - dgBlocks[i + 1], rr = dgBlocks[i + 2] + 0.35, d = Math.hypot(ox, oz);
+        if (d < rr && d > 1e-4) { lx = dgBlocks[i] + ox / d * rr; lz = dgBlocks[i + 1] + oz / d * rr; }
+      }
+    }
+    lx = clamp(lx, -DG.hx + m, DG.hx - m); lz = clamp(lz, DG.z0 + m, DG.z1 - m);
+    const onLadder = Math.abs(lx) < 1 && lz > DG.z1 - m - 0.3 && dz > 0;
+    if (onLadder) lx = (p.x - DG.x) * 0.9;               // hold on: drift to the middle of the ladder instead of sliding off
+    p.x = DG.x + lx; p.z = DG.z + lz;
+    return onLadder;
+  }
+
+  /* ---------- Input ---------- */
+  const keys = new Set();
+  const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 }, look = { id: null, x: 0, y: 0 };
+  let started = false, touchJump = false, mouseDrag = false, lastMX = 0, lastMY = 0;
+  const intro = $('intro'), stick = $('stick'), knob = $('knob'), jumpBtn = $('jump');
+  const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function turn(dx, dy, k) {
+    p.yaw -= dx * k;
+    p.pitch = Math.max(-1.45, Math.min(1.45, p.pitch - dy * k));
+  }
+  /* The player's name, typed on the front cover and remembered on this device. */
+  const nameEl = $('name');
+  let playerName = 'Player';
+  try { const saved = localStorage.getItem('mutation-mayhem-name'); if (saved) nameEl.value = saved.slice(0, 16); } catch (e) { /* no storage: just start blank */ }
+  /* Admins. One special name asks for a code, and the right code starts the game as an admin.
+     The name and code are kept here only as scrambled numbers, so they can't be read straight
+     off this page. That hides them from a quick look; it is not real security. Before admins
+     can do anything that matters in a shared game, this check has to move to a server. */
+  const scramble = (str) => {
+    let h1 = 0xdeadbeef ^ 77, h2 = 0x41c6ce57 ^ 77;
+    for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+  };
+  const ADMIN_NAME = 1869928790200511, ADMIN_KEY = 8246370880143628;
+  const codeEl = $('code'), codeMsg = $('codeMsg');
+  let isAdmin = false;
+  const typedName = () => (nameEl.value || '').replace(/\s+/g, ' ').trim().slice(0, 16);
+  const isAdminName = () => scramble(typedName().toLowerCase()) === ADMIN_NAME;
+  nameEl.addEventListener('input', () => {              // the code box appears only while the admin name is typed in
+    const wanted = isAdminName();
+    if (codeEl.hidden !== wanted) return;
+    codeEl.hidden = !wanted; codeEl.value = ''; codeMsg.hidden = true;
+    if (wanted) codeEl.focus();
+  });
+  /* ---------- The avatar shop (the blue stall) ---------- */
+  const BLUE = shops[1], shopOut = { x: Math.cos(BLUE.phi), z: Math.sin(BLUE.phi) };          // which way the stall faces
+  const shopFront = { x: BLUE.x + shopOut.x * 4.2, z: BLUE.z + shopOut.z * 4.2 };              // where a customer stands
+  const shopBtn = $('shopOpen'), shopEl = $('avatarShop'), optionButtons = [];
+  const keeperYaw = Math.atan2(-shopOut.x, -shopOut.z);  // she stands behind the counter, facing the customers
+  keeper.root.position.set(BLUE.x + shopOut.x * 0.5, HUB.h + 0.2, BLUE.z + shopOut.z * 0.5);
+  keeper.root.rotation.y = keeperYaw;
+  let keeperWave = 0;
+  function keeperPose(dt, time) {                        // she sways a little, and waves when you come close
+    const near = started && Math.hypot(p.x - BLUE.x, p.z - BLUE.z) < 11 && !p.dungeon && !p.inCave;
+    keeperWave += ((near ? 1 : 0) - keeperWave) * Math.min(1, dt * 5);
+    if (reduced) { keeper.armR.rotation.z = keeperWave * 2.4; return; }
+    keeper.root.rotation.y = keeperYaw + Math.sin(time * 0.7) * 0.12;
+    keeper.head.rotation.z = Math.sin(time * 0.9) * 0.06;
+    keeper.armR.rotation.z = keeperWave * (2.4 + Math.sin(time * 9) * 0.28);
+    keeper.armL.rotation.z = -0.1;
+  }
+  let shopTurn = 0, shopTurnTo = 0;                      // 0 shows the avatar's front, half a turn shows its back
+  function markOptions() {
+    optionButtons.forEach((o) => {
+      const on = AV[o.key] === o.value;
+      if (on) o.b.classList.add('on'); else o.b.classList.remove('on');
+      o.b.setAttribute('aria-pressed', String(on));
+    });
+  }
+  [['avSkin', 'skin'], ['avHair', 'hair'], ['avHairC', 'hairColor'], ['avShirt', 'shirt'], ['avPants', 'pants'], ['avHead', 'head'], ['avBack', 'back']].forEach(([holderId, key]) => {
+    const holder = $(holderId), colour = key === 'skin' || key === 'shirt' || key === 'pants' || key === 'hairColor';
+    CHOICES[key].forEach(([value, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      if (colour) { b.style.background = value; b.setAttribute('aria-label', label); b.title = label; } else b.textContent = label;
+      b.addEventListener('click', () => {
+        AV[key] = value; dress(true); markOptions();
+        if (key === 'back' && value !== 'none') shopTurnTo = Math.PI;       // turn right round to show what's on the back
+        else if (key === 'hair') shopTurnTo = 2.2;                         // turn part way, so a ponytail or bun shows
+        else if (key !== 'hairColor') shopTurnTo = 0;
+      });
+      holder.appendChild(b);
+      optionButtons.push({ b, key, value });
+    });
+  });
+  function openShop() {
+    if (shopping || !started) return;
+    shopping = true; walking = false; shopTurn = shopTurnTo = 0;
+    keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
+    stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
+    shopBtn.hidden = true; shopEl.hidden = false;
+    document.body.classList.add('shopping');
+    markOptions();
+    $('shopDone').focus();
+  }
+  function closeShop() {
+    if (!shopping) return;
+    shopping = false;
+    shopEl.hidden = true;
+    document.body.classList.remove('shopping');
+    canvas.focus();
+  }
+  function shopView(dt) {                                // while shopping: the camera stands in front of the avatar, stall behind
+    shopTurn += (shopTurnTo - shopTurn) * Math.min(1, dt * 6);
+    const narrow = window.innerWidth <= 640, back = narrow ? 4.8 : 3.9;
+    camera.position.set(p.x + shopOut.x * back, p.y + 1.5, p.z + shopOut.z * back);
+    camera.lookAt(p.x, p.y + (narrow ? 0.05 : 1.05), p.z);    // on a phone look lower, so the avatar sits above the sheet
+    avatar.visible = true;
+    poseAvatar(dt, Math.atan2(-shopOut.x, -shopOut.z) + shopTurn);
+  }
+  shopBtn.addEventListener('click', openShop);
+  $('shopDone').addEventListener('click', closeShop);
+  $('shopTurn').addEventListener('click', () => { shopTurnTo = shopTurnTo ? 0 : Math.PI; });
+
+  /* The admin panel: the arrow on the right edge opens and closes it. Commands get added to #adminCommands later. */
+  const adminEl = $('admin'), adminTab = $('adminTab');
+  adminTab.addEventListener('click', (e) => {
+    const open = !adminEl.classList.contains('open');
+    if (open) adminEl.classList.add('open'); else adminEl.classList.remove('open');
+    adminTab.setAttribute('aria-expanded', String(open));
+    adminTab.setAttribute('aria-label', open ? 'Close admin commands' : 'Open admin commands');
+    if (e.detail > 0) adminTab.blur();                    // after a click or tap, hand the keys back to walking
+  });
+  function start(fromTouch) {
+    if (started) return;
+    const typed = typedName();
+    if (isAdminName()) {
+      if (scramble(typed.toLowerCase() + '#' + codeEl.value.trim()) !== ADMIN_KEY) {
+        codeMsg.textContent = codeEl.value ? 'That code is not right. Try again.' : 'Type the admin code to play.';
+        codeEl.hidden = false; codeMsg.hidden = false; codeEl.value = ''; codeEl.focus();
+        return;
+      }
+      isAdmin = true;
+    }
+    started = true;
+    playerName = (isAdmin ? typed.charAt(0).toUpperCase() + typed.split('@')[0].slice(1) : typed) || 'Player';   // an admin shows as the part before the @
+    const who = $('who');
+    who.textContent = playerName;
+    adminEl.hidden = !isAdmin;                            // only admins get the arrow
+    if (isAdmin) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Admin'; who.appendChild(badge); }
+    try { localStorage.setItem('mutation-mayhem-name', playerName === 'Player' ? '' : playerName); } catch (e) { /* not saved, still playable */ }
+    nameEl.blur();
+    intro.hidden = true;
+    blink();                                              // fade from the cover's flying view down to the beach
+    document.body.classList.add('playing');
+    if (fromTouch) document.body.classList.add('touch');
+    canvas.focus();
+  }
+  $('start').addEventListener('click', (e) => start(e.pointerType === 'touch' || document.body.classList.contains('touch')));
+  /* Leave: back to the front cover. The next Play starts fresh on the beach, and an admin has to sign in again. */
+  function leave() {
+    if (!started) return;
+    closeShop(); shopBtn.hidden = true; avatar.visible = false;
+    started = false; isAdmin = false;
+    keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
+    stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
+    document.body.classList.remove('playing');
+    adminEl.hidden = true; adminEl.classList.remove('open');
+    adminTab.setAttribute('aria-expanded', 'false'); adminTab.setAttribute('aria-label', 'Open admin commands');
+    $('who').textContent = '';
+    nameEl.value = playerName === 'Player' ? '' : playerName;
+    codeEl.value = ''; codeEl.hidden = true; codeMsg.hidden = true;
+    goTo(0);
+    intro.hidden = false;
+    blink();
+    $('start').focus();
+  }
+  $('leave').addEventListener('click', leave);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { passive: true, once: true });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!started) { if (e.code === 'Enter' || e.key === 'Enter') start(document.body.classList.contains('touch')); return; }
+    if (shopping) { if (e.code === 'Escape') closeShop(); return; }           // the shop's own buttons take the keys
+    if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openShop(); return; }
+    if (e.code.startsWith('Digit')) { goTo(+e.code.slice(5) - 1); return; }
+    keys.add(e.code);
+    if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => keys.delete(e.code));
+  window.addEventListener('blur', () => keys.clear());
+
+  function moveStick(e) {
+    let dx = (e.clientX - joy.ox) / 56, dy = (e.clientY - joy.oy) / 56;
+    const m = Math.hypot(dx, dy);
+    if (m > 1) { dx /= m; dy /= m; }
+    joy.x = dx; joy.y = dy;
+    knob.style.transform = 'translate(calc(-50% + ' + (dx * 36).toFixed(1) + 'px), calc(-50% + ' + (dy * 36).toFixed(1) + 'px))';
+  }
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!started) return;
+    if (e.pointerType === 'touch') {
+      document.body.classList.add('touch');
+      const sr = stick.getBoundingClientRect(), sx = sr.left + sr.width / 2, sy = sr.top + sr.height / 2;
+      if (joy.id === null && sr.width > 0 && Math.hypot(e.clientX - sx, e.clientY - sy) < sr.width / 2 + 34) {
+        joy.id = e.pointerId; joy.ox = sx; joy.oy = sy;   // the walking circle: push away from its middle
+        stick.classList.add('on');
+        moveStick(e);
+      } else if (look.id === null) { look.id = e.pointerId; look.x = e.clientX; look.y = e.clientY; }
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not critical */ }
+      e.preventDefault();
+    } else {
+      mouseDrag = true; lastMX = e.clientX; lastMY = e.clientY;      // hold and drag to look; the keys do the turning
+    }
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerId === joy.id) {
+      moveStick(e);
+    } else if (e.pointerId === look.id) {
+      turn(e.clientX - look.x, e.clientY - look.y, 0.0052);
+      look.x = e.clientX; look.y = e.clientY;
+    } else if (mouseDrag && e.pointerType !== 'touch') {
+      turn(e.clientX - lastMX, e.clientY - lastMY, 0.0042);
+      lastMX = e.clientX; lastMY = e.clientY;
+    }
+  });
+  function release(e) {
+    if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)'; }
+    if (e.pointerId === look.id) look.id = null;
+    if (e.pointerType !== 'touch') mouseDrag = false;
+  }
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  jumpBtn.addEventListener('pointerdown', (e) => { touchJump = true; e.preventDefault(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((n) => jumpBtn.addEventListener(n, () => { touchJump = false; }));
+
+  const placeBox = $('places');
+  places.forEach((pl, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const k = document.createElement('span'); k.className = 'num'; k.textContent = String(i + 1);
+    b.appendChild(k); b.appendChild(document.createTextNode(pl.name));
+    b.addEventListener('click', () => { if (!started) start(document.body.classList.contains('touch')); goTo(i); b.blur(); });
+    placeBox.appendChild(b);
+  });
+
+  /* ---------- Per-frame update ---------- */
+  let bobT = 0;
+  function update(dt, time) {
+    if (keys.has('ArrowLeft') || keys.has('KeyA')) p.yaw += 2.1 * dt;      // left and right turn you
+    if (keys.has('ArrowRight') || keys.has('KeyD')) p.yaw -= 2.1 * dt;
+    let f = -joy.y, s = joy.x;
+    if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1;                    // up and down walk
+    if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1;
+    if (keys.has('KeyE')) s += 1;                                           // Q and E step sideways
+    if (keys.has('KeyQ')) s -= 1;
+    const mag = Math.hypot(f, s), swimming = !p.dungeon && W.bil(H, p.x, p.z) < SWIM && !p.inLid;
+    let climbing = false;
+    let moving = false;
+    running = false;
+    if (mag > 0.05) {
+      const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.93;
+      running = run;
+      const sp = (run ? 17 : 9.5) * (swimming ? 0.6 : 1) * Math.min(1, mag) * dt / mag;
+      const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
+      const dx = (fx * f + rx * s) * sp, dz = (fz * f + rz * s) * sp;
+      if (p.dungeon) { climbing = dungeonMove(dx, dz); moving = true; }
+      else {
+        if (tryMove(dx, dz)) moving = true;
+        else { const a = tryMove(dx, 0), b = tryMove(0, dz); moving = a || b; }
+        if (!p.inCave) { pushOut(); settle(); }
+      }
+    }
+    if (!p.dungeon && p.inCave && Math.hypot(p.x - DG.x, p.z - DG.z) < 1.9) enterDungeon();   // into the pond, and through it
+    if ((keys.has('Space') || touchJump) && p.onGround) { p.vy = 10; p.onGround = false; }
+    const g = p.dungeon ? DG.floor : standing(p.x, p.z);
+    if (climbing) {                                       // up the ladder
+      p.vy = 0; p.onGround = false; p.y += 5.5 * dt;
+      if (p.y > DG.top - 1.9) leaveDungeon();
+    } else if (p.onGround && p.y - g < 0.8) { p.y = g; p.vy = 0; }
+    else {
+      p.onGround = false;
+      p.vy -= 30 * dt; p.y += p.vy * dt;
+      if (p.y <= g) { p.y = g; p.vy = 0; p.onGround = true; }
+    }
+    if (p.inCave) {                                       // don't jump through the cave ceiling
+      const ce = W.bil(CE, p.x, p.z);
+      if (p.y + 1.9 > ce) { p.y = Math.max(g, ce - 1.9); if (p.vy > 0) p.vy = 0; }
+    }
+    if (moving && p.onGround && !reduced) bobT += dt * (swimming ? 5 : 11);
+    const bob = reduced ? 0 : Math.sin(bobT) * (swimming ? 0.09 : 0.045) + (swimming ? Math.sin(time * 1.6) * 0.06 : 0);
+    camY += (p.y + EYE - camY) * Math.min(1, dt * 16);
+    walking = moving && p.onGround;
+    placeCamera(dt, bob);
+  }
+  /* The camera follows behind the avatar outdoors. In the cave and the dungeon, where there is no
+     room behind you, it slides forward into the avatar's head and you see through its eyes. */
+  function placeCamera(dt, bob) {
+    camD += ((p.inCave || p.dungeon ? 0 : CAM_BACK) - camD) * Math.min(1, dt * 5);
+    avatar.visible = camD > 1.3;
+    if (camD < 0.05) { camera.position.set(p.x, camY + bob, p.z); return; }
+    const cp = Math.cos(p.pitch), vx = -Math.sin(p.yaw) * cp, vy = Math.sin(p.pitch), vz = -Math.cos(p.yaw) * cp;   // the way the view points
+    const cx = p.x - vx * camD, cz = p.z - vz * camD;
+    let cy = camY + 0.45 - vy * camD;
+    if (!p.inCave && !p.dungeon) {                        // keep the camera out of the ground and the sea
+      const floor = Math.max(W.bil(HT, cx, cz), W.bil(HT, (cx + p.x) / 2, (cz + p.z) / 2) - 0.5, 0) + 0.7;
+      if (cy < floor) cy = floor;
+    }
+    camera.position.set(cx, cy, cz);
+  }
+  function poseAvatar(dt, facing) {                      // stand the avatar where the player is, and swing its arms and legs
+    avatar.position.set(p.x, p.y, p.z);
+    avatar.rotation.y = facing;
+    stride += ((walking ? 1 : 0) - stride) * Math.min(1, dt * 10);
+    if (walking) stepT += dt * (running ? 14 : 9.5);
+    const sw = reduced ? 0 : Math.sin(stepT) * 0.75 * stride;
+    legL.rotation.x = sw; legR.rotation.x = -sw; armL.rotation.x = -sw * 0.8; armR.rotation.x = sw * 0.8;
+  }
+
+  /* ---------- HUD: where you are, and the minimap ---------- */
+  const zoneEl = $('zone');
+  let zone = '';
+  function zoneName() {
+    const a = W.axisCoords(p.x, p.z), h = W.bil(H, p.x, p.z), s = W.coastS(p.x, p.z);
+    if (p.dungeon) return 'Dungeon';
+    if (p.inCave) return 'Crystal cave';
+    if (Math.hypot(p.x - HUB.x, p.z - HUB.z) < HUB.r) return 'Town';
+    if (a.dB < 19 || (a.dB < 27 && p.y < 10)) return 'Waterfall lagoon';
+    if (h < -0.6) return s > 0.06 ? 'River' : 'Ocean';
+    if (p.y > 36) return 'Snowy peak';
+    if (h < 1.9 && s < 0.22) return 'Beach';
+    if (W.mountainAt(p.x, p.z) > 9) return 'Mountains';
+    if (W.desertF(p.x, p.z) > 0.5) return 'Desert';
+    if (W.jungleF(p.x, p.z) > 0.5) return 'Jungle';
+    return 'Meadow';
+  }
+  const hintEl = $('hint');
+  let hint = '';
+  function showZone() {
+    const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : '';
+    if (tip !== hint) { hint = tip; hintEl.textContent = tip; }
+    const atShop = started && !shopping && !p.dungeon && !p.inCave && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6;
+    if (shopBtn.hidden === atShop) shopBtn.hidden = !atShop;      // the "open the shop" button shows only at the blue stall
+    const z = zoneName();
+    if (z === zone) return;
+    zone = z;
+    zoneEl.textContent = z;
+    zoneEl.classList.remove('in'); void zoneEl.offsetWidth; zoneEl.classList.add('in');
+  }
+
+  const mapEl = $('map'), mapCtx = mapEl.getContext('2d'), MAP_R = 190, MAP_PX = 132;
+  const mapBase = document.createElement('canvas');
+  mapBase.width = mapBase.height = MAP_PX;
+  (function paintMap() {
+    const g = mapBase.getContext('2d'), img = g.createImageData(MAP_PX, MAP_PX), d = img.data;
+    for (let v = 0; v < MAP_PX; v++) for (let u = 0; u < MAP_PX; u++) {
+      const x = -MAP_R + (u + 0.5) / MAP_PX * MAP_R * 2, z = -MAP_R + (v + 0.5) / MAP_PX * MAP_R * 2;
+      const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL), k = j * V + i, o = (v * MAP_PX + u) * 4;
+      let r = mapCol[k * 3], gg = mapCol[k * 3 + 1], b = mapCol[k * 3 + 2];
+      if (H[k] < -0.1 && HT[k] - H[k] < 0.3) { const w = smoothstep(-0.1, -1.2, H[k]) * 0.72; r = lerp(r, 0.17, w); gg = lerp(gg, 0.62, w); b = lerp(b, 0.78, w); }
+      d[o] = Math.min(255, r * 268); d[o + 1] = Math.min(255, gg * 268); d[o + 2] = Math.min(255, b * 268); d[o + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  })();
+  const toMap = (v, size) => (v + MAP_R) / (MAP_R * 2) * size;
+  function drawMap() {
+    const size = mapEl.width;
+    mapCtx.imageSmoothingEnabled = true;
+    mapCtx.drawImage(mapBase, 0, 0, size, size);
+    mapCtx.fillStyle = 'rgba(255,255,255,0.9)';
+    places.forEach((pl) => { mapCtx.beginPath(); mapCtx.arc(toMap(pl.x, size), toMap(pl.z, size), size * 0.014, 0, 6.3); mapCtx.fill(); });
+    mapCtx.save();
+    mapCtx.translate(toMap(p.x, size), toMap(p.z, size));
+    mapCtx.rotate(Math.atan2(-Math.cos(p.yaw), -Math.sin(p.yaw)));
+    const a = size * 0.055;
+    mapCtx.beginPath(); mapCtx.moveTo(a, 0); mapCtx.lineTo(-a * 0.7, a * 0.62); mapCtx.lineTo(-a * 0.3, 0); mapCtx.lineTo(-a * 0.7, -a * 0.62); mapCtx.closePath();
+    mapCtx.fillStyle = '#ef6b4f'; mapCtx.strokeStyle = '#ffffff'; mapCtx.lineWidth = size * 0.012; mapCtx.lineJoin = 'round';
+    mapCtx.stroke(); mapCtx.fill();
+    mapCtx.restore();
+  }
+
+  /* ---------- Main loop ---------- */
+  let vw = 0, vh = 0;
+  function resize() {
+    const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
+    if (w === vw && h === vh) return;
+    vw = w; vh = h;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / Math.max(1, h);
+    camera.updateProjectionMatrix();
+  }
+  goTo(0);
+  let last = performance.now(), frame = 0, coverTurn = 0.9;
+  function tick(now) {
+    requestAnimationFrame(tick);
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)), time = now / 1000;
+    last = now;
+    resize();
+    if (started && !shopping) update(dt, time);
+    else if (!started) {                                  // the front cover: circle the island from the air
+      if (!reduced) coverTurn += dt * 0.07;
+      camera.position.set(Math.cos(coverTurn) * 250, 92, Math.sin(coverTurn) * 250);
+      camera.lookAt(0, 42, 0);                            // aim above the island so it sits low, under the title
+    }
+    if (started) {
+      if (shopping) shopView(dt);
+      else { camera.rotation.set(p.pitch, p.yaw, 0); poseAvatar(dt, p.yaw); }
+    }
+    skyGroup.position.copy(camera.position);
+    waves(time);
+    mistStep(dt);
+    flowing.forEach((fl) => { fl.tex.offset.y = (fl.tex.offset.y + dt * fl.speed) % 1; });
+    if (!reduced) flameMat.color.setScalar(0.86 + 0.14 * Math.sin(time * 11) * Math.sin(time * 6.3));   // torches flicker
+    clouds.rotation.y += dt * 0.004;
+    keeperPose(dt, time);
+    if (frame % 3 === 0) drawMap();
+    if (frame % 10 === 0) showZone();
+    frame++;
+    renderer.render(scene, camera);
+  }
+  window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
+    AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons };
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
