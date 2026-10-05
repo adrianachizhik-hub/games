@@ -308,6 +308,9 @@ if (process.env.SAVED === '1') {
   const w5 = I.plotWorld(4, 0, 2); I.p.x = w5.x; I.p.z = w5.z; I.p.y = 6.3; I.update(1 / 60, 0);
   console.log('saved progress, step onto Plot 5: my plot', I.myPlot() + 1, '| dragons appear', I.plotPets.map((d) => d.kind).join(','), '| sign', JSON.stringify(I.signLabels[4]), '| message', JSON.stringify(els.toast.textContent));
   if (I.myPlot() !== 4 || I.plotPets.length !== 3) throw new Error('your dragons should load onto the plot you step on');
+  { const sf = I.secretFront; I.p.x = sf.x; I.p.z = sf.z; I.p.y = W.bil(W.H, sf.x, sf.z); for (let k = 0; k < 12; k++) raf(29000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' }));
+    console.log('saved progress, secret shop with no diamond dragon: open', I.secretOpen(), '| says', JSON.stringify(els.toast.textContent)); if (I.secretOpen()) throw new Error('the secret shop needs a diamond dragon');
+    I.p.x = w5.x; I.p.z = w5.z; I.p.y = 6.3; I.update(1 / 60, 0); }
   I.mount(I.plotPets[1]); I.update(1 / 60, 0); raf(30000); raf(30016);
   { const c0 = I.coins(); for (let f = 0; f < 360; f++) I.earn(1 / 60);
     console.log('saved progress coins: each payday', I.coinRate(), '(green 1 + ruby 20 with a Legendary upgrader x3 + blue 3, all 3 placed) | earned in 6 s', (I.coins() - c0).toFixed(0), '| saved', store['mutation-mayhem-coins'], '| placed', JSON.stringify(I.dragonPlaced), 'of', I.plotSlots());
@@ -600,8 +603,11 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   const upBtn = [...els.invItems.children].find((b) => /^Legendary upgrader/.test(b.children[1].textContent)); upBtn.fire('click', ev({ detail: 1 }));
   console.log('click it in the inventory: panel', JSON.stringify(els.upTitle.textContent), '| asks', JSON.stringify(els.upPickT.textContent));
   els.upDragons.children[withUp].fire('click', ev({}));
-  console.log('give it to dragon', withUp, '(had a', I.UPGRADERS[oldUp].name, 'upgrader): now', I.UPGRADERS[I.dragonUpgrades[withUp]].name, '| Legendary owned', I.upgradersOwned[2], '| old one back:', I.UPGRADERS[oldUp].name, I.upgradersOwned[oldUp], '| panel closed', !I.upShopOpen(), '| message', said());
-  if (I.dragonUpgrades[withUp] !== 2 || I.upgradersOwned[2] !== own0 || I.upgradersOwned[oldUp] < 1) throw new Error('using an upgrader from the inventory went wrong');
+  console.log('give it to dragon', withUp, '(had a', I.UPGRADERS[oldUp].name, 'upgrader): now', I.UPGRADERS[I.dragonUpgrades[withUp]].name, '| Legendary owned', I.upgradersOwned[2], '| speed now +' + I.dragonSpeed[withUp] + '%', '| panel closed', !I.upShopOpen(), '| message', said());
+  if (I.dragonUpgrades[withUp] !== 2 || I.upgradersOwned[2] !== own0) throw new Error('using an upgrader from the inventory went wrong');
+  { const sp0 = I.dragonSpeed[withUp]; for (let k = 0; k < 7; k++) { I.upgradersOwned[4]++; I.renderInventory(); [...els.invItems.children].find((b) => /^Prismatic upgrader/.test(b.children[1].textContent)).fire('click', ev({ detail: 1 })); els.upDragons.children[withUp].fire('click', ev({})); }
+    console.log('7 Prismatic upgraders on the same dragon: speed +' + sp0 + '% -> +' + I.dragonSpeed[withUp] + '% | coins upgrader now', I.UPGRADERS[I.dragonUpgrades[withUp]].name, '| saved', JSON.parse(store['mutation-mayhem-speed'])[withUp]);
+    if (I.dragonSpeed[withUp] !== sp0 + 70 || I.dragonUpgrades[withUp] !== 4) throw new Error('speed should stack'); }
   // a dragon from the inventory onto the plot
   I.p.x = hm.x; I.p.z = hm.z; I.update(1 / 60, 0);
   const dragBtn = () => [...els.invItems.children].find((b) => / dragon$/.test(b.children[1].textContent));
@@ -654,6 +660,59 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   I.p.x = I.upFront.x; frames(12); els.talkBtn.fire('click', ev({})); els.talkNo.fire('click', ev({})); console.log('"No thanks": talking', !!talk());
   I.goTo(6); frames(5); const x1 = I.p.x, z1 = I.p.z; window.fire('keydown', ev({ code: 'KeyE' })); frames(30); window.fire('keyup', ev({ code: 'KeyE' }));
   console.log('away from the shops, E still steps sideways:', Math.hypot(I.p.x - x1, I.p.z - z1).toFixed(1), 'units');
+}
+
+// ---- the secret shop, the fire village and the fire egg chase ----
+{
+  let T = 70000; const fr = (n = 1) => { for (let k = 0; k < n; k++) { I.update(1 / 60, 0); I.eggsAnimate(1 / 60, 0); } }, hud = (n = 12) => { for (let k = 0; k < n; k++) raf(T += 16); };
+  const V = I.VILLAGE, vy = W.bil(W.H, V.x, V.z), stand = (x, z, y) => { I.p.x = x; I.p.z = z; I.p.y = y === undefined ? W.bil(W.H, x, z) : y; I.p.vy = 0; I.p.onGround = true; I.p.dungeon = I.p.inCave = I.p.inLid = false; };
+  const lab = () => document.getElementById('shopOpenLabel').textContent;
+  I.goTo(8); hud(); console.log('jump to the Village place: zone', I.zoneName(), '| villagers', I.villagers.length, '| hint', JSON.stringify(els.hint.textContent));
+  // the secret shop
+  stand(I.secretFront.x, I.secretFront.z); hud(); console.log('at the secret shop: button', JSON.stringify(lab()), '| own a diamond dragon', I.ownDragons.includes('diamond'));
+  if (lab() !== 'Open the secret shop') throw new Error('no secret shop button');
+  window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); hud(2);
+  I.giveCoins(-I.coins() + 1000); els.secretBuy.fire('click', ev({})); console.log('shop open', I.secretOpen(), '| buy fire resistance with 1,000 coins:', said(), '| resistance', I.fireResUntil() > Date.now());
+  // the fire, before resistance
+  I.setFireClock(300); fr(); hud(); stand(V.x + 6, V.z); fr(); hud(); console.log('fire out: fire egg there', I.fireEggThere(), '| hint', JSON.stringify(els.hint.textContent));
+  I.setFireClock(10); stand(V.x + 0.5, V.z, vy); fr(2);
+  console.log('fire lit, no resistance, step into it: pushed back to', Math.hypot(I.p.x - V.x, I.p.z - V.z).toFixed(1), 'from the middle | carrying', !!I.carrying(), '| message', said());
+  if (I.carrying() || Math.hypot(I.p.x - V.x, I.p.z - V.z) < 3.3) throw new Error('the fire should push you back without resistance');
+  window.fire('keydown', ev({ code: 'Escape' }));
+  stand(I.secretFront.x, I.secretFront.z); hud(); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); hud(2);
+  I.giveCoins(300000); els.secretBuy.fire('click', ev({})); hud(2);
+  console.log('buy it with 301,000: coins left', Math.floor(I.coins()), '| resistance for', ((I.fireResUntil() - Date.now()) / 1000).toFixed(0), 's | shows', JSON.stringify(els.secretRes.textContent), '| under the coins', JSON.stringify(els.effect.textContent));
+  window.fire('keydown', ev({ code: 'Escape' }));
+  // grab it on foot: the villagers catch you
+  const home = I.plotWorld(I.myPlot(), 0, 0);
+  stand(V.x + 0.3, V.z, vy); fr(2);
+  console.log('step into the fire with resistance: carrying', I.carrying() && I.EGG_TIERS[I.carrying().egg.tier].name, 'egg,', I.carrying() && I.carrying().total, 's | chase on', !!I.chase(), '| message', said());
+  if (!I.carrying() || I.carrying().total !== I.FIRE_SECONDS) throw new Error('should grab the fire egg with 15 seconds');
+  I.keys.add('KeyW'); I.keys.add('ShiftLeft'); let n = 0; while (I.carrying() && n++ < 600) { I.p.yaw = face(home.x, home.z); fr(); } I.keys.clear();
+  console.log('run home on foot: caught after', (n / 60).toFixed(1), 's | carrying', !!I.carrying(), '| back on my plot', I.plotAt(I.p.x, I.p.z) === I.myPlot(), '| egg back in the fire', I.fireEggThere(), '| message', said());
+  if (I.carrying() || I.plotAt(I.p.x, I.p.z) !== I.myPlot() || !I.fireEggThere()) throw new Error('getting caught should send you home without the egg');
+  // too slow
+  stand(V.x + 0.3, V.z, vy); fr(2); I.chase().wait = 1e9; fr(60 * 16);
+  console.log('grab it and stand still (villagers held back): after 16 s carrying', !!I.carrying(), '| home', I.plotAt(I.p.x, I.p.z) === I.myPlot(), '| message', said());
+  // on a dragon: too slow, then fast enough
+  const flyHome = (speedUp) => {
+    const hp = I.plotWorld(I.myPlot(), 0, 2); stand(hp.x, hp.z, 6.3); fr(2);
+    const pet = I.plotPets.find((d) => !d.homing); I.dragonSpeed[pet.index] = speedUp; I.mount(pet);
+    const tj = () => { window.fire('keydown', ev({ code: 'Space' })); fr(1); window.fire('keyup', ev({ code: 'Space' })); fr(1); };
+    tj(); fr(6); tj(); window.fire('keydown', ev({ code: 'Space' })); fr(30); window.fire('keyup', ev({ code: 'Space' }));
+    I.p.x = V.x + 0.3; I.p.z = V.z; I.p.y = vy + 2; fr(1);
+    const got = !!I.carrying(); I.keys.add('KeyW'); I.keys.add('ShiftLeft'); let k = 0;
+    while (I.carrying() && k++ < 60 * 16) { I.p.yaw = face(hp.x, hp.z); if (I.p.y < W.bil(W.HT, I.p.x, I.p.z) + 12) I.keys.add('Space'); else I.keys.delete('Space'); fr(); } I.keys.clear();
+    const out = { kind: pet.kind, speed: I.rideSpeed ? (I.riding() ? I.rideSpeed(true).toFixed(0) : '-') : '-', got, secs: (k / 60).toFixed(1), msg: said(), dragons: I.ownDragons.slice(-1)[0] };
+    if (I.riding()) I.dismount(true); return out;
+  };
+  const slow = flyHome(0); console.log('fly it home on a', slow.kind, 'dragon with no speed upgrades: grabbed', slow.got, '| after', slow.secs, 's:', slow.msg);
+  if (!/caught/.test(slow.msg)) throw new Error('an unupgraded dragon should be caught');
+  const before = I.ownDragons.length, fast = flyHome(400); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
+  console.log('fly it home on a', fast.kind, 'dragon at +400% speed: grabbed', fast.got, '| home after', fast.secs, 's | dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], '| it earns', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], 'every 3 s | fire egg there now', I.fireEggThere());
+  if (I.ownDragons.length !== before + 1 || !/^fire(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.fireEggThere()) throw new Error('a fast dragon should get the fire egg home and hatch a fire dragon');
+  const n50 = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(5); n50[d] = (n50[d] || 0) + 1; } console.log('fire egg hatches:', Object.keys(n50).map((k) => k + ' ' + (n50[k] / 200).toFixed(0) + '%').join(', '));
+  I.setFireClock(null);
 }
 
 // ---- and once more, as a device with saved progress ----
