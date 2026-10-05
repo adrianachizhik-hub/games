@@ -60,6 +60,10 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 
 **Riding (section "Riding your dragons"):** click or tap one of your dragons (within 10 units) to climb on; it grows to riding size (`RIDE_SIZE`). It walks where you steer, much faster than running (18 + 2 per tier on the ground, 30 + 5 per tier flying, Shift adds half again), rarer ones faster. Jump twice quickly (within 0.35 s) to take off; while flying, hold Jump to climb and let go to glide down. One jump on the ground gets you off, and the dragon flies home to your plot. Riding stops at the cave (too big). Jumping to a place or Leave sends it straight home. Jump taps are remembered between frames (`jumpTapped`) so quick double-taps work on slow devices. Only your 24 newest dragons roam the plot; all are saved.
 
+**Upgraders (the red stall, section "The red stall: upgraders"):** the red stall's sign says "Upgrades" (sign cell 9) and the shop button at it reads "Open the upgrade shop". Five upgraders (`UPGRADERS`): Common ×1.5 for 100 coins, Rare ×2 for 500, Legendary ×3 for 2,500, Mythic ×5 for 10,000, Prismatic ×10 for 50,000. Adriana's rule: any upgrader works on any dragon, each upgrades only one dragon, better ones boost more. You buy one and then pick the dragon from a list showing its coins a second now and after. A dragon holds one upgrader; only a better one can replace it. Saved in `mutation-mayhem-upgrades`, matching `mutation-mayhem-dragons` by position (-1 for none). The prices and boosts were Claude's choice.
+
+**Lucky blocks (section "Lucky blocks"):** 8 yellow "?" blocks spinning around the island (outside town). Walk into one: Common egg 50%, Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1% (Adriana's odds), and the other 4% gives 250 coins (Claude's choice; she did not answer). The egg is carried home with the usual countdown. Needs a claimed plot; can't open one while carrying an egg. An opened block turns up somewhere else, at least 40 away, 45 seconds later.
+
 Still open: the names of the top two tiers (Mythic and Prismatic are placeholders), whether dragons should follow you, and the starter dog, cat and parrot.
 
 ### The build order we agreed on
@@ -197,7 +201,7 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 
 **Not built**
 - The starter pets (dog, cat, parrot) and pets following you. Dragons from eggs do live on your plot (see "Dragons and eggs").
-- The red, green, and yellow shops. Their purposes are undecided, though one is presumably the pet shop.
+- The green and yellow shops. Their purposes are undecided. (The red one sells upgraders.)
 - Spending coins: prices and buying (coins are earned by dragons, see Saved on the device).
 - Mutation blocks, mutations, rarities.
 - Admin commands other than the egg radar.

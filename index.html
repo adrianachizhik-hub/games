@@ -164,7 +164,7 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  #shopOpen[hidden], #avatarShop[hidden] { display: none; }
+  #shopOpen[hidden], #avatarShop[hidden], #upShop[hidden], #upList[hidden], #upPick[hidden] { display: none; }
   /* Dragon eggs: the countdown while you carry one, and short messages above it */
   #carry, #toast {
     position: fixed;
@@ -208,7 +208,7 @@
   body.touch #shopOpen kbd { display: none; }
   body.touch #shopOpen { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
   @media (pointer: coarse) { #shopOpen kbd { display: none; } }
-  #avatarShop {
+  #avatarShop, #upShop {
     position: fixed;
     right: calc(14px + env(safe-area-inset-right, 0px));
     top: calc(14px + env(safe-area-inset-top, 0px));
@@ -223,11 +223,11 @@
     box-shadow: 0 6px 0 #0d2f37;
   }
   @media (max-width: 640px) {               /* on a phone the shop is a sheet along the bottom, so the avatar shows above it */
-    #avatarShop { left: 10px; right: 10px; top: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 54vh; }
+    #avatarShop, #upShop { left: 10px; right: 10px; top: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 54vh; }
   }
-  #avatarShop h2 { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
-  #avatarShop .sub { margin: 4px 0 2px; font-size: 0.92rem; opacity: 0.8; }
-  #avatarShop h3 { margin: 11px 0 6px; font-size: 1rem; font-weight: 600; }
+  #avatarShop h2, #upShop h2 { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+  #avatarShop .sub, #upShop .sub { margin: 4px 0 2px; font-size: 0.92rem; opacity: 0.8; }
+  #avatarShop h3, #upShop h3 { margin: 11px 0 6px; font-size: 1rem; font-weight: 600; }
   .swatches, .picks { display: flex; flex-wrap: wrap; gap: 9px; }
   .swatches button { width: 35px; height: 35px; padding: 0; border: 3px solid #0d2f37; border-radius: 50%; cursor: pointer; }
   .swatches button.on { box-shadow: 0 0 0 3px var(--panel-solid), 0 0 0 7px #0d2f37; }
@@ -244,7 +244,7 @@
     cursor: pointer;
   }
   .picks button.on { background: #ffd23f; font-weight: 600; }
-  #avatarShop .foot {                       /* stays in view at the bottom while the choices scroll */
+  #avatarShop .foot, #upShop .foot {                       /* stays in view at the bottom while the choices scroll */
     position: sticky;
     bottom: 0;
     display: flex;
@@ -254,7 +254,7 @@
     padding: 10px 18px 16px;
     background: var(--panel-solid);
   }
-  #shopDone {
+  #shopDone, #upDone {
     flex: 1;
     font: inherit;
     font-size: 1.1rem;
@@ -267,7 +267,27 @@
     box-shadow: 0 4px 0 #0d2f37;
     cursor: pointer;
   }
-  #avatarShop button:focus-visible, #shopOpen:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  #upShop .have { display: flex; align-items: center; gap: 7px; margin: 10px 0 2px; font-weight: 500; }
+  .uprow { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 8px 8px 12px; border: 3px solid #0d2f37; border-radius: 14px; background: #fff; color: #0d2f37; }
+  .uprow .what { flex: 1; min-width: 0; }
+  .uprow b { display: block; font-size: 1rem; }
+  .uprow small { font-size: 0.85rem; opacity: 0.8; }
+  .uprow button, #upDragons button, #upCancel {
+    font: inherit;
+    font-weight: 600;
+    color: #0d2f37;
+    background: #ffd23f;
+    border: 3px solid #0d2f37;
+    border-radius: 999px;
+    padding: 5px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .uprow button:disabled, #upDragons button:disabled { background: #e3e0d6; color: #6b7275; cursor: default; }
+  #upDragons { display: grid; gap: 7px; }
+  #upDragons button { border-radius: 12px; text-align: left; white-space: normal; background: #fff; }
+  #upCancel { margin-top: 10px; background: #fff; }
+  #avatarShop button:focus-visible, #upShop button:focus-visible, #shopOpen:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
   body.shopping .where, body.shopping #map, body.shopping .keys, body.shopping #stick, body.shopping #jump, body.shopping #leave, body.shopping #admin { display: none !important; }
   /* Admin commands: an arrow on the right edge that slides a panel in. Only admins get it. */
   #admin {
@@ -692,7 +712,15 @@
 
 <div id="carry" role="status" hidden><span id="carryDot"></span><span id="carryText"></span></div>
 <p id="toast" aria-live="polite" hidden></p>
-<button id="shopOpen" type="button" hidden>Open the avatar shop<kbd>Enter</kbd></button>
+<button id="shopOpen" type="button" hidden><span id="shopOpenLabel">Open the avatar shop</span><kbd>Enter</kbd></button>
+<div id="upShop" role="dialog" aria-label="Upgrade shop" hidden>
+  <h2>Upgrade shop</h2>
+  <p class="sub">An upgrader makes one dragon earn more coins. Better upgraders boost more.</p>
+  <p class="have"><span class="coin" aria-hidden="true"></span>You have <b id="upCoins">0</b> coins</p>
+  <div id="upList"></div>
+  <div id="upPick" hidden><h3 id="upPickT"></h3><div id="upDragons"></div><button id="upCancel" type="button">Back</button></div>
+  <div class="foot"><button id="upDone" type="button">Done</button></div>
+</div>
 <div id="avatarShop" role="dialog" aria-label="Avatar shop" hidden>
   <h2>Avatar shop</h2>
   <p class="sub">Everything is free for now.</p>
@@ -1416,7 +1444,7 @@ const World = (function () {
      local +z points away from the middle. Shops face outward, plots open inward. */
   const HUB = W.HUB, PLOT = 11, PLOT_R = 23.5, SHOP_R = 9;
   const plots = [], shops = [];
-  /* The sign labels live in one picture, 256 by 128 pixels each, four to a row: 0 to 6 the plots, 7 "Shop", 8 "Avatars".
+  /* The sign labels live in one picture, 256 by 128 pixels each, four to a row: 0 to 6 the plots, 7 "Shop", 8 "Avatars", 9 "Upgrades".
      A claimed plot's sign is painted again with its owner's name. Long labels shrink, then split onto two lines. */
   const signCv = document.createElement('canvas'), signG = signCv.getContext('2d'), signLabels = [];
   signCv.width = 1024; signCv.height = 384;
@@ -1456,7 +1484,7 @@ const World = (function () {
       box(F, 7.2, 0.25, 6, 0, 3.45, 0.3, ROOFS[i], 0.1);                 // roof, tipped toward the front
       box(F, 2.2, 1, 0.16, 0, 3.92, 2.2, 0x7a5533);                      // sign board on the roof
       const sp = spot(cx, cz, phi, 0, 2.31);
-      signs.push({ x: sp.x, y: y0 + 3.92, z: sp.z, nx: Math.cos(phi), nz: Math.sin(phi), w: 1.9, h: 0.95, cell: i === 1 ? 8 : 7 });   // the blue stall is the avatar shop
+      signs.push({ x: sp.x, y: y0 + 3.92, z: sp.z, nx: Math.cos(phi), nz: Math.sin(phi), w: 1.9, h: 0.95, cell: i === 1 ? 8 : i === 0 ? 9 : 7 });   // the blue stall is the avatar shop, the red one sells upgraders
       [-2, 0, 2].forEach((lx) => { const c = spot(cx, cz, phi, lx, 0); addCollider(c.x, c.z, 2.3); });
       shops.push({ x: cx, z: cz, phi });
     }
@@ -1485,7 +1513,7 @@ const World = (function () {
     scene.add(new THREE.Mesh(merge(parts), plantMat));
 
     /* The words on the signs: one picture holding all nine labels (see paintSign). */
-    for (let c = 0; c < 9; c++) paintSign(c, c < 7 ? 'Plot ' + (c + 1) : c === 7 ? 'Shop' : 'Avatars');
+    for (let c = 0; c < 10; c++) paintSign(c, c < 7 ? 'Plot ' + (c + 1) : c === 7 ? 'Shop' : c === 8 ? 'Avatars' : 'Upgrades');
     const ps = [], uv = [];
     signs.forEach((sg) => {
       const rx = sg.nz, rz = -sg.nx, hw = sg.w / 2, hh = sg.h / 2;           // rx, rz: to the reader's right
@@ -2236,6 +2264,7 @@ const World = (function () {
   });
   function placeEgg(egg, spot) { egg.spot = spot; egg.taken = false; egg.g.visible = true; egg.g.position.set(spot.x, spot.y, spot.z); }
   function respawnEgg(egg) {                             // the same kind of egg turns up again somewhere else, away from you
+    if (egg.lucky) return;                                // eggs from lucky blocks were never out in the world
     const t = EGG_TIERS[egg.tier], used = eggs.filter((e) => e !== egg && e.tier === egg.tier).map((e) => e.spot);
     const open = t.spots.filter((s) => !used.includes(s) && s !== egg.spot);
     let free = open.filter((s) => Math.hypot(s.x - p.x, s.z - p.z) > 40);
@@ -2307,7 +2336,7 @@ const World = (function () {
   /* Your plot. Points on it are measured in the plot's own frame: lz points away from the middle of town. */
   let myPlot = -1;
   let riding = null, flying = false, tapT = 0, jumpWas = false, jumpTapped = false;   // riding (below); jumpTapped: a tap is kept even if it falls between two frames
-  const ownDragons = [], plotPets = [], flyers = [];
+  const ownDragons = [], dragonUpgrades = [], plotPets = [], flyers = [];
   const PLOT_HALF = PLOT / 2 - 0.4;
   function plotLocal(i, x, z) { const q = plots[i], dx = x - q.x, dz = z - q.z; return { lx: dx * Math.sin(q.phi) - dz * Math.cos(q.phi), lz: dx * Math.cos(q.phi) + dz * Math.sin(q.phi) }; }
   function plotWorld(i, lx, lz) { const q = plots[i]; return { x: q.x + lx * Math.sin(q.phi) + lz * Math.cos(q.phi), z: q.z - lx * Math.cos(q.phi) + lz * Math.sin(q.phi) }; }
@@ -2326,15 +2355,26 @@ const World = (function () {
   try {                                                  // what this device remembers
     const sp = localStorage.getItem('mutation-mayhem-plot');
     if (sp !== null && sp !== '' && +sp >= 0 && +sp < plots.length) myPlot = +sp;
-    (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k) => { if (DRAGON_KINDS[k]) ownDragons.push(k); });
+    const ups = JSON.parse(localStorage.getItem('mutation-mayhem-upgrades') || '[]') || [];
+    (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k, i) => {
+      if (!DRAGON_KINDS[k]) return;
+      ownDragons.push(k); dragonUpgrades.push(Number.isInteger(ups[i]) && ups[i] >= 0 && ups[i] < 5 ? ups[i] : -1);
+    });
   } catch (e) { /* nothing saved, start fresh */ }
   if (myPlot >= 0) ownDragons.slice(-24).forEach((k) => addPet(k, false));
   /* Coins. Every dragon you own makes coins each second while you play; rarer dragons make more
      (jade a little more than diamond, being the rarer of the two). Kept on this device. */
   const COINS_PER_SECOND = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60 };
+  /* Upgraders, sold at the red stall. Each one boosts one dragon's coins; any upgrader fits any dragon, better ones
+     boost more. A dragon holds one upgrader, and only a better one can replace it. dragonUpgrades[i] goes with
+     ownDragons[i]: the upgrader's number, or -1 for none. */
+  const UPGRADERS = [
+    { name: 'Common', boost: 1.5, price: 100 }, { name: 'Rare', boost: 2, price: 500 }, { name: 'Legendary', boost: 3, price: 2500 },
+    { name: 'Mythic', boost: 5, price: 10000 }, { name: 'Prismatic', boost: 10, price: 50000 }
+  ];
   let coins = 0, coinsShown = -1, rateShown = -1, coinSaveT = 0;
   try { coins = Math.max(0, +localStorage.getItem('mutation-mayhem-coins') || 0); } catch (e) { /* none saved */ }
-  const coinRate = () => ownDragons.reduce((sum, k) => sum + (COINS_PER_SECOND[k] || 0), 0);
+  const coinRate = () => ownDragons.reduce((sum, k, i) => sum + (COINS_PER_SECOND[k] || 0) * (dragonUpgrades[i] >= 0 ? UPGRADERS[dragonUpgrades[i]].boost : 1), 0);
   const coinCountEl = $('coinCount'), coinRateEl = $('coinRate');
   function saveCoins() { try { localStorage.setItem('mutation-mayhem-coins', String(Math.floor(coins))); } catch (e) { /* not saved, still playable */ } }
   window.addEventListener('pagehide', saveCoins);        // closing the tab keeps the last few seconds too
@@ -2345,12 +2385,12 @@ const World = (function () {
       if (coinSaveT > 5) { coinSaveT = 0; saveCoins(); }
     }
     const c = Math.floor(coins), r = coinRate();
-    if (c !== coinsShown) { coinsShown = c; coinCountEl.textContent = c.toLocaleString('en-US'); }
-    if (r !== rateShown) { rateShown = r; coinRateEl.textContent = r ? '+' + r.toLocaleString('en-US') + ' a second' : 'hatch dragons to earn'; }
+    if (c !== coinsShown) { coinsShown = c; coinCountEl.textContent = c.toLocaleString('en-US'); if (upShopOpen) refreshUpShop(); }
+    if (r !== rateShown) { rateShown = r; coinRateEl.textContent = r ? '+' + (Math.round(r * 10) / 10).toLocaleString('en-US') + ' a second' : 'hatch dragons to earn'; }
   }
   function nameMyPlot() { if (myPlot >= 0) paintSign(myPlot, playerName + '\'s Plot'); }   // the sign says whose plot it is
   function saveProgress() {
-    try { localStorage.setItem('mutation-mayhem-plot', String(myPlot)); localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons)); } catch (e) { /* not saved, still playable */ }
+    try { localStorage.setItem('mutation-mayhem-plot', String(myPlot)); localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons)); localStorage.setItem('mutation-mayhem-upgrades', JSON.stringify(dragonUpgrades)); } catch (e) { /* not saved, still playable */ }
   }
 
   /* Messages, and the countdown while you carry an egg. */
@@ -2398,7 +2438,7 @@ const World = (function () {
   }
   function dropEgg() {                                    // leaving the game: the egg goes back where it was
     const egg = stopCarrying();
-    if (egg) placeEgg(egg, egg.spot);
+    if (egg && !egg.lucky) placeEgg(egg, egg.spot);
   }
   function jumpTo(i) {
     if (carrying) { toast('You can\'t jump to places while carrying an egg. Run!', 3); return; }
@@ -2414,6 +2454,7 @@ const World = (function () {
       if (i >= 0) { myPlot = i; saveProgress(); nameMyPlot(); toast('This is now ' + playerName + '\'s Plot! Find eggs around the island and bring them here to hatch.', 6); }
     }
     nagT -= dt;
+    luckyPlay();
     if (!carrying) {
       for (const egg of eggs) {
         if (egg.taken || !!egg.spot.dungeon !== p.dungeon || Math.abs(p.y - egg.spot.y) > 2.2 || Math.hypot(p.x - egg.spot.x, p.z - egg.spot.z) > 1.4) continue;
@@ -2435,6 +2476,7 @@ const World = (function () {
   /* Every frame, playing or not: eggs bob and sparkle, dragons on your plot wander, babies fly away. */
   function eggsAnimate(dt, time) {
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) toastEl.hidden = true; }
+    luckyAnimate(dt, time);
     const tw = (s, k) => { const v = reduced ? 1 : 0.55 + 0.45 * Math.sin(time * 4 + k); s.scale.set(v, v, v); };
     for (const egg of eggs) {
       if (!egg.g.visible) continue;
@@ -2448,7 +2490,7 @@ const World = (function () {
       if (hatching.t > 1.6) {
         scene.remove(hatching.mesh);
         const kind = pickDragon(hatching.tier);
-        ownDragons.push(kind); saveProgress(); addPet(kind, true);
+        ownDragons.push(kind); dragonUpgrades.push(-1); saveProgress(); addPet(kind, true);
         toast('You hatched a ' + DRAGON_KINDS[kind].name + ' dragon! (' + EGG_TIERS[hatching.tier].name + ') It makes ' + COINS_PER_SECOND[kind] + ' coin' + (COINS_PER_SECOND[kind] === 1 ? '' : 's') + ' a second.', 5);
         hatching = null;
       }
@@ -2585,6 +2627,133 @@ const World = (function () {
     return '';
   }
 
+  /* ---------- The red stall: upgraders ---------- */
+  /* Buy an upgrader, then pick which one dragon gets it (see UPGRADERS). */
+  const RED = shops[0], redOut = { x: Math.cos(RED.phi), z: Math.sin(RED.phi) };
+  const upFront = { x: RED.x + redOut.x * 4.2, z: RED.z + redOut.z * 4.2 };   // where a customer stands
+  const upEl = $('upShop'), upList = $('upList'), upPick = $('upPick'), upDragons = $('upDragons');
+  let upShopOpen = false, upChoice = -1;
+  const fmt = (n) => Math.floor(n).toLocaleString('en-US'), fmtRate = (r) => (Math.round(r * 10) / 10).toLocaleString('en-US');
+  const upRows = UPGRADERS.map((u, i) => {
+    const row = document.createElement('div'), what = document.createElement('div'), name = document.createElement('b'), note = document.createElement('small'), buy = document.createElement('button');
+    row.className = 'uprow'; what.className = 'what';
+    name.textContent = u.name + ' upgrader'; note.textContent = '×' + u.boost + ' coins for one dragon';
+    buy.type = 'button'; buy.textContent = fmt(u.price) + ' coins';
+    buy.addEventListener('click', () => chooseUpgrader(i));
+    what.appendChild(name); what.appendChild(note); row.appendChild(what); row.appendChild(buy); upList.appendChild(row);
+    return { buy };
+  });
+  function refreshUpShop() {
+    $('upCoins').textContent = fmt(coins);
+    upRows.forEach((r, i) => { r.buy.disabled = coins < UPGRADERS[i].price; });
+  }
+  function showUpList() { upChoice = -1; upList.hidden = false; upPick.hidden = true; refreshUpShop(); }
+  function chooseUpgrader(i) {                            // step two: which dragon gets it?
+    const u = UPGRADERS[i];
+    if (coins < u.price) return;
+    if (!ownDragons.length) { toast('Hatch a dragon first, then come back for an upgrader.', 4); return; }
+    upChoice = i; upList.hidden = true; upPick.hidden = false;
+    $('upPickT').textContent = 'Which dragon gets the ' + u.name + ' upgrader (×' + u.boost + ')?';
+    while (upDragons.firstChild) upDragons.removeChild(upDragons.firstChild);
+    ownDragons.forEach((k, d) => {
+      const b = document.createElement('button'), cur = dragonUpgrades[d], base = COINS_PER_SECOND[k];
+      b.type = 'button';
+      if (cur >= i) { b.disabled = true; b.textContent = DRAGON_KINDS[k].name + ' dragon · already has a ' + UPGRADERS[cur].name + ' upgrader'; }
+      else b.textContent = DRAGON_KINDS[k].name + ' dragon · ' + fmtRate(base * (cur >= 0 ? UPGRADERS[cur].boost : 1)) + ' → ' + fmtRate(base * u.boost) + ' a second';
+      b.addEventListener('click', () => applyUpgrade(d));
+      upDragons.appendChild(b);
+    });
+  }
+  function applyUpgrade(d) {
+    const u = UPGRADERS[upChoice];
+    if (!u || coins < u.price || dragonUpgrades[d] >= upChoice) return;
+    coins -= u.price; dragonUpgrades[d] = upChoice;
+    saveProgress(); saveCoins();
+    toast('Your ' + DRAGON_KINDS[ownDragons[d]].name + ' dragon now makes ' + fmtRate(COINS_PER_SECOND[ownDragons[d]] * u.boost) + ' coins a second!', 4);
+    showUpList();
+  }
+  function openUpShop() {
+    if (upShopOpen || shopping || !started) return;
+    upShopOpen = true; walking = false;
+    keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
+    stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
+    shopBtn.hidden = true; upEl.hidden = false;
+    document.body.classList.add('shopping');
+    showUpList();
+    $('upDone').focus();
+  }
+  function closeUpShop() {
+    if (!upShopOpen) return;
+    upShopOpen = false; upEl.hidden = true;
+    document.body.classList.remove('shopping');
+    canvas.focus();
+  }
+  $('upDone').addEventListener('click', closeUpShop);
+  $('upCancel').addEventListener('click', showUpList);
+
+  /* ---------- Lucky blocks ---------- */
+  /* Yellow "?" blocks hidden around the island. Walk into one: usually it gives you an egg to carry home
+     (Common 50%, Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1%); the other 4% of the time, coins instead.
+     An opened block turns up again somewhere else a little later. */
+  const LUCKY_ODDS = [50, 30, 10, 5, 1], LUCKY_COINS = 250, LUCKY_COUNT = 8;
+  const luckySpots = outdoorSpots(24, 28, (x, z) => fromTown(x, z) > 40);
+  const luckyMat = (function () {
+    const cv = document.createElement('canvas'), g = cv.getContext('2d');
+    cv.width = cv.height = 128;
+    g.fillStyle = '#b8860b'; g.fillRect(0, 0, 128, 128);              // dark edge
+    g.fillStyle = '#ffc21f'; g.fillRect(10, 10, 108, 108);
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '700 92px "Trebuchet MS", "Segoe UI", sans-serif';
+    g.fillStyle = '#7a4a00'; g.fillText('?', 68, 72);                 // shadow, then the question mark
+    g.fillStyle = '#ffffff'; g.fillText('?', 64, 68);
+    return new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(cv), emissive: 0x332200 });
+  })();
+  const luckyGeo = new THREE.BoxGeometry(1, 1, 1), luckyBlocks = [];
+  for (let k = 0; k < Math.min(LUCKY_COUNT, luckySpots.length); k++) {
+    const m = new THREE.Mesh(luckyGeo, luckyMat);
+    m.scale.set(1.4, 1.4, 1.4);
+    scene.add(m);
+    const b = { m, spot: null, wait: 0, phase: k * 1.3 };
+    placeLucky(b, luckySpots[k]);
+    luckyBlocks.push(b);
+  }
+  function placeLucky(b, spot) { b.spot = spot; b.wait = 0; b.m.visible = true; b.m.position.set(spot.x, spot.y + 1.3, spot.z); }
+  function rollLucky() {                                  // a tier number, or -1 for coins
+    let r = Math.random() * 100;
+    for (let i = 0; i < LUCKY_ODDS.length; i++) { r -= LUCKY_ODDS[i]; if (r < 0) return i; }
+    return -1;
+  }
+  function openLucky(b) {
+    b.m.visible = false; b.wait = 45;                     // back somewhere else in 45 seconds
+    const tier = rollLucky();
+    if (tier < 0) { coins += LUCKY_COINS; saveCoins(); toast('Lucky block! ' + LUCKY_COINS + ' coins!', 4); return; }
+    const egg = { tier, lucky: true, taken: false, g: { visible: false }, spot: { x: b.spot.x, y: b.spot.y, z: b.spot.z } };
+    pickUp(egg);
+    toast('Lucky block! A ' + EGG_TIERS[tier].name + ' egg! Get it home to your plot before it hatches.', 5);
+  }
+  function luckyPlay() {                                  // from eggsPlay: walking into a block
+    if (p.dungeon || p.inCave) return;
+    for (const b of luckyBlocks) {
+      if (!b.m.visible || Math.abs(p.y - b.spot.y) > 2.5 || Math.hypot(p.x - b.spot.x, p.z - b.spot.z) > 1.5) continue;
+      if (myPlot < 0) { if (nagT <= 0) { toast('Claim a plot first: walk onto any plot in town. Then come back for this lucky block!', 5); nagT = 6; } return; }
+      if (carrying) { if (nagT <= 0) { toast('Take your egg home first, then open the lucky block.', 4); nagT = 6; } return; }
+      openLucky(b); return;
+    }
+  }
+  function luckyAnimate(dt, time) {
+    for (const b of luckyBlocks) {
+      if (!b.m.visible) {
+        b.wait -= dt;
+        if (b.wait <= 0) {
+          const used = luckyBlocks.map((q) => q.spot), free = luckySpots.filter((s) => !used.includes(s) && Math.hypot(s.x - p.x, s.z - p.z) > 40);
+          placeLucky(b, free.length ? free[Math.floor(Math.random() * free.length)] : b.spot);
+        }
+        continue;
+      }
+      b.m.rotation.y = reduced ? 0.6 : time * 0.9 + b.phase;
+      b.m.position.y = b.spot.y + 1.3 + (reduced ? 0 : Math.sin(time * 2.2 + b.phase) * 0.15);
+    }
+  }
+
   /* ---------- The avatar shop (the blue stall) ---------- */
   const BLUE = shops[1], shopOut = { x: Math.cos(BLUE.phi), z: Math.sin(BLUE.phi) };          // which way the stall faces
   const shopFront = { x: BLUE.x + shopOut.x * 4.2, z: BLUE.z + shopOut.z * 4.2 };              // where a customer stands
@@ -2651,7 +2820,8 @@ const World = (function () {
     avatar.visible = true;
     poseAvatar(dt, Math.atan2(-shopOut.x, -shopOut.z) + shopTurn);
   }
-  shopBtn.addEventListener('click', openShop);
+  const openStall = () => { if ($('shopOpenLabel').textContent === 'Open the upgrade shop') openUpShop(); else openShop(); };
+  shopBtn.addEventListener('click', openStall);
   $('shopDone').addEventListener('click', closeShop);
   $('shopTurn').addEventListener('click', () => { shopTurnTo = shopTurnTo ? 0 : Math.PI; });
 
@@ -2734,7 +2904,7 @@ const World = (function () {
   /* Leave: back to the front cover. The next Play starts fresh on the beach, and an admin has to sign in again. */
   function leave() {
     if (!started) return;
-    closeShop(); shopBtn.hidden = true; avatar.visible = false;
+    closeShop(); closeUpShop(); shopBtn.hidden = true; avatar.visible = false;
     dropEgg(); dismount(true); saveCoins(); toastEl.hidden = true;
     started = false; isAdmin = false; setRadar(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
@@ -2761,7 +2931,8 @@ const World = (function () {
       return;
     }
     if (shopping) { if (e.code === 'Escape') closeShop(); return; }           // the shop's own buttons take the keys
-    if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openShop(); return; }
+    if (upShopOpen) { if (e.code === 'Escape') closeUpShop(); return; }   // the upgrade shop's own buttons take the keys
+    if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openStall(); return; }
     if (e.code.startsWith('Digit')) { jumpTo(+e.code.slice(5) - 1); return; }
     if (e.code === 'Space' && !e.repeat) jumpTapped = true;
     keys.add(e.code);
@@ -2928,8 +3099,11 @@ const World = (function () {
   function showZone() {
     const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : started ? rideHint() : '';
     if (tip !== hint) { hint = tip; hintEl.textContent = tip; }
-    const atShop = started && !shopping && !carrying && !riding && !p.dungeon && !p.inCave && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6;
-    if (shopBtn.hidden === atShop) shopBtn.hidden = !atShop;      // the "open the shop" button shows only at the blue stall
+    const free = started && !shopping && !upShopOpen && !carrying && !riding && !p.dungeon && !p.inCave;
+    const atShop = free && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6, atUp = free && Math.hypot(p.x - upFront.x, p.z - upFront.z) < 3.6;
+    const label = atUp ? 'Open the upgrade shop' : 'Open the avatar shop';   // one button, for whichever stall you are at
+    if ($('shopOpenLabel').textContent !== label) $('shopOpenLabel').textContent = label;
+    if (shopBtn.hidden === (atShop || atUp)) shopBtn.hidden = !(atShop || atUp);
     const z = zoneName();
     if (z === zone) return;
     zone = z;
@@ -3006,7 +3180,7 @@ const World = (function () {
     last = now;
     earn(Math.min(real, 5));                              // coins follow the real clock (a long gap, like a hidden tab, counts as 5 seconds at most)
     resize();
-    if (started && !shopping) update(dt, time);
+    if (started && !shopping && !upShopOpen) update(dt, time);
     else if (!started) {                                  // the front cover: circle the island from the air
       if (!reduced) coverTurn += dt * 0.07;
       camera.position.set(Math.cos(coverTurn) * 250, 92, Math.sin(coverTurn) * 250);
@@ -3032,6 +3206,7 @@ const World = (function () {
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, COINS_PER_SECOND, earn,
+    giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();

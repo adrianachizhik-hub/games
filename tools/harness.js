@@ -83,7 +83,7 @@ function el(id) {
     classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) },
     listeners: {}, addEventListener(n, f) { (this.listeners[n] = this.listeners[n] || []).push(f); }, fire(n, e) { (this.listeners[n] || []).forEach((f) => f(e)); },
     getBoundingClientRect() { return id === 'stick' && document.body.classList.contains('touch') ? { left: 22, top: 720 - 28 - 124, width: 124, height: 124 } : { left: 0, top: 0, width: 0, height: 0 }; },
-    appendChild(c) { this.children.push(c); }, getContext() { return ctx2d(this); }, focus() {}, blur() {}, setPointerCapture() {}, requestPointerLock() {} };
+    appendChild(c) { this.children.push(c); }, removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); }, get firstChild() { return this.children[0]; }, getContext() { return ctx2d(this); }, focus() {}, blur() {}, setPointerCapture() {}, requestPointerLock() {} };
 }
 const els = {};
 const document = { getElementById: (id) => els[id] || (els[id] = el(id)), createElement: (t) => el(t), createTextNode: (t) => ({ text: t }), body: el('body'), addEventListener() {}, pointerLockElement: null };
@@ -92,7 +92,7 @@ const wl = {};
 const window = { THREE, matchMedia: () => ({ matches: false }), addEventListener(n, f) { (wl[n] = wl[n] || []).push(f); }, fire(n, e) { (wl[n] || []).forEach((f) => f(e)); }, innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1 };
 // SAVED=1: a device that has played before, with a claimed plot and some dragons already saved.
 // Without it the device starts fresh, and at the very end the harness runs itself again with SAVED=1.
-const store = process.env.SAVED !== '1' ? {} : { 'mutation-mayhem-plot': '2', 'mutation-mayhem-dragons': JSON.stringify(['green', 'ruby', 'blue']), 'mutation-mayhem-coins': '500' };
+const store = process.env.SAVED !== '1' ? {} : { 'mutation-mayhem-plot': '2', 'mutation-mayhem-dragons': JSON.stringify(['green', 'ruby', 'blue']), 'mutation-mayhem-coins': '500', 'mutation-mayhem-upgrades': '[-1,2,-1]' };
 const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
 const sandbox = { localStorage, window, document, THREE, performance: { now: () => 0 }, requestAnimationFrame: (f) => { raf = f; }, console, Math, Float32Array, Uint8Array, Uint16Array, Uint8ClampedArray, Map, Set, Infinity };
 vm.createContext(sandbox);
@@ -305,8 +305,8 @@ if (process.env.SAVED === '1') {
   if (I.myPlot() !== 2 || I.plotPets.length !== 3) throw new Error('saved plot or dragons did not come back');
   els.start.fire('click', ev({ pointerType: 'mouse' })); I.goTo(7); I.mount(I.plotPets[1]); I.update(1 / 60, 0); raf(30000); raf(30016);
   { const c0 = I.coins(); for (let f = 0; f < 300; f++) I.earn(1 / 60);
-    console.log('saved progress coins: rate', I.coinRate(), '(green 1 + ruby 20 + blue 3) | earned in 5 s', (I.coins() - c0).toFixed(0), '| saved', store['mutation-mayhem-coins']);
-    if (I.coinRate() !== 24 || Math.abs(I.coins() - c0 - 120) > 1) throw new Error('coin rate wrong for saved dragons'); }
+    console.log('saved progress coins: rate', I.coinRate(), '(green 1 + ruby 20 with a Legendary upgrader x3 + blue 3) | earned in 5 s', (I.coins() - c0).toFixed(0), '| saved', store['mutation-mayhem-coins']);
+    if (I.coinRate() !== 64 || Math.abs(I.coins() - c0 - 320) > 1) throw new Error('coin rate wrong for saved dragons'); }
   console.log('ride a saved dragon: riding', I.riding().kind, '| sign on the saved plot', JSON.stringify(I.signLabels[2]));
   if (I.signLabels[2] !== I.name() + "'s Plot") throw new Error('saved plot sign not named');
   I.dismount(true); process.exit(0);
@@ -461,6 +461,44 @@ click(screenOf(far.root.position.x, far.root.position.y + 0.6, far.root.position
 I.mount(far); I.p.inCave = true; I.p.inLid = true; frameN(1); console.log('ride into the cave           : riding', !!I.riding(), '| message', said()); I.p.inCave = I.p.inLid = false;
 I.goTo(7); frameN(1); I.mount(far); window.fire('keydown', ev({ code: 'Digit1' })); window.fire('keyup', ev({ code: 'Digit1' }));
 console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.zoneName(), '| dragon back on its plot', I.plotAt(far.root.position.x, far.root.position.z) === I.myPlot() || far.lx === 0);
+}
+
+// ---- lucky blocks ----
+{
+  const n = {}; for (let k = 0; k < 200000; k++) { const t = I.rollLucky(); n[t] = (n[t] || 0) + 1; }
+  console.log('lucky blocks out:', I.luckyBlocks.length, '| odds:', E.map((t, i) => t.name + ' ' + (n[i] / 2000).toFixed(1) + '%').join(', '), '| coins', (n[-1] / 2000).toFixed(1) + '%');
+  els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear(); if (I.riding()) I.dismount(true);
+  const b = I.luckyBlocks[0], c0 = I.coins(), was = I.ownDragons.length;
+  I.goTo(6); I.p.x = b.spot.x; I.p.z = b.spot.z; I.p.y = b.spot.y; I.p.vy = 0; I.p.onGround = true; I.update(1 / 60, 0);
+  const got = I.carrying();
+  console.log('walk into a lucky block: block gone', !b.m.visible, '| got', got ? E[got.egg.tier].name + ' egg, ' + got.total + ' s to get home' : (I.coins() - c0).toFixed(0) + ' coins', '| message', said());
+  if (b.m.visible || (!got && I.coins() - c0 < 249)) throw new Error('the lucky block gave nothing');
+  const b2 = I.luckyBlocks[1]; if (got) { I.p.x = b2.spot.x; I.p.z = b2.spot.z; I.p.y = b2.spot.y; I.update(1 / 60, 0); console.log('another block while carrying: opened', !b2.m.visible, '| message', said()); if (!b2.m.visible) throw new Error('opened a block while carrying'); }
+  if (got) { const home2 = I.plotWorld(I.myPlot(), 0, 0); I.p.x = home2.x; I.p.z = home2.z; I.p.y = 6.3; tick(2.5); console.log('took the lucky egg home: dragons', was, '->', I.ownDragons.length, '| newest', I.ownDragons[I.ownDragons.length - 1]); if (I.ownDragons.length !== was + 1) throw new Error('lucky egg did not hatch'); }
+  for (let k = 0; k < 60 * 50; k++) I.eggsAnimate(1 / 60, k / 60);
+  console.log('50 s later the block is back', b.m.visible, '| somewhere else', Math.hypot(b.m.position.x - I.p.x, b.m.position.z - I.p.z) > 40);
+}
+
+// ---- the red stall: upgraders ----
+{
+  I.goTo(7); I.p.x = I.upFront.x; I.p.z = I.upFront.z; I.p.y = 6.3; for (let k = 0; k < 12; k++) raf(40000 + k * 16);
+  const SBt = document.getElementById('shopOpenLabel').textContent;
+  console.log('at the red stall: button shown', !document.getElementById('shopOpen').hidden, '| says', JSON.stringify(SBt), '| sign', JSON.stringify(I.signLabels[9]));
+  if (SBt !== 'Open the upgrade shop' || document.getElementById('shopOpen').hidden) throw new Error('no upgrade shop button at the red stall');
+  window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(41000);
+  const rows = els.upList.children, buy = (i) => rows[i].children[1];
+  I.giveCoins(-I.coins() + 300); I.earn(0);
+  console.log('upgrade shop open', I.upShopOpen(), '| 300 coins: can buy', I.UPGRADERS.map((u, i) => u.name + ' ' + !buy(i).disabled).join(', '));
+  if (!I.upShopOpen() || buy(1).disabled === false) throw new Error('rare upgrader should cost more than 300');
+  I.giveCoins(300); I.earn(0); const r0 = I.coinRate(), k0 = I.ownDragons[0];
+  buy(1).fire('click', ev({})); const picks = els.upDragons.children;
+  console.log('buy a Rare upgrader: asks', JSON.stringify(els.upPickT.textContent), '|', picks.length, 'dragons to pick from, first:', JSON.stringify(picks[0].textContent));
+  picks[0].fire('click', ev({}));
+  console.log('give it to the first dragon (' + k0 + '): coins', I.coins().toFixed(0), '| rate', r0, '->', I.coinRate(), '| upgrades', JSON.stringify(I.dragonUpgrades.slice(0, 3)), '| message', said(), '| saved', store['mutation-mayhem-upgrades'].slice(0, 12));
+  if (Math.abs(I.coinRate() - r0 - I.COINS_PER_SECOND[k0]) > 1e-9 || I.coins() > 100.5) throw new Error('rare upgrader should double one dragon');
+  I.giveCoins(200); I.earn(0); buy(0).fire('click', ev({}));
+  console.log('a Common upgrader on the same dragon:', JSON.stringify(els.upDragons.children[0].textContent), 'disabled', els.upDragons.children[0].disabled);
+  els.upCancel.fire('click', ev({})); window.fire('keydown', ev({ code: 'Escape' })); console.log('Escape closes it:', !I.upShopOpen());
 }
 
 // ---- and once more, as a device with saved progress ----
