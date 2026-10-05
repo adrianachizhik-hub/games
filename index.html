@@ -1300,7 +1300,7 @@ const World = (function () {
   const VILLAGE = { x: -30, z: 117, r: 17 }, SECRET = { x: -28, z: 46 };   // the fire village (far south-west corner) and the secret shop (deep jungle)
   function probe(x, z) {
     if (W.lidAt(x, z)) return null;
-    if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 3 || Math.hypot(x - SECRET.x, z - SECRET.z) < 6) return null;   // nothing grows there either
+    if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 3 || Math.hypot(x - SECRET.x, z - SECRET.z) < 3.2) return null;   // nothing grows there either (the jungle grows right up to the secret shop)
     if (Math.hypot(x - W.HUB.x, z - W.HUB.z) < W.HUB.r + 3) return null;      // keep the town circle clear
     const h = W.bil(H, x, z);
     if (W.bil(HT, x, z) - h > 0.1) return null;
@@ -2652,7 +2652,8 @@ const World = (function () {
     coinsEl.appendChild(pop);
     setTimeout(() => { if (pop.parentNode) pop.parentNode.removeChild(pop); }, 1200);
   }
-  function saveCoins() { try { localStorage.setItem('mutation-mayhem-coins', String(Math.floor(coins))); } catch (e) { /* not saved, still playable */ } }
+  let realCoins = null;                                  // an admin's own coins, put away while they have unlimited ones
+  function saveCoins() { if (coins === Infinity) return; try { localStorage.setItem('mutation-mayhem-coins', String(Math.floor(coins))); } catch (e) { /* not saved, still playable */ } }
   window.addEventListener('pagehide', saveCoins);        // closing the tab keeps the last few seconds too
   function earn(dt) {                                   // dt here is real time, so slow computers earn as fast as quick ones
     if (started) {
@@ -2707,7 +2708,8 @@ const World = (function () {
     carryMeshes[egg.tier].visible = true;
     carryDot.style.background = '#' + (t.shell || t.swirl[0]).toString(16).padStart(6, '0');
     carryEl.hidden = false; carryEl.classList.remove('low');
-    toast('You found a ' + t.name + ' egg! Get it home to your plot before it hatches.');
+    toast('You found a ' + t.name + ' egg! Get it home to your plot before it hatches.' + (radarOn ? ' (Egg radar used up. Switch it on again to find another egg.)' : ''), radarOn ? 6 : 4.5);
+    if (radarOn) setRadar(false);                         // the radar finds one egg per use
   }
   function stopCarrying() {
     if (!carrying) return null;
@@ -3394,7 +3396,10 @@ const World = (function () {
     box(5, 0.9, 0.5, 0, 0.6, 1.6, 0x2a1e12);              // counter
     box(5.8, 0.3, 4.8, 0, 3.05, 0.2, 0x2f6a2a, 0.12);      // a roof grown over with leaves and vines
     [-2, -0.7, 0.6, 1.9].forEach((x, k) => box(0.12, 1.2 + k % 2 * 0.6, 0.12, x, 2.3 - k % 2 * 0.3, 2.4, 0x3f8a3a));
-    box(0.3, 0.4, 0.3, 1.8, 1.25, 1.6, 0xffc21f);          // a lantern on the counter
+    const leaf = [0x2a5a24, 0x2f6a2a, 0x24501f];          // thick hedges around it, with one narrow gap at the front
+    for (let k = -3; k <= 3; k++) box(1.6, 2.6 + (k & 1) * 0.6, 1.6, k * 1.2, 1.3, -3.0, leaf[(k + 3) % 3]);
+    [-1, 1].forEach((sd) => { for (let k = -2; k <= 2; k++) box(1.6, 2.4 + (k & 1) * 0.7, 1.6, sd * 3.4, 1.2, k * 1.2, leaf[(k + 5) % 3]); box(1.8, 2.2, 1.6, sd * 2.6, 1.1, 3.0, leaf[1]); });
+    box(6.6, 0.8, 5.6, 0, 3.5, 0.2, 0x24501f, 0.12);       // leaves heaped on the roof, so it looks like more jungle from above
     scene.add(new THREE.Mesh(merge(parts), plantMat));
     addCollider(SECRET.x, SECRET.z, 2.6);
   })();
@@ -3623,7 +3628,7 @@ const World = (function () {
     if (e.detail > 0) adminTab.blur();                    // after a click or tap, hand the keys back to walking
   });
   /* Admin command: the egg radar. While it is on, the minimap marks the nearest egg and draws a line to it,
-     and a label under the minimap says what kind it is and how far. */
+     and a label under the minimap says what kind it is and how far. One use at a time: picking up an egg switches it off. */
   let radarOn = false;
   const radarEl = $('radar'), radarBtn = document.createElement('button');
   radarBtn.type = 'button';
@@ -3707,6 +3712,7 @@ const World = (function () {
     nameMyPlot();
     adminEl.hidden = !isAdmin;                            // only admins get the arrow
     if (isAdmin) setRadar(true);                          // admins start with the egg radar on
+    if (isAdmin && realCoins === null) { realCoins = coins; coins = Infinity; }   // and unlimited coins (never saved)
     document.body.classList[isAdmin ? 'add' : 'remove']('admin');
     greetChat();
     if (isAdmin) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Admin'; who.appendChild(badge); }
@@ -3728,6 +3734,7 @@ const World = (function () {
   function leave() {
     if (!started) return;
     closeShop(); closeUpShop(); closePlotMenu(); closeTalk(); shopBtn.hidden = true; avatar.visible = false;
+    if (realCoins !== null) { coins = realCoins; realCoins = null; }   // an admin's unlimited coins end when they leave
     dropEgg(); dropBlock(); villagersHome(); dismount(true); releasePlot(); saveCoins(); closeSecret(); toastEl.hidden = true;
     started = false; isAdmin = false; setRadar(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
@@ -4051,7 +4058,7 @@ const World = (function () {
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, talking: () => talking, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
-    giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
+    giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);

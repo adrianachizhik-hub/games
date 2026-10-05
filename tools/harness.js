@@ -415,6 +415,7 @@ if (!radarBtn) throw new Error('no egg radar button');
 I.goTo(6); tick(0.1);
 const near = I.nearestEgg(); let brute = Infinity; I.eggs.forEach((e) => { if (!e.taken) brute = Math.min(brute, Math.hypot(e.spot.x - I.p.x, e.spot.z - I.p.z)); });
 console.log('nearest egg from the Meadow:', I.EGG_TIERS[near.egg.tier].name, near.dist.toFixed(1), '| checked against every egg', Math.abs(near.dist - brute) < 1e-9);
+if (I.admin()) { els.leave.fire('click', ev({ detail: 1 })); playAgain(); reclaim(); }   // a fresh sign-in (picking up eggs earlier switched the radar off)
 raf(8900); raf(8916); raf(8932);
 console.log('just signed in (admin ' + I.admin() + '): radar on', I.radarOn(), '| label shown', !els.radar.hidden);
 if (I.radarOn() !== I.admin()) throw new Error('the radar should start on for admins only');
@@ -538,7 +539,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   if (SBt !== 'Open the upgrade shop' || document.getElementById('shopOpen').hidden) throw new Error('no upgrade shop button at the red stall');
   window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(41000);
   const rows = els.upList.children, buy = (k) => rows[k].children[1], left = (k) => rows[k].children[0].children[2].textContent;
-  I.giveCoins(-I.coins() + 300); I.earn(0);
+  I.setCoins(300); I.earn(0);
   console.log('upgrade shop open', I.upShopOpen(), '| stock:', I.UPGRADERS.map((u, k) => u.name + ' ' + JSON.stringify(left(k))).join(', '), '| radar row shown', !rows[5].hidden, '|', JSON.stringify(els.upRestock.textContent));
   if (!I.upShopOpen() || left(4) !== 'Out of stock' || !buy(4).disabled) throw new Error('prismatic should be out of stock this round');
   buy(1).fire('click', ev({}));
@@ -577,7 +578,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   const lab = () => document.getElementById('shopOpenLabel').textContent;
   console.log('at my name sign: button', JSON.stringify(lab()), 'shown', !document.getElementById('shopOpen').hidden);
   if (lab() !== 'Buy 1 more space · 500 coins') throw new Error('no buy-space button at the sign');
-  I.giveCoins(-I.coins() + 100); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); console.log('press it with 100 coins: message', said(), '| spaces', I.plotSlots());
+  I.setCoins(100); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); console.log('press it with 100 coins: message', said(), '| spaces', I.plotSlots());
   I.giveCoins(1500); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); console.log('with 1,600: spaces', I.plotSlots(), '| coins left', I.coins().toFixed(0), '| button now', JSON.stringify(lab()));
   if (I.plotSlots() !== 6 || I.spacePrice() !== 1000) throw new Error('buying space went wrong');
   I.p.x = home3.x; I.p.z = home3.z; for (let k = 0; k < 12; k++) raf(45000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(45300);
@@ -595,7 +596,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   // buy an upgrader and keep it
   const rr = (() => { for (let r = 1; r < 20000; r++) { const st = I.stockFor(r); if (st.counts[2] && st.counts[0]) return r; } })(); I.setStockRound(rr);
   I.p.x = I.upFront.x; I.p.z = I.upFront.z; for (let k = 0; k < 12; k++) raf(46000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(46300);
-  I.giveCoins(-I.coins() + 3000); const own0 = I.upgradersOwned[2];
+  I.setCoins(3000); const own0 = I.upgradersOwned[2];
   els.upList.children[2].children[1].fire('click', ev({}));
   console.log('buy a Legendary upgrader: coins', I.coins().toFixed(0), '| owned', own0, '->', I.upgradersOwned[2], '| asks', JSON.stringify(els.upPickT.textContent));
   els.upCancel.fire('click', ev({})); window.fire('keydown', ev({ code: 'Escape' }));
@@ -620,7 +621,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   I.p.x = hm.x; I.p.z = hm.z; I.update(1 / 60, 0); const p0 = I.dragonPlaced.filter(Boolean).length, n0 = els.invItems.children.length; dragBtn().fire('click', ev({ detail: 1 }));
   console.log('bought a space, click again: placed', p0, '->', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| saved upgraders', store['mutation-mayhem-upgraders']);
   if (I.dragonPlaced.filter(Boolean).length !== p0 + 1) throw new Error('clicking a dragon in the inventory should place it');
-  I.setStockRound(null); I.giveCoins(-I.coins());
+  I.setStockRound(null); I.setCoins(0);
 }
 
 // ---- chat ----
@@ -665,6 +666,26 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   console.log('away from the shops, E still steps sideways:', Math.hypot(I.p.x - x1, I.p.z - z1).toFixed(1), 'units');
 }
 
+// ---- admins: unlimited coins, and the radar finds one egg per use ----
+{
+  if (I.admin()) { els.leave.fire('click', ev({ detail: 1 })); playAgain(); reclaim(); }   // fresh sign-in (earlier tests set exact coin amounts)
+  for (let k = 0; k < 12; k++) raf(90000 + k * 16);
+  console.log('coins (admin ' + I.admin() + '):', I.coins(), '| shown', JSON.stringify(els.coinCount.textContent), '| saved', store['mutation-mayhem-coins']);
+  if (I.admin() && I.coins() !== Infinity) throw new Error('admins should have unlimited coins');
+  if (I.admin()) {
+    document.getElementById('adminCommands').children.find((b) => /radar/i.test(b.textContent)).fire('click', ev({ detail: 1 }));
+    if (!I.radarOn()) document.getElementById('adminCommands').children.find((b) => /radar/i.test(b.textContent)).fire('click', ev({ detail: 1 }));
+    const e = I.nearestEgg().egg; I.p.x = e.spot.x; I.p.z = e.spot.z; I.p.y = e.spot.y; I.p.dungeon = !!e.spot.dungeon; I.p.inCave = I.p.inLid = !!e.spot.cave; I.update(1 / 60, 0);
+    console.log('radar on, pick up the egg it found: carrying', !!I.carrying(), '| radar now on', I.radarOn(), '| message', JSON.stringify(els.toast.textContent));
+    if (I.radarOn()) throw new Error('the radar should switch off after one egg');
+    I.dropEgg(); I.p.dungeon = I.p.inCave = I.p.inLid = false;
+    const before = store['mutation-mayhem-coins']; els.leave.fire('click', ev({ detail: 1 }));
+    console.log('admin leaves: coins back to', I.coins(), '| saved still', store['mutation-mayhem-coins'], '(was', before + ')');
+    if (I.coins() === Infinity || store['mutation-mayhem-coins'] === 'Infinity') throw new Error('unlimited coins must not stick');
+    playAgain(); reclaim();
+  }
+}
+
 // ---- admin announcement ----
 {
   const ab = I.annBtn(), ai = I.annInput();
@@ -686,7 +707,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   stand(I.secretFront.x, I.secretFront.z); hud(); console.log('at the secret shop: button', JSON.stringify(lab()), '| own a diamond dragon', I.ownDragons.includes('diamond'));
   if (lab() !== 'Open the secret shop') throw new Error('no secret shop button');
   window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); hud(2);
-  I.giveCoins(-I.coins() + 1000); els.secretBuy.fire('click', ev({})); console.log('shop open', I.secretOpen(), '| buy fire resistance with 1,000 coins:', said(), '| resistance', I.fireResUntil() > Date.now());
+  I.setCoins(1000); els.secretBuy.fire('click', ev({})); console.log('shop open', I.secretOpen(), '| buy fire resistance with 1,000 coins:', said(), '| resistance', I.fireResUntil() > Date.now());
   // the fire, before resistance
   I.setFireClock(300); fr(); hud(); stand(V.x + 6, V.z); fr(); hud(); console.log('fire out: fire egg there', I.fireEggThere(), '| hint', JSON.stringify(els.hint.textContent));
   I.setFireClock(10); stand(V.x + 0.5, V.z, vy); fr(2);
