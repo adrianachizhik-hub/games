@@ -2110,6 +2110,23 @@ const World = (function () {
     block(k.head, teal, 0.06, 0.08, 0.06, 0.05, 0.71, 0);
   })();
 
+  /* ---------- The upgrade shop's keeper ---------- */
+  /* A boy behind the counter of the red stall, in simple clothes: a plain green T-shirt, jeans and white
+     sneakers, with long swoopy hair that sweeps across his forehead and hangs to his shoulders. */
+  const upKeeper = figure({ skin: lam('#f1c27d'), shirt: lam('#4f9a5a'), pants: lam('#3d5f8f'), face: paint.face });
+  (function styleUpKeeper() {
+    const k = upKeeper, hairC = lam('#8a5a2b'), hairD = lam('#6f4620'), white = lam('#f2f2f2');
+    [k.legL, k.legR].forEach((leg) => block(leg, white, 0.35, 0.16, 0.42, 0, -0.74, -0.04));   // sneakers
+    block(k.head, hairC, 0.6, 0.18, 0.6, 0, 0.5, 0.01);                          // top of the hair
+    block(k.head, hairC, 0.62, 0.6, 0.14, 0, 0.2, 0.25);                         // long at the back, down to the shoulders
+    block(k.head, hairC, 0.1, 0.66, 0.46, -0.3, 0.16, 0.04);                     // sides, hanging down past the jaw
+    block(k.head, hairC, 0.1, 0.66, 0.46, 0.3, 0.16, 0.04);
+    block(k.head, hairD, 0.12, 0.22, 0.16, 0.3, -0.06, 0.12);                    // ends flicking out at the shoulders
+    block(k.head, hairD, 0.12, 0.22, 0.16, -0.3, -0.06, 0.12);
+    block(k.head, hairC, 0.6, 0.16, 0.1, 0.03, 0.45, -0.28, 0, 0, -0.2);         // the big swoop across the forehead
+    block(k.head, hairC, 0.13, 0.3, 0.09, 0.27, 0.3, -0.27, 0, 0, -0.25);        // sweeping down the side of his face
+  })();
+
   /* ---------- Player ---------- */
   const EYE = 1.65, SWIM = -1.05, MAX_SLOPE = 1.6;
   const p = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: 0, onGround: true, inLid: false, inCave: false, dungeon: false };
@@ -3160,15 +3177,20 @@ const World = (function () {
   const keeperYaw = Math.atan2(-shopOut.x, -shopOut.z);  // she stands behind the counter, facing the customers
   keeper.root.position.set(BLUE.x + shopOut.x * 0.5, HUB.h + 0.2, BLUE.z + shopOut.z * 0.5);
   keeper.root.rotation.y = keeperYaw;
-  let keeperWave = 0;
-  function keeperPose(dt, time) {                        // she sways a little, and waves when you come close
-    const near = started && Math.hypot(p.x - BLUE.x, p.z - BLUE.z) < 11 && !p.dungeon && !p.inCave;
-    keeperWave += ((near ? 1 : 0) - keeperWave) * Math.min(1, dt * 5);
-    if (reduced) { keeper.armR.rotation.z = keeperWave * 2.4; return; }
-    keeper.root.rotation.y = keeperYaw + Math.sin(time * 0.7) * 0.12;
-    keeper.head.rotation.z = Math.sin(time * 0.9) * 0.06;
-    keeper.armR.rotation.z = keeperWave * (2.4 + Math.sin(time * 9) * 0.28);
-    keeper.armL.rotation.z = -0.1;
+  const upKeeperYaw = Math.atan2(-redOut.x, -redOut.z);  // the boy behind the red stall's counter
+  upKeeper.root.position.set(RED.x + redOut.x * 0.5, HUB.h + 0.2, RED.z + redOut.z * 0.5);
+  upKeeper.root.rotation.y = upKeeperYaw;
+  const keepers = [{ k: keeper, yaw: keeperYaw, at: BLUE, wave: 0, sway: 0 }, { k: upKeeper, yaw: upKeeperYaw, at: RED, wave: 0, sway: 2.1 }];
+  function keeperPose(dt, time) {                        // they sway a little, and wave when you come close
+    for (const q of keepers) {
+      const near = started && Math.hypot(p.x - q.at.x, p.z - q.at.z) < 11 && !p.dungeon && !p.inCave;
+      q.wave += ((near ? 1 : 0) - q.wave) * Math.min(1, dt * 5);
+      if (reduced) { q.k.armR.rotation.z = q.wave * 2.4; continue; }
+      q.k.root.rotation.y = q.yaw + Math.sin(time * 0.7 + q.sway) * 0.12;
+      q.k.head.rotation.z = Math.sin(time * 0.9 + q.sway) * 0.06;
+      q.k.armR.rotation.z = q.wave * (2.4 + Math.sin(time * 9 + q.sway) * 0.28);
+      q.k.armL.rotation.z = -0.1;
+    }
   }
   let shopTurn = 0, shopTurnTo = 0;                      // 0 shows the avatar's front, half a turn shows its back
   function markOptions() {
@@ -3618,7 +3640,7 @@ const World = (function () {
     renderer.render(scene, camera);
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
-    AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
+    AV, avatar, gear, hair, keeper, upKeeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
