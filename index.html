@@ -2522,7 +2522,7 @@ const World = (function () {
     }
     nagT -= dt;
     luckyPlay();
-    if (carryingBlock) return;                            // hands full: no eggs until the block is open
+    if (carryingBlock) { blockStep(dt); return; }        // hands full: no eggs until the block is open
     if (!carrying) {
       for (const egg of eggs) {
         if (egg.taken || !!egg.spot.dungeon !== p.dungeon || Math.abs(p.y - egg.spot.y) > 2.2 || Math.hypot(p.x - egg.spot.x, p.z - egg.spot.z) > 1.4) continue;
@@ -2868,8 +2868,8 @@ const World = (function () {
   $('plotDone').addEventListener('click', closePlotMenu);
 
   /* ---------- Lucky blocks ---------- */
-  /* Yellow "?" blocks hidden around the island. Walk into one to pick it up, carry it to your plot (no countdown,
-     and no jumping to places on the way), and open it there: usually an egg that hatches on the spot (Common 50%,
+  /* Yellow "?" blocks hidden around the island. Walk into one to pick it up, carry it to your plot before its
+     countdown runs out (no jumping to places on the way), and open it there: usually an egg that hatches on the spot (Common 50%,
      Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1%); the other 4% of the time, coins instead. An opened block
      turns up again somewhere else a little later. */
   const LUCKY_ODDS = [50, 30, 10, 5, 1], LUCKY_COINS = 250, LUCKY_COUNT = 8;
@@ -2899,16 +2899,39 @@ const World = (function () {
     for (let i = 0; i < LUCKY_ODDS.length; i++) { r -= LUCKY_ODDS[i]; if (r < 0) return i; }
     return -1;
   }
-  /* You carry a lucky block home (no countdown; it can't hatch) and open it on your plot. */
-  let carryingBlock = null;
+  /* You carry a lucky block home before its countdown runs out (LUCKY_BASE seconds, plus a little more the further it
+     was from your plot, like eggs), and open it on your plot, where the clock stops. Too late, and it crumbles. */
+  const LUCKY_BASE = 30;
+  let carryingBlock = null, blockLeft = 0, blockShown = -1;
   const blockCarry = new THREE.Mesh(luckyGeo, luckyMat);
   blockCarry.position.set(0, 2.25, -0.05); blockCarry.scale.set(0.6, 0.6, 0.6); blockCarry.visible = false; avatar.add(blockCarry);
   function pickUpBlock(b) {
     b.m.visible = false; b.wait = Infinity;               // it stays gone while you carry it
     carryingBlock = b; blockCarry.visible = true;
-    carryDot.style.background = '#ffc21f'; carryText.textContent = 'Lucky block: take it to your plot to open it';
+    const home = plots[myPlot];
+    blockLeft = Math.round(LUCKY_BASE + Math.hypot(b.spot.x - home.x, b.spot.z - home.z) * EXTRA_PER_UNIT); blockShown = -1;
+    carryDot.style.background = '#ffc21f'; blockClock();
     carryEl.hidden = false; carryEl.classList.remove('low');
-    toast('You picked up a lucky block! Take it to your plot to open it.', 4);
+    toast('You picked up a lucky block! Get it to your plot before time runs out, then open it there.', 4);
+  }
+  function blockClock() {                                // the countdown under the screen, red for the last 10 seconds
+    const sec = Math.ceil(blockLeft);
+    if (sec === blockShown) return;
+    blockShown = sec;
+    carryText.textContent = 'Lucky block: get it to your plot! ' + clock(sec);
+    if (sec <= 10) carryEl.classList.add('low');
+  }
+  function blockStep(dt) {                               // from eggsPlay, while you hold a block
+    if (!p.dungeon && plotAt(p.x, p.z) === myPlot) {      // home: the clock stops; open it whenever you like
+      if (carryText.textContent.indexOf('Home!') < 0) { carryText.textContent = 'Home! Open the lucky block'; carryEl.classList.remove('low'); blockShown = -1; }
+      return;
+    }
+    blockLeft -= dt;
+    if (blockLeft > 0) { blockClock(); return; }
+    const b = carryingBlock;                              // too late
+    carryingBlock = null; blockCarry.visible = false; carryEl.hidden = true;
+    b.wait = 45;
+    toast('Too late! The lucky block crumbled. Another one will turn up somewhere.', 5);
   }
   function dropBlock() {                                  // leaving the game: the block goes back where it was
     if (!carryingBlock) return;
@@ -3411,7 +3434,7 @@ const World = (function () {
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
-    carryingBlock: () => carryingBlock, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
+    carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();

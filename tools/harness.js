@@ -489,7 +489,13 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   const px = I.p.x; window.fire('keydown', ev({ code: 'Digit8' })); window.fire('keyup', ev({ code: 'Digit8' }));
   console.log('press 8 holding a block: moved', I.p.x !== px, '| message', said());
   if (I.p.x !== px) throw new Error('jumped while carrying a block');
-  tick(70); console.log('70 s later still holding it (no countdown):', I.carryingBlock() === b);
+  { const hp = I.plots[I.myPlot()], d = Math.hypot(b.spot.x - hp.x, b.spot.z - hp.z), t0 = I.blockLeft();
+    console.log('countdown: started at', t0, 's for a block', d.toFixed(0), 'away (30 + distance / 7 =', Math.round(30 + d / 7) + ') | shows', JSON.stringify(els.carryText.textContent));
+    if (Math.abs(t0 - Math.round(30 + d / 7)) > 0.5) throw new Error('lucky block time should depend on distance');
+    tick(5); console.log('5 s later:', JSON.stringify(els.carryText.textContent));
+    const hh = I.plotWorld(I.myPlot(), 0, 0); I.p.x = hh.x; I.p.z = hh.z; I.p.y = 6.3; tick(0.1); const atHome = I.blockLeft(); tick(120);
+    console.log('home, then 2 minutes wait: still holding', I.carryingBlock() === b, '| clock stopped', I.blockLeft() === atHome, '| shows', JSON.stringify(els.carryText.textContent));
+    if (I.carryingBlock() !== b || I.blockLeft() !== atHome) throw new Error('the clock should stop at home'); }
   const home2 = I.plotWorld(I.myPlot(), 0, 0); I.p.x = home2.x; I.p.z = home2.z; I.p.y = 6.3; for (let k = 0; k < 12; k++) raf(39000 + k * 16);
   console.log('on my plot: button says', JSON.stringify(document.getElementById('shopOpenLabel').textContent), 'shown', !document.getElementById('shopOpen').hidden, '| carry note out of its way', els.carry.hidden);
   if (document.getElementById('shopOpenLabel').textContent !== 'Open the lucky block') throw new Error('no button to open the block at home');
@@ -501,6 +507,11 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   const b3 = I.luckyBlocks[2]; I.p.x = b3.spot.x; I.p.z = b3.spot.z; I.p.y = b3.spot.y; I.update(1 / 60, 0); I.p.x = home2.x; I.p.z = home2.z; I.p.y = 6.3;
   const c1 = I.coins(); Math.random = () => 0.99; I.openLucky(); Math.random = real;
   console.log('a block with coins inside: +', (I.coins() - c1).toFixed(0), 'coins | message', said());
+  { const b5 = I.luckyBlocks[4]; I.p.x = b5.spot.x; I.p.z = b5.spot.z; I.p.y = b5.spot.y; I.update(1 / 60, 0); const t5 = I.blockLeft();
+    tick(t5 - 9); console.log('another block, nearly out of time:', JSON.stringify(els.carryText.textContent), '| red', els.carry.classList.contains('low'));
+    tick(10); console.log('out of time: holding', !!I.carryingBlock(), '| message', said(), '| block hidden until it turns up again', !b5.m.visible);
+    if (I.carryingBlock()) throw new Error('the block should crumble when time runs out');
+    for (let k = 0; k < 60 * 46; k++) I.eggsAnimate(1 / 60, k / 60); console.log('46 s later it is back:', b5.m.visible); }
   const b4 = I.luckyBlocks[3]; I.p.x = b4.spot.x; I.p.z = b4.spot.z; I.p.y = b4.spot.y; I.update(1 / 60, 0);
   els.leave.fire('click', ev({ detail: 1 })); console.log('Leave holding a block: holding', !!I.carryingBlock(), '| block back in its place', b4.m.visible); els.start.fire('click', ev({ pointerType: 'mouse' })); reclaim();
   for (let k = 0; k < 60 * 50; k++) I.eggsAnimate(1 / 60, k / 60);

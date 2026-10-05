@@ -64,7 +64,7 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 
 **Your plot's menu (section "Your plot's menu"):** stand on your plot and press "Open my plot": every dragon with Store or Place. More space is bought at your name sign (Adriana's request): stand by it and the button reads "Buy 1 more space · 500 coins", doubling each time (`spacePrice`, `signSpot`). When a stall and a sign are both in reach, the nearer one gets the button. A dragon hatched onto a full plot goes to storage. Adriana's rule: 5 to start, buy more, price goes up each time; the numbers were Claude's.
 
-**Lucky blocks (section "Lucky blocks"):** 8 yellow "?" blocks spinning around the island (outside town). Walk into one to pick it up (held over your head); Adriana asked that it be brought back to your plot and opened there. No countdown, but no jumping to places while carrying it, and no picking up eggs or other blocks. On your plot the button reads "Open the lucky block": Common egg 50%, Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1% (Adriana's odds), which hatches on the spot, or the other 4% gives 250 coins (Claude's choice; she did not answer). Needs a claimed plot. Leave puts a carried block back. An opened block turns up somewhere else, at least 40 away, 45 seconds later.
+**Lucky blocks (section "Lucky blocks"):** 8 yellow "?" blocks spinning around the island (outside town). Walk into one to pick it up (held over your head); Adriana asked that it be brought back to your plot and opened there, before a countdown runs out: `LUCKY_BASE` 30 seconds plus 1 per 7 units from your plot (her request: "time based on how far it is"). The clock stops once you are on your plot; too late and the block crumbles and turns up elsewhere 45 seconds later. No jumping to places while carrying it, and no picking up eggs or other blocks. On your plot the button reads "Open the lucky block": Common egg 50%, Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1% (Adriana's odds), which hatches on the spot, or the other 4% gives 250 coins (Claude's choice; she did not answer). Needs a claimed plot. Leave puts a carried block back. An opened block turns up somewhere else, at least 40 away, 45 seconds later.
 
 Still open: the names of the top two tiers (Mythic and Prismatic are placeholders), whether dragons should follow you, and the starter dog, cat and parrot.
 
@@ -216,6 +216,8 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 - Once pets and coins exist, make sure progress is saved before Leave, or add a confirmation.
 - Add prices to the avatar shop when coins exist.
 - The artifact link is still titled "Isla Verde". She was offered a rename to "Mutation Mayhem" and has not answered.
+
+**Waiting on the server: chat.** Adriana asked for a chat box in the top left corner so players can talk to each other. Like unique names, it needs a server; she was asked whether to build the box now (only usable once the server exists) or wait.
 
 **Paused on 5 October 2026: names unique across the whole world**
 - Adriana wants each exact name to belong to one player only ("Taj" taken means nobody else can be "Taj", but "Taj 65" is fine), so nobody ends up in someone else's account. Capitals should count as the same name.
