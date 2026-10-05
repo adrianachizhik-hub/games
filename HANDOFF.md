@@ -209,6 +209,12 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 - Add prices to the avatar shop when coins exist.
 - The artifact link is still titled "Isla Verde". She was offered a rename to "Mutation Mayhem" and has not answered.
 
+**Paused on 5 October 2026: names unique across the whole world**
+- Adriana wants each exact name to belong to one player only ("Taj" taken means nobody else can be "Taj", but "Taj 65" is fine), so nobody ends up in someone else's account. Capitals should count as the same name.
+- This needs a server with one shared list of names (the first piece of multiplayer). Each device would get a secret key so only the name's owner can use it.
+- Options she was shown (prices from third-party sites, to be checked on Render's own pricing page): A) Render Starter web service (about $7 a month) plus a small persistent disk for the names list (recommended; exact disk price still to check); B) free web service (sleeps after 15 minutes, about a minute to wake) plus a paid database (about $6 to $7 a month); C) Starter plus paid database (about $13 to $14 a month). Render's free database is deleted after 30 days.
+- She was told to check with a grown-up because it costs money every month. She chose to come back to it later. Nothing has been built for it.
+
 **Questions only she can answer**
 - What are the other three shops?
 - What does the pet area on a plot look like?
