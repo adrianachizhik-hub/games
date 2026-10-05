@@ -120,9 +120,10 @@ const ev = (o) => Object.assign({ preventDefault() {}, metaKey: false, ctrlKey: 
 I.keys.clear();
 const AN = process.env.ADMIN_NAME || '', AC = process.env.ADMIN_CODE || '';
 let MODE = process.env.MODE || 'other';
+const playAgain = () => { document.getElementById('confirm').hidden = true; if (MODE === 'admin') { els.name.value = AN; els.name.fire('input', ev({})); els.code.value = AC; } els.start.fire('click', ev({ pointerType: 'mouse' })); };   // Play, signing an admin back in
 if (MODE !== 'other' && !(AN && AC)) { console.log('ADMIN_NAME and ADMIN_CODE are not set: skipping the admin sign-in checks'); MODE = 'other'; }
 const flip = (s) => s.replace(/[a-z]/gi, (c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase())), st = () => 'started ' + document.body.classList.contains('playing') + ' | admin ' + I.admin() + ' | name ' + JSON.stringify(I.name()) + ' | tag ' + JSON.stringify(document.getElementById('who').textContent) + ' badge ' + JSON.stringify((document.getElementById('who').children[0] || {}).textContent) + ' | code box hidden ' + els.code.hidden + ' | message ' + JSON.stringify(els.codeMsg.hidden ? '' : els.codeMsg.textContent);
-els.code.hidden = true; els.codeMsg.hidden = true; els.admin.hidden = true; document.getElementById("confirm").hidden = true;   // hidden in the markup, as in the page
+els.code.hidden = true; els.codeMsg.hidden = true; els.admin.hidden = true; document.getElementById("confirm").hidden = true; document.getElementById("announce").hidden = true;   // hidden in the markup, as in the page
 if (MODE === 'admin') {
   els.name.value = AN.slice(0, -1); els.name.fire('input', ev({})); console.log('typing, one letter short :', st());
   els.name.value = flip(AN); els.name.fire('input', ev({})); console.log('admin name typed         :', st());
@@ -304,7 +305,7 @@ console.log('figures dumped:', shots.length);
 if (process.env.SAVED === '1') {
   console.log('saved progress, loaded: plot', I.myPlot(), '(none yet) | dragons saved', JSON.stringify(I.ownDragons), '| on a plot', I.plotPets.length, '| looks', I.AV.shirt, I.AV.pants);
   if (I.myPlot() !== -1 || I.plotPets.length) throw new Error('nothing should be on a plot before you step on one');
-  els.start.fire('click', ev({ pointerType: 'mouse' })); I.update(1 / 60, 0);
+  playAgain(); I.update(1 / 60, 0);
   console.log('saved progress, Play: spawned in', I.zoneName(), '| at the middle of the shops', Math.hypot(I.p.x - W.HUB.x, I.p.z - W.HUB.z) < 0.5);
   const w5 = I.plotWorld(4, 0, 2); I.p.x = w5.x; I.p.z = w5.z; I.p.y = 6.3; I.update(1 / 60, 0);
   console.log('saved progress, step onto Plot 5: my plot', I.myPlot() + 1, '| dragons appear', I.plotPets.map((d) => d.kind).join(','), '| sign', JSON.stringify(I.signLabels[4]), '| message', JSON.stringify(els.toast.textContent));
@@ -330,11 +331,11 @@ const zonesOf = (t) => { const z = {}; t.spots.forEach((s) => { stand(s); const 
 I.goTo(0);
 console.log('egg hiding places:'); E.forEach((t, i) => console.log(' ', t.name.padEnd(10), t.spots.length, 'spots,', I.eggs.filter((e) => e.tier === i).length, 'out at once | zones', zonesOf(t)));
 els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear();
+if (I.myPlot() >= 0 || !document.body.classList.contains('playing')) { els.leave.fire('click', ev({ detail: 1 })); document.getElementById('confirm').hidden = true; els.name.value = MODE === 'admin' ? AN : I.name(); els.name.fire('input', ev({})); els.code.value = AC; els.start.fire('click', ev({ pointerType: 'mouse' })); }   // start with no plot
 const common = I.eggs.find((e) => e.tier === 0);
 stand(common.spot); tick(0.2);
 console.log('touch an egg with no plot : carrying', !!I.carrying(), '| message', said());
 if (I.carrying()) throw new Error('picked up an egg without a plot');
-if (I.myPlot() >= 0) { els.leave.fire('click', ev({ detail: 1 })); els.name.value = MODE === 'admin' ? AN : I.name(); els.name.fire('input', ev({})); els.code.value = AC; els.start.fire('click', ev({ pointerType: 'mouse' })); }   // start with no plot
 I.goTo(7); const home = I.plotWorld(2, 0, 3); I.p.x = home.x; I.p.z = home.z; tick(0.2);
 console.log('walk onto Plot 3         : my plot', I.myPlot() + 1, '| message', said());
 if (I.myPlot() !== 2) throw new Error('plot not claimed');
@@ -367,7 +368,7 @@ const leg = I.eggs.find((e) => e.tier === 2); stand(leg.spot); tick(0.1); const 
 els.leave.fire('click', ev({ detail: 1 })); console.log('Leave gives the plot back: my plot', I.myPlot(), '| pets on it', I.plotPets.length, '| sign', JSON.stringify(I.signLabels[2]), '| where Play puts you next', I.zoneName());
 if (I.myPlot() !== -1 || I.plotPets.length || I.signLabels[2] !== 'Plot 3') throw new Error('Leave should give the plot back');
 console.log('Leave while carrying     : carrying', !!I.carrying(), '| egg back in its place', leg.g.visible && leg.spot === ls, '| countdown hidden', els.carry.hidden);
-els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear(); reclaim();
+playAgain(); I.keys.clear(); reclaim();
 console.log('Play again, step onto Plot 3: my plot', I.myPlot() + 1, '| dragons back on it', I.plotPets.length, '| sign', JSON.stringify(I.signLabels[2]));
 // how often each dragon comes out
 const odds = E.map((t, i) => { const n = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(i); n[d] = (n[d] || 0) + 1; } return t.name + ' ' + Object.keys(n).map((d) => d + ' ' + Math.round(n[d] / 200) + '%').join(' '); });
@@ -427,7 +428,7 @@ console.log('after Leave: radar on', I.radarOn(), '| button', JSON.stringify(rad
 
 // ---- riding dragons ----
 {
-els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear(); reclaim();
+playAgain(); I.keys.clear(); reclaim();
 const frameN = (n = 1) => { for (let k = 0; k < n; k++) { I.update(1 / 60, 0); I.eggsAnimate(1 / 60, 0); } };
 const screenOf = (x, y, z) => {                        // where a point shows on screen: the click maths run backwards
   const o = I.camera.position, t = Math.tan(70 * Math.PI / 360), W0 = 1280, H0 = 720;
@@ -481,7 +482,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
 {
   const n = {}; for (let k = 0; k < 200000; k++) { const t = I.rollLucky(); n[t] = (n[t] || 0) + 1; }
   console.log('lucky blocks out:', I.luckyBlocks.length, '| odds:', E.map((t, i) => t.name + ' ' + (n[i] / 2000).toFixed(1) + '%').join(', '), '| coins', (n[-1] / 2000).toFixed(1) + '%');
-  els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear(); if (I.riding()) I.dismount(true);
+  playAgain(); I.keys.clear(); if (I.riding()) I.dismount(true);
   const b = I.luckyBlocks[0], c0 = I.coins(), was = I.ownDragons.length;
   I.goTo(6); I.p.x = b.spot.x; I.p.z = b.spot.z; I.p.y = b.spot.y; I.p.vy = 0; I.p.onGround = true; I.update(1 / 60, 0);
   console.log('walk into a lucky block: picked up', I.carryingBlock() === b, '| block gone from the world', !b.m.visible, '| no egg yet', !I.carrying(), '| carry note', JSON.stringify(els.carryText.textContent), '| message', said());
@@ -518,7 +519,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     if (I.carryingBlock()) throw new Error('the block should crumble when time runs out');
     for (let k = 0; k < 60 * 46; k++) I.eggsAnimate(1 / 60, k / 60); console.log('46 s later it is back:', b5.m.visible); }
   const b4 = I.luckyBlocks[3]; I.p.x = b4.spot.x; I.p.z = b4.spot.z; I.p.y = b4.spot.y; I.update(1 / 60, 0);
-  els.leave.fire('click', ev({ detail: 1 })); console.log('Leave holding a block: holding', !!I.carryingBlock(), '| block back in its place', b4.m.visible); els.start.fire('click', ev({ pointerType: 'mouse' })); reclaim();
+  els.leave.fire('click', ev({ detail: 1 })); console.log('Leave holding a block: holding', !!I.carryingBlock(), '| block back in its place', b4.m.visible); playAgain(); reclaim();
   for (let k = 0; k < 60 * 50; k++) I.eggsAnimate(1 / 60, k / 60);
   console.log('50 s later the block is back', b.m.visible, '| somewhere else', Math.hypot(b.m.position.x - I.p.x, b.m.position.z - I.p.z) > 40);
 }
@@ -629,9 +630,9 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   window.fire('keydown', ev({ code: 'Slash', key: '/' }));
   ci.value = '  hello   island!  '; window.fire('keydown', ev({ code: 'KeyW', key: 'w', target: ci })); window.fire('keydown', ev({ code: 'Enter', key: 'Enter', target: ci }));
   console.log('type "hello island!" and press Enter: chat', JSON.stringify(I.chatLog().slice(-1)), '| box emptied', ci.value === '', '| W while typing walks', I.keys.has('KeyW'));
-  if (I.chatLog().slice(-1)[0] !== I.name() + ': hello island!' || I.keys.has('KeyW')) throw new Error('chat went wrong');
+  if (I.chatLog().slice(-1)[0] !== I.name() + (I.admin() ? ' (Admin)' : '') + ': hello island!' || I.keys.has('KeyW')) throw new Error('chat went wrong');
   ci.value = '   '; document.getElementById('chatSend').fire('click', ev({})); console.log('send an empty message: lines', I.chatLog().length);
-  ci.value = 'x'.repeat(300); window.fire('keydown', ev({ code: 'Enter', key: 'Enter', target: ci })); console.log('a 300-letter message is cut to', I.chatLog().slice(-1)[0].length - (I.name() + ': ').length, 'letters');
+  ci.value = 'x'.repeat(300); window.fire('keydown', ev({ code: 'Enter', key: 'Enter', target: ci })); console.log('a 300-letter message is cut to', I.chatLog().slice(-1)[0].length - (I.name() + (I.admin() ? ' (Admin)' : '') + ': ').length, 'letters');
   window.fire('keydown', ev({ code: 'Escape', target: ci }));
 }
 
@@ -662,6 +663,17 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   I.p.x = I.upFront.x; frames(12); els.talkBtn.fire('click', ev({})); els.talkNo.fire('click', ev({})); console.log('"No thanks": talking', !!talk());
   I.goTo(6); frames(5); const x1 = I.p.x, z1 = I.p.z; window.fire('keydown', ev({ code: 'KeyE' })); frames(30); window.fire('keyup', ev({ code: 'KeyE' }));
   console.log('away from the shops, E still steps sideways:', Math.hypot(I.p.x - x1, I.p.z - z1).toFixed(1), 'units');
+}
+
+// ---- admin announcement ----
+{
+  const ab = I.annBtn(), ai = I.annInput();
+  console.log('admin commands:', els.adminCommands.children.filter((c) => c.textContent).map((c) => JSON.stringify(c.textContent)).join(', '));
+  ab.fire('click', ev({})); ai.value = 'Fire village is lit, come join!'; window.fire('keydown', ev({ code: 'KeyW', target: ai })); window.fire('keydown', ev({ code: 'Enter', key: 'Enter', target: ai }));
+  console.log('announce (admin ' + I.admin() + '): banner shown', !els.announce.hidden, '| says', JSON.stringify(els.announce.children.map((c) => c.textContent).join(' | ')), '| W walked', I.keys.has('KeyW'));
+  if (I.admin() === els.announce.hidden) throw new Error('only admins should be able to announce');
+  I.showAnnouncement('Adriana', 'hello everyone'); console.log('showAnnouncement: banner', JSON.stringify(els.announce.children.map((c) => c.textContent).join(' | ')));
+  for (let k = 0; k < 60 * 9; k++) I.eggsAnimate(1 / 60, 0); console.log('9 s later the banner is gone:', els.announce.hidden);
 }
 
 // ---- the secret shop, the fire village and the fire egg chase ----

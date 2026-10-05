@@ -472,6 +472,35 @@
     pointer-events: none;
   }
   #radar[hidden] { display: none; }
+  /* An admin's announcement, at the top middle of the screen */
+  #announce {
+    position: fixed;
+    left: 50%;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    transform: translateX(-50%);
+    max-width: min(440px, calc(100% - 32px));
+    padding: 10px 18px;
+    border: 4px solid #0d2f37;
+    border-radius: 16px;
+    background: #fff8e6;
+    color: #0d2f37;
+    box-shadow: 0 5px 0 #0d2f37;
+    font-size: 1.05rem;
+    text-align: center;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+  }
+  #announce[hidden], body:not(.playing) #announce { display: none; }
+  #announce.in { animation: ann-in 0.35s ease-out; }
+  @keyframes ann-in { from { opacity: 0; transform: translate(-50%, -12px); } }
+  @media (prefers-reduced-motion: reduce) { #announce.in { animation: none; } }
+  #announce b { font-weight: 700; }
+  #announce .badge { margin: 0 8px 0 6px; padding: 1px 9px; border-radius: 999px; background: #ffd23f; color: #0d2f37; font-size: 0.82rem; font-weight: 700; }
+  #announce .annmsg { display: block; margin-top: 3px; font-weight: 500; }
+  .annbox { display: flex; gap: 6px; }
+  .annbox[hidden] { display: none; }
+  .annbox input { flex: 1; min-width: 0; font: inherit; font-size: 0.92rem; padding: 5px 9px; border: 2px solid #0d2f37; border-radius: 10px; background: #fff; color: #0d2f37; -webkit-user-select: text; user-select: text; }
+  #adminCommands .annbox button { padding: 4px 12px; }
   /* Chat: top right, beside the minimap; folds down to its "Chat" button */
   #chat {
     position: fixed;
@@ -831,6 +860,7 @@
   <p class="hint" id="hint" aria-live="polite"></p>
 </div>
 <canvas id="map" width="264" height="264" aria-hidden="true"></canvas>
+<div id="announce" role="status" aria-live="assertive" hidden></div>
 <div id="chat">
   <button id="chatToggle" type="button" aria-expanded="true" aria-controls="chatBody">Chat</button>
   <div id="chatBody">
@@ -2750,6 +2780,7 @@ const World = (function () {
   function eggsAnimate(dt, time) {
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) toastEl.hidden = true; }
     luckyAnimate(dt, time);
+    announceStep(dt);
     villageAnimate(dt, time);
     const tw = (s, k) => { const v = reduced ? 1 : 0.55 + 0.45 * Math.sin(time * 4 + k); s.scale.set(v, v, v); };
     for (const egg of eggs) {
@@ -3605,6 +3636,39 @@ const World = (function () {
   setRadar(false);
   radarBtn.addEventListener('click', (e) => { setRadar(!radarOn); if (e.detail > 0) radarBtn.blur(); });
   $('adminCommands').appendChild(radarBtn);
+
+  /* Admin command: announce to everyone. The message pops up at the top middle of the screen with the admin's name and
+     badge (showAnnouncement). There is no server yet, so for now only the admin sees it; when there is one, the
+     message will be sent to it in sendAnnouncement, and every player's game will call showAnnouncement. */
+  const annBtn = document.createElement('button'), annBox = document.createElement('div'), annInput = document.createElement('input'), annSend = document.createElement('button');
+  annBtn.type = 'button'; annBtn.textContent = 'Announce to everyone';
+  annBox.className = 'annbox'; annBox.hidden = true;
+  annInput.type = 'text'; annInput.maxLength = 100; annInput.placeholder = 'Your announcement'; annInput.setAttribute('aria-label', 'Announcement'); annInput.autocomplete = 'off';
+  annSend.type = 'button'; annSend.textContent = 'Send';
+  annBox.appendChild(annInput); annBox.appendChild(annSend);
+  annBtn.addEventListener('click', () => { annBox.hidden = !annBox.hidden; if (!annBox.hidden) { keys.clear(); annInput.focus(); } });
+  annInput.addEventListener('focus', () => keys.clear());
+  annSend.addEventListener('click', sendAnnouncement);
+  $('adminCommands').appendChild(annBtn); $('adminCommands').appendChild(annBox);
+  const annEl = $('announce');
+  let annTimer = 0;
+  function showAnnouncement(name, text) {
+    while (annEl.firstChild) annEl.removeChild(annEl.firstChild);
+    const who = document.createElement('b'), badge = document.createElement('span'), msg = document.createElement('span');
+    who.textContent = name; badge.className = 'badge'; badge.textContent = 'Admin'; msg.className = 'annmsg'; msg.textContent = text;
+    annEl.appendChild(who); annEl.appendChild(badge); annEl.appendChild(msg);
+    annEl.hidden = false; annEl.classList.remove('in'); void annEl.offsetWidth; annEl.classList.add('in');
+    annTimer = 8;
+  }
+  function sendAnnouncement() {
+    const text = (annInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    annInput.value = '';
+    if (!text || !isAdmin || !started) return;
+    showAnnouncement(playerName, text);
+    toast('Announced! For now only you can see it; everyone will once the game has a server.', 4);
+    annInput.blur(); canvas.focus();
+  }
+  function announceStep(dt) { if (annTimer > 0) { annTimer -= dt; if (annTimer <= 0) annEl.hidden = true; } }
   function nearestEgg() {
     let best = null, bd = Infinity;
     for (const egg of eggs) { if (egg.taken) continue; const d = Math.hypot(egg.spot.x - p.x, egg.spot.z - p.z); if (d < bd) { bd = d; best = egg; } }
@@ -3683,6 +3747,11 @@ const World = (function () {
   window.addEventListener('touchstart', () => document.body.classList.add('touch'), { passive: true, once: true });
 
   window.addEventListener('keydown', (e) => {
+    if (e.target === annInput) {                         // typing an announcement
+      if (e.code === 'Enter' || e.key === 'Enter') { e.preventDefault(); sendAnnouncement(); }
+      else if (e.code === 'Escape') { annInput.blur(); canvas.focus(); }
+      return;
+    }
     if (e.target === chatInput) {                        // typing a chat message: the game keys stay out of it
       if (e.code === 'Enter' || e.key === 'Enter') { e.preventDefault(); sendChat(); }
       else if (e.code === 'Escape') { chatInput.blur(); canvas.focus(); }
@@ -3983,7 +4052,7 @@ const World = (function () {
     AV, avatar, gear, hair, keeper, upKeeper, keepers, talking: () => talking, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
-    upgradersOwned, renderInventory, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
+    upgradersOwned, renderInventory, showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();

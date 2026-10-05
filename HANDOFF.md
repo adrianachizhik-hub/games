@@ -184,6 +184,7 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 ### Admin panel
 - Admins get a yellow arrow tab on the right edge under the minimap. It slides a panel in ("Admin commands").
 - New commands go inside `#adminCommands` as buttons; the "No commands yet" note hides itself when that element has children.
+- **Announce to everyone** (6 October 2026): an admin types a message; it pops up at the top middle with their name and the Admin badge for 8 seconds (`showAnnouncement`). No server yet, so only the admin sees it; with a server, `sendAnnouncement` sends it and every game calls `showAnnouncement`.
 - **Egg radar** (asked for on 4 October 2026, the first command): a button that turns on and off. While on, the minimap draws a dashed line to the nearest egg with a pulsing ring on it, and a yellow label under the minimap says which kind it is, how far, and "in the cave" or "in the mine". It switches on by itself when an admin signs in, and off on Leave. To test admin features without the real name and code, run the harness on a copy of `index.html` where `start()` sets `isAdmin = true`; never commit that copy.
 
 ### Playing
@@ -260,6 +261,8 @@ ADMIN_NAME=... ADMIN_CODE=... MODE=admin node tools/harness.js index.html
 It walks through every place, falls into the dungeon, wanders it, climbs out, tests every key, the touch controls, sign-in, the admin panel, Leave, the camera, and the avatar shop. It throws on the first error. It also writes `new-map.json`, `town.json`, and `avatar.json`, which are shape dumps that can be drawn as pictures. Do not commit those three files.
 
 The harness plays on a fresh device, then runs itself again with `SAVED=1` as a device that already has a plot and dragons saved: code that runs while the page loads must not touch anything declared further down (a `riding` check in `addPet` broke loading once).
+
+For admin features, run it signed in as an admin: `ADMIN_NAME=... ADMIN_CODE=... MODE=admin` (the `playAgain` helper signs the admin back in after each Leave).
 
 When you add a feature, extend the harness to cover it. If you add a DOM method or a three.js class the page did not use before, the fake needs it too.
 
