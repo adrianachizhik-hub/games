@@ -94,7 +94,7 @@ const window = { THREE, matchMedia: () => ({ matches: false }), addEventListener
 // Without it the device starts fresh, and at the very end the harness runs itself again with SAVED=1.
 const store = process.env.SAVED !== '1' ? {} : { 'mutation-mayhem-plot': '2', 'mutation-mayhem-dragons': JSON.stringify(['green', 'ruby', 'blue']), 'mutation-mayhem-coins': '500', 'mutation-mayhem-upgrades': '[-1,2,-1]' };
 const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
-const sandbox = { localStorage, window, document, THREE, performance: { now: () => 0 }, requestAnimationFrame: (f) => { raf = f; }, console, Math, Float32Array, Uint8Array, Uint16Array, Uint8ClampedArray, Map, Set, Infinity };
+const sandbox = { localStorage, setTimeout: () => 0, window, document, THREE, performance: { now: () => 0 }, requestAnimationFrame: (f) => { raf = f; }, console, Math, Float32Array, Uint8Array, Uint16Array, Uint8ClampedArray, Map, Set, Infinity };
 vm.createContext(sandbox);
 vm.runInContext(worldSrc + '\nthis.World = World;', sandbox);
 vm.runInContext(renderSrc, sandbox);
@@ -304,9 +304,9 @@ if (process.env.SAVED === '1') {
   console.log('saved progress: plot', I.myPlot() + 1, '| dragons', JSON.stringify(I.ownDragons), '| on the plot', I.plotPets.map((d) => d.kind).join(','));
   if (I.myPlot() !== 2 || I.plotPets.length !== 3) throw new Error('saved plot or dragons did not come back');
   els.start.fire('click', ev({ pointerType: 'mouse' })); I.goTo(7); I.mount(I.plotPets[1]); I.update(1 / 60, 0); raf(30000); raf(30016);
-  { const c0 = I.coins(); for (let f = 0; f < 300; f++) I.earn(1 / 60);
-    console.log('saved progress coins: rate', I.coinRate(), '(green 1 + ruby 20 with a Legendary upgrader x3 + blue 3) | earned in 5 s', (I.coins() - c0).toFixed(0), '| saved', store['mutation-mayhem-coins']);
-    if (I.coinRate() !== 64 || Math.abs(I.coins() - c0 - 320) > 1) throw new Error('coin rate wrong for saved dragons'); }
+  { const c0 = I.coins(); for (let f = 0; f < 360; f++) I.earn(1 / 60);
+    console.log('saved progress coins: each payday', I.coinRate(), '(green 1 + ruby 20 with a Legendary upgrader x3 + blue 3, all 3 placed) | earned in 6 s', (I.coins() - c0).toFixed(0), '| saved', store['mutation-mayhem-coins'], '| placed', JSON.stringify(I.dragonPlaced), 'of', I.plotSlots());
+    if (I.coinRate() !== 64 || Math.abs(I.coins() - c0 - 128) > 1e-9) throw new Error('coin rate wrong for saved dragons'); }
   console.log('ride a saved dragon: riding', I.riding().kind, '| sign on the saved plot', JSON.stringify(I.signLabels[2]));
   if (I.signLabels[2] !== I.name() + "'s Plot") throw new Error('saved plot sign not named');
   I.dismount(true); process.exit(0);
@@ -342,8 +342,8 @@ console.log('walk into my plot        : carrying', !!I.carrying(), '| hatching',
 tick(2);
 console.log('2 seconds later          : dragons', JSON.stringify(I.ownDragons), '| pets on plot', I.plotPets.length, '| message', said(), '| egg back out elsewhere', common.g.visible && common.spot !== oldSpot);
 if (I.ownDragons.length !== 1 || !['green', 'red'].includes(I.ownDragons[0])) throw new Error('common egg did not hatch a green or red dragon');
-{ const c0 = I.coins(); tick(10); console.log('coins with one', I.ownDragons[0], 'dragon : rate', I.coinRate(), 'a second | earned in 10 s', (I.coins() - c0).toFixed(1), '| shown', JSON.stringify(els.coinCount.textContent), JSON.stringify(els.coinRate.textContent));
-  if (Math.abs(I.coins() - c0 - 10) > 0.2) throw new Error('a common dragon should make 1 coin a second'); }
+{ const c0 = I.coins(); tick(12); console.log('coins with one', I.ownDragons[0], 'dragon : pays', I.coinRate(), 'every', I.PAYOUT_SECONDS, 's | earned in 12 s', (I.coins() - c0).toFixed(1), '| shown', JSON.stringify(els.coinCount.textContent), JSON.stringify(els.coinRate.textContent));
+  if (Math.abs(I.coins() - c0 - 4) > 1e-9) throw new Error('a common dragon should pay 1 coin every 3 seconds (4 paydays in 12 s)'); }
 // a prismatic egg in the mine, and nobody takes it home
 const pris = I.eggs.find((e) => e.tier === 4); stand(pris.spot); tick(0.1);
 const pc = I.carrying(); console.log('touch the Prismatic egg  : carrying', !!pc, '| time', pc && pc.total, 's | zone', I.zoneName());
@@ -479,26 +479,59 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   console.log('50 s later the block is back', b.m.visible, '| somewhere else', Math.hypot(b.m.position.x - I.p.x, b.m.position.z - I.p.z) > 40);
 }
 
-// ---- the red stall: upgraders ----
+// ---- the red stall: upgraders, restocked every 4 minutes ----
 {
+  const N = 20000, seen = [0, 0, 0, 0, 0], tot = [0, 0, 0, 0, 0]; let radar = 0;
+  for (let r = 0; r < N; r++) { const st = I.stockFor(r); st.counts.forEach((c, k) => { if (c) { seen[k]++; tot[k] += c; } }); if (st.radar) radar++; }
+  console.log('in stock, over', N, 'restocks:', I.UPGRADERS.map((u, k) => u.name + ' ' + (seen[k] / N * 100).toFixed(0) + '% (about ' + (tot[k] / Math.max(1, seen[k])).toFixed(1) + ' each time)').join(', '), '| radar', (radar / N * 100).toFixed(1) + '%');
+  const find = (f) => { for (let r = 1; r < N; r++) if (f(I.stockFor(r))) return r; throw new Error('no such restock'); };
+  const rA = find((st) => st.counts[0] && st.counts[1] >= 1 && !st.counts[4] && !st.radar), rB = find((st) => st.radar);
+  I.setStockRound(rA);
   I.goTo(7); I.p.x = I.upFront.x; I.p.z = I.upFront.z; I.p.y = 6.3; for (let k = 0; k < 12; k++) raf(40000 + k * 16);
   const SBt = document.getElementById('shopOpenLabel').textContent;
   console.log('at the red stall: button shown', !document.getElementById('shopOpen').hidden, '| says', JSON.stringify(SBt), '| sign', JSON.stringify(I.signLabels[9]));
   if (SBt !== 'Open the upgrade shop' || document.getElementById('shopOpen').hidden) throw new Error('no upgrade shop button at the red stall');
   window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(41000);
-  const rows = els.upList.children, buy = (i) => rows[i].children[1];
+  const rows = els.upList.children, buy = (k) => rows[k].children[1], left = (k) => rows[k].children[0].children[2].textContent;
   I.giveCoins(-I.coins() + 300); I.earn(0);
-  console.log('upgrade shop open', I.upShopOpen(), '| 300 coins: can buy', I.UPGRADERS.map((u, i) => u.name + ' ' + !buy(i).disabled).join(', '));
-  if (!I.upShopOpen() || buy(1).disabled === false) throw new Error('rare upgrader should cost more than 300');
-  I.giveCoins(300); I.earn(0); const r0 = I.coinRate(), k0 = I.ownDragons[0];
+  console.log('upgrade shop open', I.upShopOpen(), '| stock:', I.UPGRADERS.map((u, k) => u.name + ' ' + JSON.stringify(left(k))).join(', '), '| radar row shown', !rows[5].hidden, '|', JSON.stringify(els.upRestock.textContent));
+  if (!I.upShopOpen() || left(4) !== 'Out of stock' || !buy(4).disabled) throw new Error('prismatic should be out of stock this round');
+  buy(1).fire('click', ev({}));
+  console.log('300 coins, try a Rare upgrader (500): message', said(), '| asked which dragon', !els.upPick.hidden);
+  if (said() !== JSON.stringify("You don't have enough money.") || !els.upPick.hidden) throw new Error('should say not enough money');
+  I.giveCoins(300); I.earn(0); const r0 = I.coinRate(), first = I.dragonPlaced.indexOf(true), k0 = I.ownDragons[first], n0 = I.stockLeft(1);
   buy(1).fire('click', ev({})); const picks = els.upDragons.children;
-  console.log('buy a Rare upgrader: asks', JSON.stringify(els.upPickT.textContent), '|', picks.length, 'dragons to pick from, first:', JSON.stringify(picks[0].textContent));
-  picks[0].fire('click', ev({}));
-  console.log('give it to the first dragon (' + k0 + '): coins', I.coins().toFixed(0), '| rate', r0, '->', I.coinRate(), '| upgrades', JSON.stringify(I.dragonUpgrades.slice(0, 3)), '| message', said(), '| saved', store['mutation-mayhem-upgrades'].slice(0, 12));
-  if (Math.abs(I.coinRate() - r0 - I.COINS_PER_SECOND[k0]) > 1e-9 || I.coins() > 100.5) throw new Error('rare upgrader should double one dragon');
-  I.giveCoins(200); I.earn(0); buy(0).fire('click', ev({}));
-  console.log('a Common upgrader on the same dragon:', JSON.stringify(els.upDragons.children[0].textContent), 'disabled', els.upDragons.children[0].disabled);
-  els.upCancel.fire('click', ev({})); window.fire('keydown', ev({ code: 'Escape' })); console.log('Escape closes it:', !I.upShopOpen());
+  console.log('600 coins, buy it: asks', JSON.stringify(els.upPickT.textContent), '|', picks.length, 'dragons to pick from, e.g.', JSON.stringify(picks[first].textContent));
+  picks[first].fire('click', ev({}));
+  console.log('give it to a placed', k0, 'dragon: coins', I.coins().toFixed(0), '| each payday', r0, '->', I.coinRate(), '| Rare left', n0, '->', I.stockLeft(1), '| message', said());
+  if (Math.abs(I.coinRate() - r0 - I.DRAGON_COINS[k0]) > 1e-9 || I.coins() > 100.5 || I.stockLeft(1) !== n0 - 1) throw new Error('rare upgrader should double one placed dragon and use up one');
+  I.setStockRound(rB); I.giveCoins(2e9); window.fire('keydown', ev({ code: 'Escape' })); for (let k = 0; k < 12; k++) raf(41500 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(42000);
+  console.log('a round with a radar: row shown', !rows[5].hidden, '|', JSON.stringify(rows[5].children[0].children[0].textContent), rows[5].children[1].textContent);
+  rows[5].children[1].fire('click', ev({})); console.log('buy it with', Math.floor(I.coins()).toLocaleString('en-US'), 'coins: message', said(), '| coins still', Math.floor(I.coins()).toLocaleString('en-US'));
+  if (rows[5].hidden || said() !== JSON.stringify("You don't have enough money.")) throw new Error('the radar should never sell');
+  I.giveCoins(-2e9); I.setStockRound(null);
+  window.fire('keydown', ev({ code: 'Escape' })); console.log('Escape closes it:', !I.upShopOpen());
+}
+
+// ---- your plot: 5 spaces to start, storage, buying more room ----
+{
+  const home3 = I.plotWorld(I.myPlot(), 0, 2); I.goTo(7); I.p.x = home3.x; I.p.z = home3.z; I.p.y = 6.3; for (let k = 0; k < 12; k++) raf(43000 + k * 16);
+  console.log('on my plot: button says', JSON.stringify(document.getElementById('shopOpenLabel').textContent), '| dragons', I.ownDragons.length, '| placed', I.dragonPlaced.filter(Boolean).length, 'of', I.plotSlots(), '| roaming the plot', I.plotPets.length);
+  if (I.dragonPlaced.filter(Boolean).length !== 5 || I.plotPets.length !== 5) throw new Error('only 5 dragons should be on a new plot');
+  window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(44000);
+  const prow = () => els.plotList.children, btn = (r) => r.children[1];
+  console.log('plot menu open', I.plotMenuOpen(), '|', JSON.stringify(els.plotTitle.textContent), JSON.stringify(els.plotSpace.textContent), '|', JSON.stringify(els.plotBuy.textContent), '| rows', prow().length, '| first', JSON.stringify(prow()[0].children[0].children[0].textContent), btn(prow()[0]).textContent);
+  const r0 = I.coinRate(); btn(prow()[0]).fire('click', ev({}));
+  console.log('Store the top dragon: placed', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| each payday', r0, '->', I.coinRate(), '|', JSON.stringify(els.plotSpace.textContent));
+  const stored = () => [...prow()].filter((r) => btn(r).textContent === 'Place');
+  btn(stored()[0]).fire('click', ev({})); console.log('Place a stored one: placed', I.dragonPlaced.filter(Boolean).length);
+  btn(stored()[0]).fire('click', ev({})); console.log('Place a 6th: placed', I.dragonPlaced.filter(Boolean).length, '| message', said());
+  if (I.dragonPlaced.filter(Boolean).length !== 5) throw new Error('a full plot took a 6th dragon');
+  I.giveCoins(-I.coins() + 100); els.plotBuy.fire('click', ev({})); console.log('Buy space with 100 coins: message', said(), '| spaces', I.plotSlots());
+  I.giveCoins(1500); els.plotBuy.fire('click', ev({})); console.log('with 1,600: spaces', I.plotSlots(), '| coins left', I.coins().toFixed(0), '| next space costs', I.spacePrice());
+  if (I.plotSlots() !== 6 || I.spacePrice() !== 1000) throw new Error('buying space went wrong');
+  btn(stored()[0]).fire('click', ev({})); console.log('now place a 6th: placed', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| saved', store['mutation-mayhem-slots'], 'spaces,', JSON.parse(store['mutation-mayhem-placed']).length, 'placed');
+  els.plotDone.fire('click', ev({})); console.log('Done closes it:', !I.plotMenuOpen());
 }
 
 // ---- and once more, as a device with saved progress ----
