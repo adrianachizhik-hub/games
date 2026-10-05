@@ -426,6 +426,36 @@
     pointer-events: none;
   }
   #radar[hidden] { display: none; }
+  /* Chat: top right, beside the minimap; folds down to its "Chat" button */
+  #chat {
+    position: fixed;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    right: calc(28px + clamp(92px, 17vmin, 132px) + env(safe-area-inset-right, 0px));
+    width: min(320px, calc(100vw - 200px));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  body:not(.playing) #chat, body.shopping #chat { display: none; }
+  #chatToggle { font: inherit; font-size: 0.9rem; font-weight: 600; padding: 4px 14px; border: 3px solid #0d2f37; border-radius: 999px; background: var(--panel); color: var(--panel-ink); cursor: pointer; }
+  #chat.closed #chatBody { display: none; }
+  #chatBody { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 3px solid #0d2f37; border-radius: 14px; background: var(--panel); color: var(--panel-ink); }
+  #chatLog { height: 132px; overflow-y: auto; font-size: 0.88rem; line-height: 1.35; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+  #chatLog p { margin: 0 0 3px; }
+  #chatLog b { font-weight: 700; }
+  #chatLog .note { opacity: 0.75; font-style: italic; }
+  .chatrow { display: flex; gap: 6px; }
+  #chatInput { flex: 1; min-width: 0; font: inherit; font-size: 0.92rem; padding: 5px 9px; border: 2px solid #0d2f37; border-radius: 10px; background: #fff; color: #0d2f37; -webkit-user-select: text; user-select: text; }
+  #chatSend { font: inherit; font-size: 0.9rem; font-weight: 600; padding: 4px 12px; border: 2px solid #0d2f37; border-radius: 10px; background: #ffd23f; color: #0d2f37; cursor: pointer; }
+  #chatToggle:focus-visible, #chatSend:focus-visible, #chatInput:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+  body.chatopen .where { max-width: calc(100% - 520px); }   /* keep the place buttons clear of the open chat */
+  @media (max-width: 760px) {               /* small screens: the chat sits under the minimap and starts folded */
+    #chat { top: calc(clamp(92px, 17vmin, 132px) + 26px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); width: min(280px, calc(100vw - 28px)); }
+    body.admin #chat { top: calc(clamp(92px, 17vmin, 132px) + 104px + env(safe-area-inset-top, 0px)); }   /* below the radar label and admin arrow */
+    body.chatopen .where { max-width: calc(100% - 172px); }
+    #chatLog { height: 96px; }
+  }
   body.shopping #radar { display: none; }
   #adminPanel .none { display: none; margin: 0; font-size: 0.98rem; line-height: 1.45; opacity: 0.85; }
   #adminCommands:empty + .none { display: block; }
@@ -754,8 +784,15 @@
   <p class="hint" id="hint" aria-live="polite"></p>
 </div>
 <canvas id="map" width="264" height="264" aria-hidden="true"></canvas>
+<div id="chat">
+  <button id="chatToggle" type="button" aria-expanded="true" aria-controls="chatBody">Chat</button>
+  <div id="chatBody">
+    <div id="chatLog" role="log" aria-live="polite"></div>
+    <div class="chatrow"><input id="chatInput" type="text" maxlength="120" placeholder="Say something" aria-label="Chat message" autocomplete="off" enterkeyhint="send"><button id="chatSend" type="button">Send</button></div>
+  </div>
+</div>
 <p id="radar" aria-live="off" hidden></p>
-<p class="keys">Up and down arrows (or W and S) walk. Left and right arrows (or A and D) turn. Space jumps, hold Shift to run. Hold the mouse button and drag to look up and down. Keys 1 to 8 jump between places. Walk up to the blue stall in town to change your avatar. Find dragon eggs and carry them home to your plot before they hatch.</p>
+<p class="keys">Up and down arrows (or W and S) walk. Left and right arrows (or A and D) turn. Space jumps, hold Shift to run. Hold the mouse button and drag to look up and down. Keys 1 to 8 jump between places. Press / to chat. Walk up to the blue stall in town to change your avatar. Find dragon eggs and carry them home to your plot before they hatch.</p>
 
 <div id="stick"><div id="knob"></div></div>
 <button id="jump" type="button">Jump</button>
@@ -3081,6 +3118,41 @@ const World = (function () {
     }
   }
 
+  /* ---------- Chat ---------- */
+  /* Type a message and press Enter or Send; "/" jumps to the box, Escape goes back to playing. There is no server
+     yet, so for now only you see what you write (the box says so). When there is one, messages will go to it here
+     in sendChat, and other players' messages will come in through addChat. */
+  const chatEl = $('chat'), chatLog = $('chatLog'), chatInput = $('chatInput'), chatToggle = $('chatToggle');
+  function addChat(who, text, note) {
+    const line = document.createElement('p');
+    if (note) { line.className = 'note'; line.textContent = text; }
+    else { const b = document.createElement('b'); b.textContent = who + ': '; line.appendChild(b); line.appendChild(document.createTextNode(text)); }
+    chatLog.appendChild(line);
+    while (chatLog.children.length > 40) chatLog.removeChild(chatLog.firstChild);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+  function sendChat() {
+    const text = (chatInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    chatInput.value = '';
+    if (!text || !started) return;
+    addChat(playerName + (isAdmin ? ' (Admin)' : ''), text);
+  }
+  function setChatOpen(open) {
+    chatEl.classList[open ? 'remove' : 'add']('closed');
+    chatToggle.setAttribute('aria-expanded', String(open));
+    document.body.classList[open ? 'add' : 'remove']('chatopen');
+  }
+  setChatOpen(!(window.innerWidth <= 760));               // open on big screens, folded on phones
+  chatToggle.addEventListener('click', (e) => { setChatOpen(chatEl.classList.contains('closed')); if (e.detail > 0) chatToggle.blur(); });
+  $('chatSend').addEventListener('click', () => { sendChat(); chatInput.focus(); });
+  chatInput.addEventListener('focus', () => { keys.clear(); });   // stop walking while you type
+  let chatGreeted = false;
+  function greetChat() {
+    if (chatGreeted) return;
+    chatGreeted = true;
+    addChat('', 'Only you can see this chat for now. Talking with other players comes when the game gets a server.', true);
+  }
+
   /* ---------- The avatar shop (the blue stall) ---------- */
   const BLUE = shops[1], shopOut = { x: Math.cos(BLUE.phi), z: Math.sin(BLUE.phi) };          // which way the stall faces
   const shopFront = { x: BLUE.x + shopOut.x * 4.2, z: BLUE.z + shopOut.z * 4.2 };              // where a customer stands
@@ -3213,6 +3285,8 @@ const World = (function () {
     nameMyPlot();
     adminEl.hidden = !isAdmin;                            // only admins get the arrow
     if (isAdmin) setRadar(true);                          // admins start with the egg radar on
+    document.body.classList[isAdmin ? 'add' : 'remove']('admin');
+    greetChat();
     if (isAdmin) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Admin'; who.appendChild(badge); }
     try {
       if (!(isAdmin && lockedName)) localStorage.setItem('mutation-mayhem-name', playerName === 'Player' ? '' : playerName);   // an admin never replaces a locked name
@@ -3251,6 +3325,11 @@ const World = (function () {
   window.addEventListener('touchstart', () => document.body.classList.add('touch'), { passive: true, once: true });
 
   window.addEventListener('keydown', (e) => {
+    if (e.target === chatInput) {                        // typing a chat message: the game keys stay out of it
+      if (e.code === 'Enter' || e.key === 'Enter') { e.preventDefault(); sendChat(); }
+      else if (e.code === 'Escape') { chatInput.blur(); canvas.focus(); }
+      return;
+    }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (!started) {
       if (!confirmEl.hidden) { if (e.code === 'Escape') { confirmEl.hidden = true; nameEl.focus(); } return; }   // its buttons take Enter
@@ -3258,7 +3337,8 @@ const World = (function () {
       return;
     }
     if (shopping) { if (e.code === 'Escape') closeShop(); return; }           // the shop's own buttons take the keys
-    if (menuOpen()) { if (e.code === 'Escape') { closeUpShop(); closePlotMenu(); } return; }   // the menu's own buttons take the keys
+    if (menuOpen()) { if (e.code === 'Escape') { closeUpShop(); closePlotMenu(); } return; }
+    if (e.key === '/' || e.code === 'Slash') { e.preventDefault(); setChatOpen(true); keys.clear(); chatInput.focus(); return; }   // jump to the chat box   // the menu's own buttons take the keys
     if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openStall(); return; }
     if (e.code.startsWith('Digit')) { jumpTo(+e.code.slice(5) - 1); return; }
     if (e.code === 'Space' && !e.repeat) jumpTapped = true;
@@ -3541,7 +3621,7 @@ const World = (function () {
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
-    upgradersOwned, renderInventory, carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
+    upgradersOwned, renderInventory, sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();

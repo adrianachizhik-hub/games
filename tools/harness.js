@@ -614,6 +614,19 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   I.setStockRound(null); I.giveCoins(-I.coins());
 }
 
+// ---- chat ----
+{
+  const ci = document.getElementById('chatInput');
+  console.log('chat after Play:', JSON.stringify(I.chatLog()));
+  window.fire('keydown', ev({ code: 'Slash', key: '/' }));
+  ci.value = '  hello   island!  '; window.fire('keydown', ev({ code: 'KeyW', key: 'w', target: ci })); window.fire('keydown', ev({ code: 'Enter', key: 'Enter', target: ci }));
+  console.log('type "hello island!" and press Enter: chat', JSON.stringify(I.chatLog().slice(-1)), '| box emptied', ci.value === '', '| W while typing walks', I.keys.has('KeyW'));
+  if (I.chatLog().slice(-1)[0] !== I.name() + ': hello island!' || I.keys.has('KeyW')) throw new Error('chat went wrong');
+  ci.value = '   '; document.getElementById('chatSend').fire('click', ev({})); console.log('send an empty message: lines', I.chatLog().length);
+  ci.value = 'x'.repeat(300); window.fire('keydown', ev({ code: 'Enter', key: 'Enter', target: ci })); console.log('a 300-letter message is cut to', I.chatLog().slice(-1)[0].length - (I.name() + ': ').length, 'letters');
+  window.fire('keydown', ev({ code: 'Escape', target: ci }));
+}
+
 // ---- and once more, as a device with saved progress ----
 if (process.env.SAVED !== '1') {
   const r = require('child_process').spawnSync(process.execPath, [__filename, file], { env: Object.assign({}, process.env, { SAVED: '1' }), encoding: 'utf8' });

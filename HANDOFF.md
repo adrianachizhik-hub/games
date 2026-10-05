@@ -219,7 +219,7 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 - Add prices to the avatar shop when coins exist.
 - The artifact link is still titled "Isla Verde". She was offered a rename to "Mutation Mayhem" and has not answered.
 
-**Waiting on the server: chat.** Adriana asked for a chat box in the top left corner so players can talk to each other. Like unique names, it needs a server; she was asked whether to build the box now (only usable once the server exists) or wait.
+**Chat (section "Chat"):** a box in the top right beside the minimap (Adriana moved it there from the top left), folded to a "Chat" button on small screens. Enter or Send posts, "/" jumps to it, Escape leaves it; game keys are ignored while typing; 120 letters at most; the last 40 lines kept. There is no server yet, so only you see your own messages, and the box says so. When a server exists, `sendChat` sends and `addChat` shows incoming messages. Before strangers can chat, think about safety for young players: a word filter, reporting, maybe preset phrases, and what the App Store asks of chat in apps for children.
 
 **Paused on 5 October 2026: names unique across the whole world**
 - Adriana wants each exact name to belong to one player only ("Taj" taken means nobody else can be "Taj", but "Taj 65" is fine), so nobody ends up in someone else's account. Capitals should count as the same name.
