@@ -191,8 +191,9 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 - Hairstyles are blocks listed in `HAIR_SHAPES`. Pieces under `up` stick up and are hidden under a cap, crown, or top hat.
 - **Using the shop:** stand in front of the blue stall and a button "Open the avatar shop" appears. While it is open the camera faces the avatar, the game HUD is hidden, and movement is paused. Picking a back accessory turns the avatar around; picking hair turns it part way. There is a "Turn around" button and a "Done" button that stays in view.
 - "Everything is free for now" is written in the panel, because coins do not exist.
-- **Shopkeeper:** a stylish girl behind the blue stall's counter (pink jacket, white top, purple skirt, gold belt, white boots, sunglasses, gold jewellery, teal beret and handbag, long high ponytail with pink tips). She sways and waves when the player is near. She has no name yet.
-- **Upgrade shopkeeper** (`upKeeper`, Adriana's request): a boy behind the red stall's counter in simple clothes (plain green T-shirt, jeans, white sneakers) with long swoopy light-brown hair across his forehead and down to his shoulders. He sways and waves like her (`keepers` in `keeperPose`). No name yet.
+- **Shopkeeper:** a stylish girl behind the blue stall's counter (pink jacket, white top, purple skirt, gold belt, white boots, sunglasses, gold jewellery, teal beret and handbag, long high ponytail with pink tips). She sways and waves when the player is near. Her name is **Mia**.
+- **Upgrade shopkeeper** (`upKeeper`, Adriana's request): a boy behind the red stall's counter in simple clothes (plain green T-shirt, jeans, white sneakers) with long swoopy light-brown hair across his forehead and down to his shoulders. He sways and waves like her (`keepers` in `keeperPose`). His name is **Leo**.
+- **Talking to them** (Adriana's request): name tags float over their heads. At their stall a blue "Talk to Mia/Leo" button appears (beside the shop button); hold E for half a second (the button fills up) or tap it. Mia: "Ugh, what do you want? Hurry up and stop wasting my time." Leo: "Hi! How are you doing? Do you need an upgrader?" (Adriana's words, punctuation tidied). The words appear a few at a time. Answer buttons were Claude's addition: Mia "Show me the avatars" / "Bye", Leo "Yes please!" (opens the upgrade shop) / "No thanks". Walking away or Escape closes it. Near a shopkeeper E talks instead of stepping sideways.
 
 ### Saved on the device (`localStorage`)
 - `mutation-mayhem-coins`: coins. Every 3 seconds (`PAYOUT_SECONDS`) the dragons placed on your plot pay out together, each its `DRAGON_COINS` (green and red 1, blue and purple 3, bronze and silver 8, gold and ruby 20, diamond 50, jade 60) times any upgrader; a "+N" floats up from the counter. Adriana asked for "combined, every 3 seconds"; Claude read that as each dragon's amount every 3 seconds (a third of the earlier per-second speed) and told her. Counted on the real clock in `tick` (`earn`); a gap such as a hidden tab counts 5 seconds at most; nothing is earned on the front cover. Saved at each payday, on Leave and when the tab closes.
@@ -233,7 +234,6 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 - What does the pet area on a plot look like?
 - What can admins do, beyond restocking shops and giving coins?
 - Which mutations exist, and what are the rarities?
-- Does the shopkeeper have a name?
 
 **App Store facts she has been told**
 - Wrapping a browser game as an iPhone app is possible as far as Claude knows, but this was not researched in depth.

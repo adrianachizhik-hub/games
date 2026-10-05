@@ -170,6 +170,47 @@
     cursor: pointer;
     white-space: nowrap;
   }
+  #talkBtn {
+    position: fixed;
+    left: 50%;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    font: inherit;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(90deg, #2f7a3a var(--fill, 0%), #3f7fd6 var(--fill, 0%));
+    border: 4px solid #0d2f37;
+    border-radius: 16px;
+    padding: 9px 22px;
+    box-shadow: 0 5px 0 #0d2f37;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #talkBtn kbd { margin-left: 8px; padding: 1px 8px; border-radius: 7px; background: #0d2f37; color: #fff; font: inherit; font-size: 0.85rem; }
+  body.pair #shopOpen { transform: translateX(calc(-100% - 6px)); }   /* both buttons: side by side across the middle */
+  body.pair #talkBtn { transform: translateX(6px); }
+  #talkBtn[hidden], #talk[hidden] { display: none; }
+  #talk {
+    position: fixed;
+    left: 50%;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    width: min(460px, calc(100% - 32px));
+    padding: 12px 16px 14px;
+    border: 4px solid #0d2f37;
+    border-radius: 18px;
+    background: #fff8e6;
+    color: #0d2f37;
+    box-shadow: 0 6px 0 #0d2f37;
+  }
+  #talk .talkwho { display: inline-block; margin: 0 0 6px; padding: 1px 12px; border-radius: 999px; color: #fff; font-weight: 700; }
+  #talkText { margin: 0; min-height: 2.8em; font-size: 1.12rem; font-weight: 500; line-height: 1.4; }
+  #talk .talkrow { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; flex-wrap: wrap; }
+  #talk button { font: inherit; font-weight: 600; padding: 6px 14px; border: 3px solid #0d2f37; border-radius: 12px; cursor: pointer; color: #0d2f37; }
+  #talkYes { background: #ffd23f; }
+  #talkNo { background: #fff; }
+  #talk button:focus-visible, #talkBtn:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
   #shopOpen[hidden], #avatarShop[hidden], #upShop[hidden], #upList[hidden], #upPick[hidden], #plotMenu[hidden] { display: none; }
   /* Dragon eggs: the countdown while you carry one, and short messages above it */
   #carry, #toast {
@@ -251,19 +292,20 @@
   .invicon { width: 26px; height: 20px; border-radius: 6px; border: 3px solid #0d2f37; }
   .invcount { position: absolute; top: -7px; right: -6px; padding: 0 6px; border-radius: 999px; background: #0d2f37; color: #ffd23f; font-size: 0.72rem; }
   .invitem:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
-  body.hasinv #carry, body.hasinv #shopOpen { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }   /* sit above the bar */
+  body.hasinv #carry, body.hasinv #shopOpen, body.hasinv #talkBtn, body.hasinv #talk { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }   /* sit above the bar */
   body.hasinv #toast { bottom: calc(168px + env(safe-area-inset-bottom, 0px)); }
   body.hasinv .keys { max-width: calc(50% - 320px); }
   @media (max-width: 1100px) { body.hasinv .keys { display: none; } }
   body.touch #inv { bottom: calc(184px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
-  body.touch.hasinv #carry, body.touch.hasinv #shopOpen { bottom: calc(282px + env(safe-area-inset-bottom, 0px)); }
+  body.touch.hasinv #carry, body.touch.hasinv #shopOpen, body.touch.hasinv #talkBtn, body.touch.hasinv #talk { bottom: calc(282px + env(safe-area-inset-bottom, 0px)); }
   body.touch.hasinv #toast { bottom: calc(338px + env(safe-area-inset-bottom, 0px)); }
   body.touch #carry { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
   body.touch #toast { bottom: calc(254px + env(safe-area-inset-bottom, 0px)); }
   #shopOpen kbd { margin-left: 8px; padding: 1px 8px; border-radius: 7px; background: #0d2f37; color: #ffd23f; font: inherit; font-size: 0.85rem; }
-  body.touch #shopOpen kbd { display: none; }
-  body.touch #shopOpen { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
-  @media (pointer: coarse) { #shopOpen kbd { display: none; } }
+  body.touch #shopOpen kbd, body.touch #talkBtn kbd { display: none; }
+  body.touch #shopOpen, body.touch #talkBtn, body.touch #talk { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
+  @media (pointer: coarse) { #shopOpen kbd, #talkBtn kbd { display: none; } }
+  @media (max-width: 520px) { body.pair #shopOpen { transform: translateX(-50%); } body.pair #talkBtn { transform: translateX(-50%) translateY(-62px); } }   /* narrow: stack them */
   #avatarShop, #upShop, #plotMenu {
     position: fixed;
     right: calc(14px + env(safe-area-inset-right, 0px));
@@ -350,7 +392,7 @@
   #upDragons button { border-radius: 12px; text-align: left; white-space: normal; background: #fff; }
   #upCancel { margin-top: 10px; background: #fff; }
   #avatarShop button:focus-visible, #upShop button:focus-visible, #plotMenu button:focus-visible, #shopOpen:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
-  body.shopping .where, body.shopping #map, body.shopping .keys, body.shopping #stick, body.shopping #jump, body.shopping #leave, body.shopping #admin { display: none !important; }
+  body.shopping .where, body.shopping #map, body.shopping .keys, body.shopping #stick, body.shopping #jump, body.shopping #leave, body.shopping #admin, body.shopping #talkBtn, body.shopping #talk { display: none !important; }
   /* Admin commands: an arrow on the right edge that slides a panel in. Only admins get it. */
   #admin {
     --w: min(290px, calc(100vw - 76px));
@@ -812,6 +854,12 @@
 <div id="carry" role="status" hidden><span id="carryDot"></span><span id="carryText"></span></div>
 <p id="toast" aria-live="polite" hidden></p>
 <div id="inv" role="group" aria-label="Inventory" hidden><span class="invlabel">Inventory</span><div id="invItems"></div></div>
+<button id="talkBtn" type="button" hidden><span id="talkLabel">Talk</span><kbd>Hold E</kbd></button>
+<div id="talk" role="dialog" aria-labelledby="talkWho" hidden>
+  <p class="talkwho" id="talkWho"></p>
+  <p id="talkText"></p>
+  <div class="talkrow"><button id="talkYes" type="button"></button><button id="talkNo" type="button"></button></div>
+</div>
 <button id="shopOpen" type="button" hidden><span id="shopOpenLabel">Open the avatar shop</span><kbd>Enter</kbd></button>
 <div id="plotMenu" role="dialog" aria-labelledby="plotTitle" hidden>
   <h2 id="plotTitle">Your plot</h2>
@@ -3180,8 +3228,67 @@ const World = (function () {
   const upKeeperYaw = Math.atan2(-redOut.x, -redOut.z);  // the boy behind the red stall's counter
   upKeeper.root.position.set(RED.x + redOut.x * 0.5, HUB.h + 0.2, RED.z + redOut.z * 0.5);
   upKeeper.root.rotation.y = upKeeperYaw;
-  const keepers = [{ k: keeper, yaw: keeperYaw, at: BLUE, wave: 0, sway: 0 }, { k: upKeeper, yaw: upKeeperYaw, at: RED, wave: 0, sway: 2.1 }];
+  /* Mia (the avatar shop) and Leo (the upgrade shop). Their names float over their heads. Stand at their stall and
+     hold E, or tap "Talk to ...", and they say their line; the answer buttons can open their shop. */
+  const keepers = [
+    { k: keeper, yaw: keeperYaw, at: BLUE, front: shopFront, wave: 0, sway: 0, name: 'Mia', colour: '#d6337f',
+      line: 'Ugh, what do you want? Hurry up and stop wasting my time.', yes: 'Show me the avatars', no: 'Bye', open: () => openShop() },
+    { k: upKeeper, yaw: upKeeperYaw, at: RED, front: upFront, wave: 0, sway: 2.1, name: 'Leo', colour: '#2f7a3a',
+      line: 'Hi! How are you doing? Do you need an upgrader?', yes: 'Yes please!', no: 'No thanks', open: () => openUpShop() }
+  ];
+  keepers.forEach((q) => {                               // a name tag over each head
+    const cv = document.createElement('canvas'), g = cv.getContext('2d');
+    cv.width = 256; cv.height = 72;
+    g.fillStyle = 'rgba(13, 47, 55, 0.85)'; g.fillRect(28, 8, 200, 56);
+    g.fillStyle = '#ffffff'; g.font = '700 42px "Trebuchet MS", "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(q.name, 128, 38);
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true }));
+    tag.position.set(0, 2.75, 0); tag.scale.set(1.3, 0.37, 1);
+    q.k.root.add(tag);
+  });
+  const talkBtn = $('talkBtn'), talkEl = $('talk'), talkText = $('talkText');
+  let talkNear = null, talking = null, talkHold = 0, holdFrom = -1, talkShownFill = -1, talkChars = 0;
+  function talkTarget() {                                // the shopkeeper you are standing in front of, if any
+    if (!started || shopping || menuOpen() || riding || carrying || carryingBlock || p.dungeon || p.inCave) return null;
+    for (const q of keepers) if (Math.hypot(p.x - q.front.x, p.z - q.front.z) < 4.5) return q;
+    return null;
+  }
+  function openTalk(q) {
+    talking = q; talkHold = 0; talkChars = 0;
+    $('talkWho').textContent = q.name; $('talkWho').style.background = q.colour;
+    talkText.textContent = ''; $('talkYes').textContent = q.yes; $('talkNo').textContent = q.no;
+    talkEl.hidden = false; talkBtn.hidden = true; shopBtn.hidden = true; document.body.classList.remove('pair');
+  }
+  function closeTalk() {
+    if (!talking) return;
+    talking = null; talkEl.hidden = true;
+    canvas.focus();
+  }
+  talkBtn.addEventListener('click', (e) => { const q = talkTarget(); if (q) openTalk(q); if (e.detail > 0) talkBtn.blur(); });
+  $('talkNo').addEventListener('click', closeTalk);
+  $('talkYes').addEventListener('click', () => { const q = talking; closeTalk(); if (q) q.open(); });
+  function talkStep(dt, time) {                          // every frame: hold E to talk, and the words appear a few at a time
+    talkNear = talking ? null : talkTarget();
+    if (talking) {
+      if (talkChars < talking.line.length) { talkChars = Math.min(talking.line.length, talkChars + dt * (reduced ? 1000 : 45)); talkText.textContent = talking.line.slice(0, Math.ceil(talkChars)); }
+      if (!started || Math.hypot(p.x - talking.front.x, p.z - talking.front.z) > 7) closeTalk();   // walked away
+      return;
+    }
+    if (talkNear && keys.has('KeyE')) {                 // half a second on the real clock, so slow computers aren't slower to talk
+      if (holdFrom < 0) holdFrom = time;
+      talkHold = time - holdFrom;
+      if (talkHold >= 0.5) { holdFrom = -1; openTalk(talkNear); return; }
+    } else { talkHold = 0; holdFrom = -1; }
+    const fill = Math.round(talkHold / 0.5 * 100);
+    if (fill !== talkShownFill && talkBtn.style.setProperty) { talkShownFill = fill; talkBtn.style.setProperty('--fill', fill + '%'); }   // the button fills up while you hold E
+    const label = talkNear ? 'Talk to ' + talkNear.name : '';
+    if (talkNear && $('talkLabel').textContent !== label) $('talkLabel').textContent = label;
+    if (talkBtn.hidden === !!talkNear) talkBtn.hidden = !talkNear;
+    const pair = !!talkNear && !shopBtn.hidden;
+    if (document.body.classList.contains('pair') !== pair) document.body.classList[pair ? 'add' : 'remove']('pair');
+  }
   function keeperPose(dt, time) {                        // they sway a little, and wave when you come close
+    talkStep(dt, time);
     for (const q of keepers) {
       const near = started && Math.hypot(p.x - q.at.x, p.z - q.at.z) < 11 && !p.dungeon && !p.inCave;
       q.wave += ((near ? 1 : 0) - q.wave) * Math.min(1, dt * 5);
@@ -3327,7 +3434,7 @@ const World = (function () {
   /* Leave: back to the front cover. The next Play starts fresh on the beach, and an admin has to sign in again. */
   function leave() {
     if (!started) return;
-    closeShop(); closeUpShop(); closePlotMenu(); shopBtn.hidden = true; avatar.visible = false;
+    closeShop(); closeUpShop(); closePlotMenu(); closeTalk(); shopBtn.hidden = true; avatar.visible = false;
     dropEgg(); dropBlock(); dismount(true); releasePlot(); saveCoins(); toastEl.hidden = true;
     started = false; isAdmin = false; setRadar(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
@@ -3360,6 +3467,7 @@ const World = (function () {
     }
     if (shopping) { if (e.code === 'Escape') closeShop(); return; }           // the shop's own buttons take the keys
     if (menuOpen()) { if (e.code === 'Escape') { closeUpShop(); closePlotMenu(); } return; }
+    if (talking && e.code === 'Escape') { closeTalk(); return; }
     if (e.key === '/' || e.code === 'Slash') { e.preventDefault(); setChatOpen(true); keys.clear(); chatInput.focus(); return; }   // jump to the chat box   // the menu's own buttons take the keys
     if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openStall(); return; }
     if (e.code.startsWith('Digit')) { jumpTo(+e.code.slice(5) - 1); return; }
@@ -3433,7 +3541,7 @@ const World = (function () {
     let f = -joy.y, s = joy.x;
     if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1;                    // up and down walk
     if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1;
-    if (keys.has('KeyE')) s += 1;                                           // Q and E step sideways
+    if (keys.has('KeyE') && !talkNear && !talking) s += 1;                   // Q and E step sideways (at a shopkeeper, E is for talking)
     if (keys.has('KeyQ')) s -= 1;
     const mag = Math.hypot(f, s), swimming = !p.dungeon && W.bil(H, p.x, p.z) < SWIM && !p.inLid;
     let climbing = false;
@@ -3528,7 +3636,7 @@ const World = (function () {
   function showZone() {
     const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : started ? rideHint() : '';
     if (tip !== hint) { hint = tip; hintEl.textContent = tip; }
-    const free = started && !shopping && !menuOpen() && !carrying && !riding && !p.dungeon && !p.inCave;
+    const free = started && !shopping && !menuOpen() && !talking && !carrying && !riding && !p.dungeon && !p.inCave;
     const onPlot = free && myPlot >= 0 && plotAt(p.x, p.z) === myPlot;
     const dShop = Math.hypot(p.x - shopFront.x, p.z - shopFront.z), dUp = Math.hypot(p.x - upFront.x, p.z - upFront.z);
     const dSign = myPlot >= 0 && plotSlots < MAX_SLOTS ? Math.hypot(p.x - signSpot().x, p.z - signSpot().z) : Infinity;
@@ -3640,7 +3748,7 @@ const World = (function () {
     renderer.render(scene, camera);
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
-    AV, avatar, gear, hair, keeper, upKeeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
+    AV, avatar, gear, hair, keeper, upKeeper, keepers, talking: () => talking, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,

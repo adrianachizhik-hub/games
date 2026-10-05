@@ -627,6 +627,35 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   window.fire('keydown', ev({ code: 'Escape', target: ci }));
 }
 
+// ---- talking to Mia and Leo ----
+{
+  let T = 60000; const frames = (n) => { for (let k = 0; k < n; k++) raf(T += 16); };
+  const talk = () => I.talking() && I.talking().name, line = () => els.talkText.textContent;
+  I.goTo(7); I.p.x = I.shopFront.x; I.p.z = I.shopFront.z; I.p.y = 6.3; I.p.yaw = Math.atan2(I.shopFront.x - I.shops[1].x, I.shopFront.z - I.shops[1].z); frames(12);
+  console.log('at the blue stall: talk button', JSON.stringify(document.getElementById('talkLabel').textContent), 'shown', !els.talkBtn.hidden, '| name tags', I.keepers.map((q) => q.name).join(', '));
+  const x0 = I.p.x, z0 = I.p.z; window.fire('keydown', ev({ code: 'KeyE' })); frames(15);
+  console.log('hold E a quarter second: talking', talk() || 'no', '| moved sideways', Math.hypot(I.p.x - x0, I.p.z - z0).toFixed(2));
+  frames(25); window.fire('keyup', ev({ code: 'KeyE' }));
+  console.log('hold E longer: talking to', talk(), '| moved sideways', Math.hypot(I.p.x - x0, I.p.z - z0).toFixed(2));
+  if (talk() !== 'Mia' || Math.hypot(I.p.x - x0, I.p.z - z0) > 0.01) throw new Error('holding E at the blue stall should talk to Mia');
+  frames(120); console.log('Mia says:', JSON.stringify(line()), '| buttons', els.talkYes.textContent, '/', els.talkNo.textContent);
+  if (line() !== 'Ugh, what do you want? Hurry up and stop wasting my time.') throw new Error("Mia's line is wrong");
+  els.talkYes.fire('click', ev({})); frames(3); console.log('"Show me the avatars": avatar shop open', I.shopping(), '| talking', !!talk());
+  window.fire('keydown', ev({ code: 'Escape' })); frames(3);
+  I.p.x = I.upFront.x; I.p.z = I.upFront.z; frames(12);
+  console.log('at the red stall: talk button', JSON.stringify(document.getElementById('talkLabel').textContent), '| shop button too', !document.getElementById('shopOpen').hidden, '| side by side', document.body.classList.contains('pair'));
+  els.talkBtn.fire('click', ev({ pointerType: 'touch' })); frames(120);
+  console.log('tap "Talk to Leo": Leo says:', JSON.stringify(line()), '| buttons', els.talkYes.textContent, '/', els.talkNo.textContent);
+  if (talk() !== 'Leo' || line() !== 'Hi! How are you doing? Do you need an upgrader?') throw new Error("Leo's line is wrong");
+  els.talkYes.fire('click', ev({})); frames(3); console.log('"Yes please!": upgrade shop open', I.upShopOpen());
+  if (!I.upShopOpen()) throw new Error('Yes please should open the upgrade shop');
+  window.fire('keydown', ev({ code: 'Escape' })); frames(12);
+  els.talkBtn.fire('click', ev({})); I.p.x += 9; frames(5); console.log('talk, then walk away: talking', !!talk());
+  I.p.x = I.upFront.x; frames(12); els.talkBtn.fire('click', ev({})); els.talkNo.fire('click', ev({})); console.log('"No thanks": talking', !!talk());
+  I.goTo(6); frames(5); const x1 = I.p.x, z1 = I.p.z; window.fire('keydown', ev({ code: 'KeyE' })); frames(30); window.fire('keyup', ev({ code: 'KeyE' }));
+  console.log('away from the shops, E still steps sideways:', Math.hypot(I.p.x - x1, I.p.z - z1).toFixed(1), 'units');
+}
+
 // ---- and once more, as a device with saved progress ----
 if (process.env.SAVED !== '1') {
   const r = require('child_process').spawnSync(process.execPath, [__filename, file], { env: Object.assign({}, process.env, { SAVED: '1' }), encoding: 'utf8' });
