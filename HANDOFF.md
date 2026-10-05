@@ -64,7 +64,7 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 
 **Your plot's menu (section "Your plot's menu"):** stand on your plot and press "Open my plot": every dragon with Store or Place, and "Buy 1 more space" at 500 coins, doubling each time (`spacePrice`). A dragon hatched onto a full plot goes to storage. Adriana's rule: 5 to start, buy more, price goes up each time; the numbers were Claude's.
 
-**Lucky blocks (section "Lucky blocks"):** 8 yellow "?" blocks spinning around the island (outside town). Walk into one: Common egg 50%, Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1% (Adriana's odds), and the other 4% gives 250 coins (Claude's choice; she did not answer). The egg is carried home with the usual countdown. Needs a claimed plot; can't open one while carrying an egg. An opened block turns up somewhere else, at least 40 away, 45 seconds later.
+**Lucky blocks (section "Lucky blocks"):** 8 yellow "?" blocks spinning around the island (outside town). Walk into one to pick it up (held over your head); Adriana asked that it be brought back to your plot and opened there. No countdown, but no jumping to places while carrying it, and no picking up eggs or other blocks. On your plot the button reads "Open the lucky block": Common egg 50%, Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1% (Adriana's odds), which hatches on the spot, or the other 4% gives 250 coins (Claude's choice; she did not answer). Needs a claimed plot. Leave puts a carried block back. An opened block turns up somewhere else, at least 40 away, 45 seconds later.
 
 Still open: the names of the top two tiers (Mythic and Prismatic are placeholders), whether dragons should follow you, and the starter dog, cat and parrot.
 

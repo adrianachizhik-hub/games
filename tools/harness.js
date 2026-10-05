@@ -470,11 +470,30 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear(); if (I.riding()) I.dismount(true);
   const b = I.luckyBlocks[0], c0 = I.coins(), was = I.ownDragons.length;
   I.goTo(6); I.p.x = b.spot.x; I.p.z = b.spot.z; I.p.y = b.spot.y; I.p.vy = 0; I.p.onGround = true; I.update(1 / 60, 0);
-  const got = I.carrying();
-  console.log('walk into a lucky block: block gone', !b.m.visible, '| got', got ? E[got.egg.tier].name + ' egg, ' + got.total + ' s to get home' : (I.coins() - c0).toFixed(0) + ' coins', '| message', said());
-  if (b.m.visible || (!got && I.coins() - c0 < 249)) throw new Error('the lucky block gave nothing');
-  const b2 = I.luckyBlocks[1]; if (got) { I.p.x = b2.spot.x; I.p.z = b2.spot.z; I.p.y = b2.spot.y; I.update(1 / 60, 0); console.log('another block while carrying: opened', !b2.m.visible, '| message', said()); if (!b2.m.visible) throw new Error('opened a block while carrying'); }
-  if (got) { const home2 = I.plotWorld(I.myPlot(), 0, 0); I.p.x = home2.x; I.p.z = home2.z; I.p.y = 6.3; tick(2.5); console.log('took the lucky egg home: dragons', was, '->', I.ownDragons.length, '| newest', I.ownDragons[I.ownDragons.length - 1]); if (I.ownDragons.length !== was + 1) throw new Error('lucky egg did not hatch'); }
+  console.log('walk into a lucky block: picked up', I.carryingBlock() === b, '| block gone from the world', !b.m.visible, '| no egg yet', !I.carrying(), '| carry note', JSON.stringify(els.carryText.textContent), '| message', said());
+  if (I.carryingBlock() !== b || I.carrying()) throw new Error('walking into a lucky block should pick it up');
+  const egg0 = I.eggs.find((e) => e.tier === 0); I.p.x = egg0.spot.x; I.p.z = egg0.spot.z; I.p.y = egg0.spot.y; I.update(1 / 60, 0);
+  console.log('walk into an egg holding it: picked up the egg', !!I.carrying());
+  if (I.carrying()) throw new Error('picked up an egg while carrying a block');
+  const b2 = I.luckyBlocks[1]; I.p.x = b2.spot.x; I.p.z = b2.spot.z; I.p.y = b2.spot.y; I.update(1 / 60, 0);
+  console.log('another block while carrying: picked up', I.carryingBlock() === b2, '| message', said());
+  const px = I.p.x; window.fire('keydown', ev({ code: 'Digit8' })); window.fire('keyup', ev({ code: 'Digit8' }));
+  console.log('press 8 holding a block: moved', I.p.x !== px, '| message', said());
+  if (I.p.x !== px) throw new Error('jumped while carrying a block');
+  tick(70); console.log('70 s later still holding it (no countdown):', I.carryingBlock() === b);
+  const home2 = I.plotWorld(I.myPlot(), 0, 0); I.p.x = home2.x; I.p.z = home2.z; I.p.y = 6.3; for (let k = 0; k < 12; k++) raf(39000 + k * 16);
+  console.log('on my plot: button says', JSON.stringify(document.getElementById('shopOpenLabel').textContent), 'shown', !document.getElementById('shopOpen').hidden, '| carry note out of its way', els.carry.hidden);
+  if (document.getElementById('shopOpenLabel').textContent !== 'Open the lucky block') throw new Error('no button to open the block at home');
+  const real = Math.random; Math.random = () => 0.6;      // 60 lands in Rare (50 to 80)
+  window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); Math.random = real;
+  console.log('open it: holding', !!I.carryingBlock(), '| hatching', I.hatching() && I.EGG_TIERS[I.hatching().tier].name, '| message', said());
+  tick(2.5); console.log('2.5 s later: dragons', was, '->', I.ownDragons.length, '| newest', I.ownDragons[I.ownDragons.length - 1]);
+  if (I.ownDragons.length !== was + 1 || !['blue', 'purple'].includes(I.ownDragons[I.ownDragons.length - 1])) throw new Error('a rare lucky egg should hatch blue or purple');
+  const b3 = I.luckyBlocks[2]; I.p.x = b3.spot.x; I.p.z = b3.spot.z; I.p.y = b3.spot.y; I.update(1 / 60, 0); I.p.x = home2.x; I.p.z = home2.z; I.p.y = 6.3;
+  const c1 = I.coins(); Math.random = () => 0.99; I.openLucky(); Math.random = real;
+  console.log('a block with coins inside: +', (I.coins() - c1).toFixed(0), 'coins | message', said());
+  const b4 = I.luckyBlocks[3]; I.p.x = b4.spot.x; I.p.z = b4.spot.z; I.p.y = b4.spot.y; I.update(1 / 60, 0);
+  els.leave.fire('click', ev({ detail: 1 })); console.log('Leave holding a block: holding', !!I.carryingBlock(), '| block back in its place', b4.m.visible); els.start.fire('click', ev({ pointerType: 'mouse' }));
   for (let k = 0; k < 60 * 50; k++) I.eggsAnimate(1 / 60, k / 60);
   console.log('50 s later the block is back', b.m.visible, '| somewhere else', Math.hypot(b.m.position.x - I.p.x, b.m.position.z - I.p.z) > 40);
 }

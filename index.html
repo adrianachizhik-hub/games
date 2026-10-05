@@ -2494,6 +2494,7 @@ const World = (function () {
   }
   function jumpTo(i) {
     if (carrying) { toast('You can\'t jump to places while carrying an egg. Run!', 3); return; }
+    if (carryingBlock) { toast('You can\'t jump to places while carrying a lucky block. Take it home!', 3); return; }
     if (riding) dismount(true);
     goTo(i);
   }
@@ -2507,6 +2508,7 @@ const World = (function () {
     }
     nagT -= dt;
     luckyPlay();
+    if (carryingBlock) return;                            // hands full: no eggs until the block is open
     if (!carrying) {
       for (const egg of eggs) {
         if (egg.taken || !!egg.spot.dungeon !== p.dungeon || Math.abs(p.y - egg.spot.y) > 2.2 || Math.hypot(p.x - egg.spot.x, p.z - egg.spot.z) > 1.4) continue;
@@ -2669,7 +2671,7 @@ const World = (function () {
     d.root.scale.set(d.rideScale, d.rideScale, d.rideScale);
     avatar.position.y = p.y + d.rideScale - 0.78;                         // sit on its back
     legL.rotation.set(-0.35, 0, -0.6); legR.rotation.set(-0.35, 0, 0.6);   // legs either side
-    armL.rotation.x = armR.rotation.x = carrying ? -2.95 : -0.8;
+    armL.rotation.x = armR.rotation.x = carrying || carryingBlock ? -2.95 : -0.8;
     d.root.position.set(p.x, p.y + (walking && !flying && !reduced ? Math.abs(Math.sin(stepT * 0.7)) * 0.06 : 0), p.z);
     d.root.rotation.y = p.yaw; d.heading = p.yaw;
     rideT += dt;
@@ -2852,9 +2854,10 @@ const World = (function () {
   $('plotBuy').addEventListener('click', buySpace);
 
   /* ---------- Lucky blocks ---------- */
-  /* Yellow "?" blocks hidden around the island. Walk into one: usually it gives you an egg to carry home
-     (Common 50%, Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1%); the other 4% of the time, coins instead.
-     An opened block turns up again somewhere else a little later. */
+  /* Yellow "?" blocks hidden around the island. Walk into one to pick it up, carry it to your plot (no countdown,
+     and no jumping to places on the way), and open it there: usually an egg that hatches on the spot (Common 50%,
+     Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1%); the other 4% of the time, coins instead. An opened block
+     turns up again somewhere else a little later. */
   const LUCKY_ODDS = [50, 30, 10, 5, 1], LUCKY_COINS = 250, LUCKY_COUNT = 8;
   const luckySpots = outdoorSpots(24, 28, (x, z) => fromTown(x, z) > 40);
   const luckyMat = (function () {
@@ -2882,21 +2885,41 @@ const World = (function () {
     for (let i = 0; i < LUCKY_ODDS.length; i++) { r -= LUCKY_ODDS[i]; if (r < 0) return i; }
     return -1;
   }
-  function openLucky(b) {
-    b.m.visible = false; b.wait = 45;                     // back somewhere else in 45 seconds
+  /* You carry a lucky block home (no countdown; it can't hatch) and open it on your plot. */
+  let carryingBlock = null;
+  const blockCarry = new THREE.Mesh(luckyGeo, luckyMat);
+  blockCarry.position.set(0, 2.25, -0.05); blockCarry.scale.set(0.6, 0.6, 0.6); blockCarry.visible = false; avatar.add(blockCarry);
+  function pickUpBlock(b) {
+    b.m.visible = false; b.wait = Infinity;               // it stays gone while you carry it
+    carryingBlock = b; blockCarry.visible = true;
+    carryDot.style.background = '#ffc21f'; carryText.textContent = 'Lucky block: take it to your plot to open it';
+    carryEl.hidden = false; carryEl.classList.remove('low');
+    toast('You picked up a lucky block! Take it to your plot to open it.', 4);
+  }
+  function dropBlock() {                                  // leaving the game: the block goes back where it was
+    if (!carryingBlock) return;
+    placeLucky(carryingBlock, carryingBlock.spot);
+    carryingBlock = null; blockCarry.visible = false; carryEl.hidden = true;
+  }
+  function openLucky() {                                  // on your plot: what's inside?
+    const b = carryingBlock;
+    if (!b || hatching) return;
+    carryingBlock = null; blockCarry.visible = false; carryEl.hidden = true;
+    b.wait = 45;                                          // a new block turns up somewhere else in 45 seconds
     const tier = rollLucky();
     if (tier < 0) { coins += LUCKY_COINS; saveCoins(); toast('Lucky block! ' + LUCKY_COINS + ' coins!', 4); return; }
-    const egg = { tier, lucky: true, taken: false, g: { visible: false }, spot: { x: b.spot.x, y: b.spot.y, z: b.spot.z } };
-    pickUp(egg);
-    toast('Lucky block! A ' + EGG_TIERS[tier].name + ' egg! Get it home to your plot before it hatches.', 5);
+    const m = new THREE.Mesh(eggGeo[tier], eggMat(tier)), c = plotWorld(myPlot, 0, 0);
+    m.position.set(c.x, HUB.h + 0.1, c.z); scene.add(m);
+    hatching = { mesh: m, tier, t: 0 };                   // it hatches right here, like an egg brought home
+    toast('Lucky block! A ' + EGG_TIERS[tier].name + ' egg! It\'s hatching...', 3);
   }
   function luckyPlay() {                                  // from eggsPlay: walking into a block
     if (p.dungeon || p.inCave) return;
     for (const b of luckyBlocks) {
       if (!b.m.visible || Math.abs(p.y - b.spot.y) > 2.5 || Math.hypot(p.x - b.spot.x, p.z - b.spot.z) > 1.5) continue;
       if (myPlot < 0) { if (nagT <= 0) { toast('Claim a plot first: walk onto any plot in town. Then come back for this lucky block!', 5); nagT = 6; } return; }
-      if (carrying) { if (nagT <= 0) { toast('Take your egg home first, then open the lucky block.', 4); nagT = 6; } return; }
-      openLucky(b); return;
+      if (carrying || carryingBlock) { if (nagT <= 0) { toast('You can only carry one thing at a time. Take ' + (carrying ? 'your egg' : 'your lucky block') + ' home first.', 4); nagT = 6; } return; }
+      pickUpBlock(b); return;
     }
   }
   function luckyAnimate(dt, time) {
@@ -2980,7 +3003,7 @@ const World = (function () {
     avatar.visible = true;
     poseAvatar(dt, Math.atan2(-shopOut.x, -shopOut.z) + shopTurn);
   }
-  const openStall = () => { const l = $('shopOpenLabel').textContent; if (l === 'Open the upgrade shop') openUpShop(); else if (l === 'Open my plot') openPlotMenu(); else openShop(); };
+  const openStall = () => { const l = $('shopOpenLabel').textContent; if (l === 'Open the upgrade shop') openUpShop(); else if (l === 'Open the lucky block') { openLucky(); shopBtn.hidden = true; } else if (l === 'Open my plot') openPlotMenu(); else openShop(); };
   shopBtn.addEventListener('click', openStall);
   $('shopDone').addEventListener('click', closeShop);
   $('shopTurn').addEventListener('click', () => { shopTurnTo = shopTurnTo ? 0 : Math.PI; });
@@ -3065,7 +3088,7 @@ const World = (function () {
   function leave() {
     if (!started) return;
     closeShop(); closeUpShop(); closePlotMenu(); shopBtn.hidden = true; avatar.visible = false;
-    dropEgg(); dismount(true); saveCoins(); toastEl.hidden = true;
+    dropEgg(); dropBlock(); dismount(true); saveCoins(); toastEl.hidden = true;
     started = false; isAdmin = false; setRadar(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
@@ -3233,7 +3256,7 @@ const World = (function () {
     if (walking) stepT += dt * (running ? 14 : 9.5);
     const sw = reduced ? 0 : Math.sin(stepT) * 0.75 * stride;
     legL.rotation.x = sw; legR.rotation.x = -sw; armL.rotation.x = -sw * 0.8; armR.rotation.x = sw * 0.8;
-    if (carrying) armL.rotation.x = armR.rotation.x = -2.95;         // holding the egg up over your head
+    if (carrying || carryingBlock) armL.rotation.x = armR.rotation.x = -2.95;   // holding the egg or block up over your head
     poseRider(dt);
   }
 
@@ -3260,11 +3283,13 @@ const World = (function () {
     const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : started ? rideHint() : '';
     if (tip !== hint) { hint = tip; hintEl.textContent = tip; }
     const free = started && !shopping && !menuOpen() && !carrying && !riding && !p.dungeon && !p.inCave;
-    const atShop = free && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6, atUp = free && Math.hypot(p.x - upFront.x, p.z - upFront.z) < 3.6;
-    const atPlot = free && !atShop && !atUp && myPlot >= 0 && plotAt(p.x, p.z) === myPlot;
-    const label = atUp ? 'Open the upgrade shop' : atPlot ? 'Open my plot' : 'Open the avatar shop';   // one button, for wherever you are
+    const onPlot = free && myPlot >= 0 && plotAt(p.x, p.z) === myPlot;
+    const atShop = free && !carryingBlock && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6, atUp = free && !carryingBlock && Math.hypot(p.x - upFront.x, p.z - upFront.z) < 3.6;
+    const atPlot = onPlot && !atShop && !atUp;
+    const label = atUp ? 'Open the upgrade shop' : atPlot && carryingBlock ? 'Open the lucky block' : atPlot ? 'Open my plot' : 'Open the avatar shop';   // one button, for wherever you are
     if ($('shopOpenLabel').textContent !== label) $('shopOpenLabel').textContent = label;
     if (shopBtn.hidden === (atShop || atUp || atPlot)) shopBtn.hidden = !(atShop || atUp || atPlot);
+    if (carryingBlock) carryEl.hidden = atPlot;           // at home the "Open the lucky block" button takes the note's place
     const z = zoneName();
     if (z === zone) return;
     zone = z;
@@ -3368,7 +3393,7 @@ const World = (function () {
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
-    stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice,
+    carryingBlock: () => carryingBlock, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();
