@@ -281,8 +281,6 @@
   .uprow.out .left { color: #8a3a2a; }
   .uprow[hidden] { display: none; }
   #plotMenu .restock { margin: 2px 0 8px; font-size: 1rem; font-weight: 600; }
-  #plotBuy { width: 100%; font: inherit; font-weight: 600; color: #0d2f37; background: #ffd23f; border: 3px solid #0d2f37; border-radius: 12px; padding: 7px 12px; cursor: pointer; }
-  #plotBuy:disabled { background: #e3e0d6; color: #6b7275; cursor: default; }
   #upShop .restock { margin: 2px 0 0; font-size: 0.9rem; font-weight: 600; }
   .uprow button, #upDragons button, #upCancel {
     font: inherit;
@@ -730,7 +728,7 @@
   <p class="sub">Dragons on your plot earn coins. Dragons in storage don't.</p>
   <p class="have"><span class="coin" aria-hidden="true"></span>You have <b id="plotCoins">0</b> coins</p>
   <p class="restock" id="plotSpace"></p>
-  <button id="plotBuy" type="button"></button>
+  <p class="sub">Want more space? Walk up to the sign with your name on it.</p>
   <h3>Your dragons</h3>
   <div id="plotList"></div>
   <div class="foot"><button id="plotDone" type="button">Done</button></div>
@@ -1896,7 +1894,7 @@ const World = (function () {
   const HEADS = [['none', 'None'], ['cap', 'Cap'], ['crown', 'Crown'], ['tophat', 'Top hat'], ['ears', 'Cat ears']];
   const BACKS = [['none', 'None'], ['sword', 'Sword'], ['skateboard', 'Skateboard'], ['backpack', 'Backpack'], ['wings', 'Wings']];
   const CHOICES = { skin: SKINS, hair: HAIRS, hairColor: HAIRCOLS, shirt: SHIRTS, pants: PANTS, head: HEADS, back: BACKS };
-  const AV = { skin: '#e0ac69', hair: 'short', hairColor: '#4a2f1d', shirt: '#3f7fd6', pants: '#2c3e63', head: 'none', back: 'none' };   // what the player is wearing
+  const AV = { skin: '#e0ac69', hair: 'short', hairColor: '#4a2f1d', shirt: '#e2483d', pants: '#6b4a2b', head: 'none', back: 'none' };   // what the player is wearing (a new player: short hair, red shirt, brown pants)
   try {                                                  // the last look chosen on this device
     const saved = JSON.parse(localStorage.getItem('mutation-mayhem-avatar') || 'null') || {};
     for (const k in CHOICES) if (CHOICES[k].some((c) => c[0] === saved[k])) AV[k] = saved[k];
@@ -2088,6 +2086,11 @@ const World = (function () {
     { name: 'Town', x: HUB.x, z: HUB.z + HUB.r - 2.5, yaw: yawToward(0, -1), pitch: 0 }
   ];
   let camY = 0;
+  function spawnInTown() {                               // where everyone starts: the middle of the four shops
+    goTo(7);
+    p.x = HUB.x; p.z = HUB.z; p.yaw = yawToward(1, 1); p.pitch = 0;   // facing out between two stalls, toward the plots
+    p.y = standing(p.x, p.z); camY = p.y + EYE;
+  }
   function goTo(i) {
     const pl = places[i];
     if (!pl) return;
@@ -2376,8 +2379,6 @@ const World = (function () {
     plotPets.push(d);
   }
   try {                                                  // what this device remembers
-    const sp = localStorage.getItem('mutation-mayhem-plot');
-    if (sp !== null && sp !== '' && +sp >= 0 && +sp < plots.length) myPlot = +sp;
     const ups = JSON.parse(localStorage.getItem('mutation-mayhem-upgrades') || '[]') || [];
     (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k, i) => {
       if (!DRAGON_KINDS[k]) return;
@@ -2410,7 +2411,6 @@ const World = (function () {
   else ownDragons.map((k, i) => i).sort((a, b) => dragonValue(b) - dragonValue(a)).slice(0, plotSlots).forEach((i) => { dragonPlaced[i] = true; });
   while (dragonPlaced.filter(Boolean).length > plotSlots) dragonPlaced[dragonPlaced.lastIndexOf(true)] = false;
   const placedCount = () => dragonPlaced.filter(Boolean).length;
-  if (myPlot >= 0) ownDragons.forEach((k, i) => { if (dragonPlaced[i]) addPet(k, false, i); });
   const coinCountEl = $('coinCount'), coinRateEl = $('coinRate');
   const fmtRate = (r) => (Math.round(r * 10) / 10).toLocaleString('en-US');
   const coinsEl = $('coins');
@@ -2436,10 +2436,24 @@ const World = (function () {
     if (upShopOpen) restockTick();
     if (r !== rateShown) { rateShown = r; coinRateEl.textContent = r ? '+' + fmtRate(r) + ' every ' + PAYOUT_SECONDS + ' seconds' : ownDragons.length ? 'put dragons on your plot to earn' : 'hatch dragons to earn'; }
   }
+  /* Your plot is chosen fresh each visit: the first plot you step on becomes yours, and your dragons appear on it.
+     Leaving gives it back. (Only the dragons, upgrades and spaces are saved, not which plot.) */
+  function claimPlot(i) {
+    myPlot = i; nameMyPlot();
+    ownDragons.forEach((k, d) => { if (dragonPlaced[d]) addPet(k, true, d); });
+    toast(ownDragons.length ? 'Welcome back! This is ' + playerName + '\'s Plot, and your dragons are here.' : 'This is now ' + playerName + '\'s Plot! Find eggs around the island and bring them here to hatch.', 6);
+  }
+  function releasePlot() {                               // leaving: anything hatching finishes, then the plot is empty again
+    if (myPlot < 0) return;
+    if (hatching) { scene.remove(hatching.mesh); const kind = pickDragon(hatching.tier); ownDragons.push(kind); dragonUpgrades.push(-1); dragonPlaced.push(placedCount() < plotSlots); saveProgress(); hatching = null; }
+    plotPets.forEach((d) => scene.remove(d.root)); plotPets.length = 0;
+    paintSign(myPlot, 'Plot ' + (myPlot + 1));
+    myPlot = -1;
+  }
   function nameMyPlot() { if (myPlot >= 0) paintSign(myPlot, playerName + '\'s Plot'); }   // the sign says whose plot it is
   function saveProgress() {
     try {
-      localStorage.setItem('mutation-mayhem-plot', String(myPlot)); localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons));
+      localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons));
       localStorage.setItem('mutation-mayhem-upgrades', JSON.stringify(dragonUpgrades)); localStorage.setItem('mutation-mayhem-slots', String(plotSlots));
       localStorage.setItem('mutation-mayhem-placed', JSON.stringify(dragonPlaced.map((on, i) => (on ? i : -1)).filter((i) => i >= 0)));
     } catch (e) { /* not saved, still playable */ }
@@ -2504,7 +2518,7 @@ const World = (function () {
     if (!started) return;
     if (myPlot < 0 && !p.dungeon) {
       const i = plotAt(p.x, p.z);
-      if (i >= 0) { myPlot = i; saveProgress(); nameMyPlot(); toast('This is now ' + playerName + '\'s Plot! Find eggs around the island and bring them here to hatch.', 6); }
+      if (i >= 0) claimPlot(i);
     }
     nagT -= dt;
     luckyPlay();
@@ -2680,6 +2694,7 @@ const World = (function () {
   let rideT = 0;
   function rideHint() {
     if (riding) return flying ? 'Hold Jump to fly higher. Land to get off.' : 'Jump twice to fly. Jump once to get off.';
+    if (myPlot < 0) return 'Walk onto a plot in town to make it yours';
     if (myPlot >= 0 && plotPets.length && plotAt(p.x, p.z) === myPlot) return (document.body.classList.contains('touch') ? 'Tap' : 'Click') + ' a dragon to ride it';
     return '';
   }
@@ -2797,13 +2812,12 @@ const World = (function () {
   let plotMenuOpen = false;
   const menuOpen = () => upShopOpen || plotMenuOpen;
   const spacePrice = () => 500 * Math.pow(2, plotSlots - 5);
+  const buyLabel = () => (plotSlots >= MAX_SLOTS ? 'Your plot is as big as it gets' : 'Buy 1 more space · ' + fmt(spacePrice()) + ' coins');
+  const signSpot = () => plotWorld(myPlot, 3.1, -PLOT / 2 - 1.9);   // in front of your plot's sign, on the town side
   function refreshPlotMenu() {
     $('plotTitle').textContent = playerName + '\'s Plot';
     $('plotCoins').textContent = fmt(coins);
     $('plotSpace').textContent = placedCount() + ' of ' + plotSlots + ' spaces used';
-    const buy = $('plotBuy');
-    buy.textContent = plotSlots >= MAX_SLOTS ? 'Your plot is as big as it gets' : 'Buy 1 more space · ' + fmt(spacePrice()) + ' coins';
-    buy.disabled = plotSlots >= MAX_SLOTS;
     while (plotList.firstChild) plotList.removeChild(plotList.firstChild);
     if (!ownDragons.length) { const p0 = document.createElement('p'); p0.className = 'sub'; p0.textContent = 'No dragons yet. Find eggs and bring them home to hatch.'; plotList.appendChild(p0); }
     ownDragons.map((k, i) => i).sort((a, b) => (dragonPlaced[b] - dragonPlaced[a]) || (dragonValue(b) - dragonValue(a))).forEach((i) => {
@@ -2832,7 +2846,8 @@ const World = (function () {
     if (coins < spacePrice()) { toast('You don\'t have enough money.', 3); return; }
     coins -= spacePrice(); plotSlots++; saveProgress(); saveCoins();
     toast('Your plot now has room for ' + plotSlots + ' dragons!', 3);
-    refreshPlotMenu();
+    if (plotMenuOpen) refreshPlotMenu();
+    $('shopOpenLabel').textContent = buyLabel();
   }
   function openPlotMenu() {
     if (menuOpen() || shopping || !started || myPlot < 0) return;
@@ -2851,7 +2866,6 @@ const World = (function () {
     canvas.focus();
   }
   $('plotDone').addEventListener('click', closePlotMenu);
-  $('plotBuy').addEventListener('click', buySpace);
 
   /* ---------- Lucky blocks ---------- */
   /* Yellow "?" blocks hidden around the island. Walk into one to pick it up, carry it to your plot (no countdown,
@@ -3003,7 +3017,7 @@ const World = (function () {
     avatar.visible = true;
     poseAvatar(dt, Math.atan2(-shopOut.x, -shopOut.z) + shopTurn);
   }
-  const openStall = () => { const l = $('shopOpenLabel').textContent; if (l === 'Open the upgrade shop') openUpShop(); else if (l === 'Open the lucky block') { openLucky(); shopBtn.hidden = true; } else if (l === 'Open my plot') openPlotMenu(); else openShop(); };
+  const openStall = () => { const l = $('shopOpenLabel').textContent; if (l === 'Open the upgrade shop') openUpShop(); else if (l === 'Open the lucky block') { openLucky(); shopBtn.hidden = true; } else if (l === 'Open my plot') openPlotMenu(); else if (l.indexOf('Buy 1 more space') === 0) buySpace(); else openShop(); };
   shopBtn.addEventListener('click', openStall);
   $('shopDone').addEventListener('click', closeShop);
   $('shopTurn').addEventListener('click', () => { shopTurnTo = shopTurnTo ? 0 : Math.PI; });
@@ -3088,7 +3102,7 @@ const World = (function () {
   function leave() {
     if (!started) return;
     closeShop(); closeUpShop(); closePlotMenu(); shopBtn.hidden = true; avatar.visible = false;
-    dropEgg(); dropBlock(); dismount(true); saveCoins(); toastEl.hidden = true;
+    dropEgg(); dropBlock(); dismount(true); releasePlot(); saveCoins(); toastEl.hidden = true;
     started = false; isAdmin = false; setRadar(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
@@ -3098,7 +3112,7 @@ const World = (function () {
     $('who').textContent = '';
     nameEl.value = playerName === 'Player' ? '' : playerName;
     codeEl.value = ''; codeEl.hidden = true; codeMsg.hidden = true;
-    goTo(0);
+    spawnInTown();
     intro.hidden = false;
     blink();
     $('start').focus();
@@ -3284,11 +3298,15 @@ const World = (function () {
     if (tip !== hint) { hint = tip; hintEl.textContent = tip; }
     const free = started && !shopping && !menuOpen() && !carrying && !riding && !p.dungeon && !p.inCave;
     const onPlot = free && myPlot >= 0 && plotAt(p.x, p.z) === myPlot;
-    const atShop = free && !carryingBlock && Math.hypot(p.x - shopFront.x, p.z - shopFront.z) < 3.6, atUp = free && !carryingBlock && Math.hypot(p.x - upFront.x, p.z - upFront.z) < 3.6;
+    const dShop = Math.hypot(p.x - shopFront.x, p.z - shopFront.z), dUp = Math.hypot(p.x - upFront.x, p.z - upFront.z);
+    const dSign = myPlot >= 0 && plotSlots < MAX_SLOTS ? Math.hypot(p.x - signSpot().x, p.z - signSpot().z) : Infinity;
+    const near = Math.min(dShop, dUp, dSign);              // a stall and a plot sign can be close together: the nearest one wins
+    const atShop = free && !carryingBlock && dShop < 3.6 && dShop === near, atUp = free && !carryingBlock && dUp < 3.6 && dUp === near;
     const atPlot = onPlot && !atShop && !atUp;
-    const label = atUp ? 'Open the upgrade shop' : atPlot && carryingBlock ? 'Open the lucky block' : atPlot ? 'Open my plot' : 'Open the avatar shop';   // one button, for wherever you are
+    const atSign = free && !carryingBlock && !atPlot && dSign < 2.6 && dSign === near;
+    const label = atUp ? 'Open the upgrade shop' : atPlot && carryingBlock ? 'Open the lucky block' : atPlot ? 'Open my plot' : atSign ? buyLabel() : 'Open the avatar shop';   // one button, for wherever you are
     if ($('shopOpenLabel').textContent !== label) $('shopOpenLabel').textContent = label;
-    if (shopBtn.hidden === (atShop || atUp || atPlot)) shopBtn.hidden = !(atShop || atUp || atPlot);
+    if (shopBtn.hidden === (atShop || atUp || atPlot || atSign)) shopBtn.hidden = !(atShop || atUp || atPlot || atSign);
     if (carryingBlock) carryEl.hidden = atPlot;           // at home the "Open the lucky block" button takes the note's place
     const z = zoneName();
     if (z === zone) return;
@@ -3358,7 +3376,7 @@ const World = (function () {
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
   }
-  goTo(0);
+  spawnInTown();
   let last = performance.now(), frame = 0, coverTurn = 0.9;
   function tick(now) {
     requestAnimationFrame(tick);
@@ -3393,7 +3411,7 @@ const World = (function () {
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
-    carryingBlock: () => carryingBlock, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice,
+    carryingBlock: () => carryingBlock, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();

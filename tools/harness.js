@@ -301,19 +301,25 @@ console.log('figures dumped:', shots.length);
 
 // ---- a device that has played before: saved plot and dragons come back, and you can ride one ----
 if (process.env.SAVED === '1') {
-  console.log('saved progress: plot', I.myPlot() + 1, '| dragons', JSON.stringify(I.ownDragons), '| on the plot', I.plotPets.map((d) => d.kind).join(','));
-  if (I.myPlot() !== 2 || I.plotPets.length !== 3) throw new Error('saved plot or dragons did not come back');
-  els.start.fire('click', ev({ pointerType: 'mouse' })); I.goTo(7); I.mount(I.plotPets[1]); I.update(1 / 60, 0); raf(30000); raf(30016);
+  console.log('saved progress, loaded: plot', I.myPlot(), '(none yet) | dragons saved', JSON.stringify(I.ownDragons), '| on a plot', I.plotPets.length, '| looks', I.AV.shirt, I.AV.pants);
+  if (I.myPlot() !== -1 || I.plotPets.length) throw new Error('nothing should be on a plot before you step on one');
+  els.start.fire('click', ev({ pointerType: 'mouse' })); I.update(1 / 60, 0);
+  console.log('saved progress, Play: spawned in', I.zoneName(), '| at the middle of the shops', Math.hypot(I.p.x - W.HUB.x, I.p.z - W.HUB.z) < 0.5);
+  const w5 = I.plotWorld(4, 0, 2); I.p.x = w5.x; I.p.z = w5.z; I.p.y = 6.3; I.update(1 / 60, 0);
+  console.log('saved progress, step onto Plot 5: my plot', I.myPlot() + 1, '| dragons appear', I.plotPets.map((d) => d.kind).join(','), '| sign', JSON.stringify(I.signLabels[4]), '| message', JSON.stringify(els.toast.textContent));
+  if (I.myPlot() !== 4 || I.plotPets.length !== 3) throw new Error('your dragons should load onto the plot you step on');
+  I.mount(I.plotPets[1]); I.update(1 / 60, 0); raf(30000); raf(30016);
   { const c0 = I.coins(); for (let f = 0; f < 360; f++) I.earn(1 / 60);
     console.log('saved progress coins: each payday', I.coinRate(), '(green 1 + ruby 20 with a Legendary upgrader x3 + blue 3, all 3 placed) | earned in 6 s', (I.coins() - c0).toFixed(0), '| saved', store['mutation-mayhem-coins'], '| placed', JSON.stringify(I.dragonPlaced), 'of', I.plotSlots());
     if (I.coinRate() !== 64 || Math.abs(I.coins() - c0 - 128) > 1e-9) throw new Error('coin rate wrong for saved dragons'); }
-  console.log('ride a saved dragon: riding', I.riding().kind, '| sign on the saved plot', JSON.stringify(I.signLabels[2]));
-  if (I.signLabels[2] !== I.name() + "'s Plot") throw new Error('saved plot sign not named');
+  console.log('ride a saved dragon: riding', I.riding().kind, '| sign', JSON.stringify(I.signLabels[4]));
+  if (I.signLabels[4] !== I.name() + "'s Plot") throw new Error('saved plot sign not named');
   I.dismount(true); process.exit(0);
 }
 
 // ---- dragon eggs: claim a plot, find eggs, carry them home, hatch ----
 const E = I.EGG_TIERS, said = () => JSON.stringify(els.toast.hidden ? '' : els.toast.textContent);
+const reclaim = () => { I.goTo(7); const w = I.plotWorld(2, 0, 2); I.p.x = w.x; I.p.z = w.z; I.p.y = 6.3; I.update(1 / 60, 0); };   // after Leave the plot is free again: step back onto Plot 3
 const tick = (secs) => { for (let f = 0; f < secs * 60; f++) { I.update(1 / 60, f / 60); I.eggsAnimate(1 / 60, f / 60); I.earn(1 / 60); } };
 const stand = (spot) => { I.p.x = spot.x; I.p.z = spot.z; I.p.y = spot.y; I.p.vy = 0; I.p.onGround = true; I.p.dungeon = !!spot.dungeon; I.p.inLid = !!spot.cave; I.p.inCave = !!spot.cave; };
 const zonesOf = (t) => { const z = {}; t.spots.forEach((s) => { stand(s); const n = I.zoneName(); z[n] = (z[n] || 0) + 1; }); return JSON.stringify(z); };
@@ -353,8 +359,11 @@ if (I.carrying() || I.ownDragons.length !== 1) throw new Error('egg should have 
 tick(5); console.log('5 seconds later          : still flying', I.flyers.length);
 // leaving while carrying puts the egg back
 const leg = I.eggs.find((e) => e.tier === 2); stand(leg.spot); tick(0.1); const ls = leg.spot;
-els.leave.fire('click', ev({ detail: 1 })); console.log('Leave while carrying     : carrying', !!I.carrying(), '| egg back in its place', leg.g.visible && leg.spot === ls, '| countdown hidden', els.carry.hidden);
-els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear();
+els.leave.fire('click', ev({ detail: 1 })); console.log('Leave gives the plot back: my plot', I.myPlot(), '| pets on it', I.plotPets.length, '| sign', JSON.stringify(I.signLabels[2]), '| where Play puts you next', I.zoneName());
+if (I.myPlot() !== -1 || I.plotPets.length || I.signLabels[2] !== 'Plot 3') throw new Error('Leave should give the plot back');
+console.log('Leave while carrying     : carrying', !!I.carrying(), '| egg back in its place', leg.g.visible && leg.spot === ls, '| countdown hidden', els.carry.hidden);
+els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear(); reclaim();
+console.log('Play again, step onto Plot 3: my plot', I.myPlot() + 1, '| dragons back on it', I.plotPets.length, '| sign', JSON.stringify(I.signLabels[2]));
 // how often each dragon comes out
 const odds = E.map((t, i) => { const n = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(i); n[d] = (n[d] || 0) + 1; } return t.name + ' ' + Object.keys(n).map((d) => d + ' ' + Math.round(n[d] / 200) + '%').join(' '); });
 console.log('hatch odds:', odds.join(' | '));
@@ -413,7 +422,7 @@ console.log('after Leave: radar on', I.radarOn(), '| button', JSON.stringify(rad
 
 // ---- riding dragons ----
 {
-els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear();
+els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear(); reclaim();
 const frameN = (n = 1) => { for (let k = 0; k < n; k++) { I.update(1 / 60, 0); I.eggsAnimate(1 / 60, 0); } };
 const screenOf = (x, y, z) => {                        // where a point shows on screen: the click maths run backwards
   const o = I.camera.position, t = Math.tan(70 * Math.PI / 360), W0 = 1280, H0 = 720;
@@ -493,7 +502,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   const c1 = I.coins(); Math.random = () => 0.99; I.openLucky(); Math.random = real;
   console.log('a block with coins inside: +', (I.coins() - c1).toFixed(0), 'coins | message', said());
   const b4 = I.luckyBlocks[3]; I.p.x = b4.spot.x; I.p.z = b4.spot.z; I.p.y = b4.spot.y; I.update(1 / 60, 0);
-  els.leave.fire('click', ev({ detail: 1 })); console.log('Leave holding a block: holding', !!I.carryingBlock(), '| block back in its place', b4.m.visible); els.start.fire('click', ev({ pointerType: 'mouse' }));
+  els.leave.fire('click', ev({ detail: 1 })); console.log('Leave holding a block: holding', !!I.carryingBlock(), '| block back in its place', b4.m.visible); els.start.fire('click', ev({ pointerType: 'mouse' })); reclaim();
   for (let k = 0; k < 60 * 50; k++) I.eggsAnimate(1 / 60, k / 60);
   console.log('50 s later the block is back', b.m.visible, '| somewhere else', Math.hypot(b.m.position.x - I.p.x, b.m.position.z - I.p.z) > 40);
 }
@@ -539,18 +548,24 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   if (I.dragonPlaced.filter(Boolean).length !== 5 || I.plotPets.length !== 5) throw new Error('only 5 dragons should be on a new plot');
   window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(44000);
   const prow = () => els.plotList.children, btn = (r) => r.children[1];
-  console.log('plot menu open', I.plotMenuOpen(), '|', JSON.stringify(els.plotTitle.textContent), JSON.stringify(els.plotSpace.textContent), '|', JSON.stringify(els.plotBuy.textContent), '| rows', prow().length, '| first', JSON.stringify(prow()[0].children[0].children[0].textContent), btn(prow()[0]).textContent);
+  console.log('plot menu open', I.plotMenuOpen(), '|', JSON.stringify(els.plotTitle.textContent), JSON.stringify(els.plotSpace.textContent), '| rows', prow().length, '| first', JSON.stringify(prow()[0].children[0].children[0].textContent), btn(prow()[0]).textContent);
   const r0 = I.coinRate(); btn(prow()[0]).fire('click', ev({}));
   console.log('Store the top dragon: placed', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| each payday', r0, '->', I.coinRate(), '|', JSON.stringify(els.plotSpace.textContent));
   const stored = () => [...prow()].filter((r) => btn(r).textContent === 'Place');
   btn(stored()[0]).fire('click', ev({})); console.log('Place a stored one: placed', I.dragonPlaced.filter(Boolean).length);
   btn(stored()[0]).fire('click', ev({})); console.log('Place a 6th: placed', I.dragonPlaced.filter(Boolean).length, '| message', said());
   if (I.dragonPlaced.filter(Boolean).length !== 5) throw new Error('a full plot took a 6th dragon');
-  I.giveCoins(-I.coins() + 100); els.plotBuy.fire('click', ev({})); console.log('Buy space with 100 coins: message', said(), '| spaces', I.plotSlots());
-  I.giveCoins(1500); els.plotBuy.fire('click', ev({})); console.log('with 1,600: spaces', I.plotSlots(), '| coins left', I.coins().toFixed(0), '| next space costs', I.spacePrice());
-  if (I.plotSlots() !== 6 || I.spacePrice() !== 1000) throw new Error('buying space went wrong');
-  btn(stored()[0]).fire('click', ev({})); console.log('now place a 6th: placed', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| saved', store['mutation-mayhem-slots'], 'spaces,', JSON.parse(store['mutation-mayhem-placed']).length, 'placed');
   els.plotDone.fire('click', ev({})); console.log('Done closes it:', !I.plotMenuOpen());
+  const sg = I.signSpot(); I.p.x = sg.x; I.p.z = sg.z; I.p.y = 6.3; for (let k = 0; k < 12; k++) raf(44500 + k * 16);
+  const lab = () => document.getElementById('shopOpenLabel').textContent;
+  console.log('at my name sign: button', JSON.stringify(lab()), 'shown', !document.getElementById('shopOpen').hidden);
+  if (lab() !== 'Buy 1 more space · 500 coins') throw new Error('no buy-space button at the sign');
+  I.giveCoins(-I.coins() + 100); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); console.log('press it with 100 coins: message', said(), '| spaces', I.plotSlots());
+  I.giveCoins(1500); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); console.log('with 1,600: spaces', I.plotSlots(), '| coins left', I.coins().toFixed(0), '| button now', JSON.stringify(lab()));
+  if (I.plotSlots() !== 6 || I.spacePrice() !== 1000) throw new Error('buying space went wrong');
+  I.p.x = home3.x; I.p.z = home3.z; for (let k = 0; k < 12; k++) raf(45000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(45300);
+  btn(stored()[0]).fire('click', ev({})); console.log('back in the menu, place a 6th: placed', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| saved', store['mutation-mayhem-slots'], 'spaces,', JSON.parse(store['mutation-mayhem-placed']).length, 'placed');
+  els.plotDone.fire('click', ev({}));
 }
 
 // ---- and once more, as a device with saved progress ----

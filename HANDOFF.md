@@ -51,7 +51,7 @@ Players hatch dragons from eggs. Each egg tier hatches one of two colours. Every
 Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scales and twinkle stars around them. Prismatic hatches diamond 60%, jade 40% ("jade is last in order, so a little rarer"); every other egg is 50/50.
 
 **Built (section "Dragon eggs" in `index.html`):**
-- The first plot you walk onto in town becomes yours (yellow square on the minimap), and its sign is repainted as "<name>'s Plot" (`paintSign`, `nameMyPlot`; long names shrink and split onto two lines). Only one plot per player for now.
+- The first plot you walk onto in town becomes yours for this visit (yellow square on the minimap) and your saved dragons appear on it (`claimPlot`); Leave gives it back (`releasePlot`). Adriana asked for this: "they walk to a plot and when they step on it all of their things load on it". Which plot is not saved. Its sign is repainted as "<name>'s Plot" (`paintSign`, `nameMyPlot`; long names shrink and split onto two lines). Only one plot per player for now.
 - Eggs are hidden around the island, rarer ones in harder places: Common on beaches and meadows (6 out at once), Rare deep in the jungle and desert (4), Legendary high in the mountains near the peak (3), Mythic inside the crystal cave (2), Prismatic down in the mine (1). Spots are picked once from their own random stream (`W.rng(4142)`), so plants did not move. A collected egg turns up again somewhere else, away from you.
 - Walk into an egg to carry it (held over your head, countdown at the bottom). Time = the tier's `base` seconds (30, 24, 20, 17, 15) plus 1 second per 7 units from the egg to your plot. Adriana's "rarer dragons are faster" was read as "rarer eggs hatch sooner"; she has not confirmed this.
 - Bring it into your plot: it wobbles and hatches, and the dragon lives on your plot and wanders about (rarer ones walk faster). Run out of time: it hatches where you are and the baby flies away.
@@ -62,7 +62,7 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 
 **Upgraders (the red stall, section "The red stall: upgraders"):** the red stall's sign says "Upgrades" (sign cell 9) and the shop button at it reads "Open the upgrade shop". It restocks every 4 minutes on the clock (`RESTOCK_SECONDS`), the same for everyone: each upgrader is in stock with chance `STOCK_CHANCE` (90, 60, 30, 12, 4%) with 1 to `STOCK_MOST` (5, 3, 2, 1, 1) of them, and a countdown shows the next restock. 5% of restocks also show an "Egg radar" at 999,999,999 coins that always answers "You don't have enough money." (Adriana's idea: players can't get the admin radar). Too few coins for anything now also says "You don't have enough money." Five upgraders (`UPGRADERS`): Common ×1.5 for 100 coins, Rare ×2 for 500, Legendary ×3 for 2,500, Mythic ×5 for 10,000, Prismatic ×10 for 50,000. Adriana's rule: any upgrader works on any dragon, each upgrades only one dragon, better ones boost more. You buy one and then pick the dragon from a list showing its coins a second now and after. A dragon holds one upgrader; only a better one can replace it. Saved in `mutation-mayhem-upgrades`, matching `mutation-mayhem-dragons` by position (-1 for none). The prices and boosts were Claude's choice.
 
-**Your plot's menu (section "Your plot's menu"):** stand on your plot and press "Open my plot": every dragon with Store or Place, and "Buy 1 more space" at 500 coins, doubling each time (`spacePrice`). A dragon hatched onto a full plot goes to storage. Adriana's rule: 5 to start, buy more, price goes up each time; the numbers were Claude's.
+**Your plot's menu (section "Your plot's menu"):** stand on your plot and press "Open my plot": every dragon with Store or Place. More space is bought at your name sign (Adriana's request): stand by it and the button reads "Buy 1 more space · 500 coins", doubling each time (`spacePrice`, `signSpot`). When a stall and a sign are both in reach, the nearer one gets the button. A dragon hatched onto a full plot goes to storage. Adriana's rule: 5 to start, buy more, price goes up each time; the numbers were Claude's.
 
 **Lucky blocks (section "Lucky blocks"):** 8 yellow "?" blocks spinning around the island (outside town). Walk into one to pick it up (held over your head); Adriana asked that it be brought back to your plot and opened there. No countdown, but no jumping to places while carrying it, and no picking up eggs or other blocks. On your plot the button reads "Open the lucky block": Common egg 50%, Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1% (Adriana's odds), which hatches on the spot, or the other 4% gives 250 coins (Claude's choice; she did not answer). Needs a claimed plot. Leave puts a carried block back. An opened block turns up somewhere else, at least 40 away, 45 seconds later.
 
@@ -178,13 +178,13 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 ### Playing
 - **Camera:** behind the avatar outdoors (`CAM_BACK = 5.2`). In the cave and dungeon it slides into the avatar's head (first person), because there is no room behind you. It is kept above the ground and the sea.
 - **Keys:** up/down or W/S walk, left/right or A/D turn, Q/E sidestep, Space jumps, Shift runs, 1 to 8 jump to places, Enter opens the avatar shop when its button shows, Escape closes it.
-- **Places:** Beach, Jungle, Desert, Waterfall, Cave, Peak, Meadow, Town. The game starts on the Beach.
+- **Places:** Beach, Jungle, Desert, Waterfall, Cave, Peak, Meadow, Town. Everyone starts in the middle of the four shops (`spawnInTown`), facing out between two stalls.
 - **HUD:** name tag, zone name, place buttons, hint line, round minimap, key reminder, Leave button.
-- **Leave** returns to the front cover at once. The next Play starts fresh on the beach. There is no "are you sure?" yet (see section 8).
+- **Leave** returns to the front cover at once. The next Play starts again in the middle of the shops. There is no "are you sure?" yet (see section 8).
 
 ### Avatar and avatar shop
 - The avatar is a blocky figure built by `figure(paints)`. Limbs hang from joints and swing when walking.
-- What the player wears is in `AV`: `skin`, `hair`, `hairColor`, `shirt`, `pants`, `head`, `back`. The allowed values are in `CHOICES`. `dress(save)` applies it. It is remembered on the device.
+- A new player starts with short hair, a red shirt and brown pants (Adriana's choice). What the player wears is in `AV`: `skin`, `hair`, `hairColor`, `shirt`, `pants`, `head`, `back`. The allowed values are in `CHOICES`. `dress(save)` applies it. It is remembered on the device.
 - Choices: 6 skin colours, 11 hairstyles (short, buzz cut, spiky, swoop, curly, bob, long, **ponytail**, pigtails, bun, no hair), 8 hair colours, 10 shirt colours, 8 pants colours, head accessories (cap, crown, top hat, cat ears), back accessories (sword, skateboard, backpack, wings).
 - Hairstyles are blocks listed in `HAIR_SHAPES`. Pieces under `up` stick up and are hidden under a cap, crown, or top hat.
 - **Using the shop:** stand in front of the blue stall and a button "Open the avatar shop" appears. While it is open the camera faces the avatar, the game HUD is hidden, and movement is paused. Picking a back accessory turns the avatar around; picking hair turns it part way. There is a "Turn around" button and a "Done" button that stays in view.
@@ -198,7 +198,6 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 - `mutation-mayhem-name`: the player's display name.
 - `mutation-mayhem-name-locked`: `'1'` once the player answered "I'm sure" to "Are you sure <name> is your name? You can't change it later." (asked the first time a name is used, Back or I'm sure). After that the name box is filled in and any other name is refused with "Your name is X. Names can't be changed." (capitals don't matter). An empty name plays as "Player" and locks nothing. The admin name skips the question, is never locked, and never replaces a locked name. Clearing the site's data in the browser is the only way to unlock, which Adriana has not been told how to do.
 - `mutation-mayhem-avatar`: the `AV` object as JSON.
-- `mutation-mayhem-plot`: the index (0 to 6) of the plot you claimed.
 - `mutation-mayhem-dragons`: the dragons you have hatched, as a JSON list of colour names.
 
 ## 8. What is not built, and open questions
