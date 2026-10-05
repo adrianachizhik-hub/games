@@ -230,6 +230,7 @@ els.leave.fire('click', ev({ detail: 1 })); els.name.value = 'Somebody Else'; el
 console.log('try another name: started', document.body.classList.contains('playing'), '| name box put back to', JSON.stringify(els.name.value), '| message', JSON.stringify(els.codeMsg.hidden ? '' : els.codeMsg.textContent), '| asked', !els.confirm.hidden);
 if (document.body.classList.contains('playing')) throw new Error('a locked name was changed');
 els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('Play with own name again:', S());
+if (!document.body.classList.contains('playing')) { document.getElementById('confirmBack').fire('click', ev({})); els.name.value = AN || ''; els.name.fire('input', ev({})); els.code.value = AC; els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('admin mode, sign in again:', S()); }   // admins have no locked name
 
 // ---- third-person camera and the avatar ----
 const cam = I.camera, dist = () => Math.hypot(cam.position.x - I.p.x, cam.position.z - I.p.z);
@@ -333,6 +334,7 @@ const common = I.eggs.find((e) => e.tier === 0);
 stand(common.spot); tick(0.2);
 console.log('touch an egg with no plot : carrying', !!I.carrying(), '| message', said());
 if (I.carrying()) throw new Error('picked up an egg without a plot');
+if (I.myPlot() >= 0) { els.leave.fire('click', ev({ detail: 1 })); els.name.value = MODE === 'admin' ? AN : I.name(); els.name.fire('input', ev({})); els.code.value = AC; els.start.fire('click', ev({ pointerType: 'mouse' })); }   // start with no plot
 I.goTo(7); const home = I.plotWorld(2, 0, 3); I.p.x = home.x; I.p.z = home.z; tick(0.2);
 console.log('walk onto Plot 3         : my plot', I.myPlot() + 1, '| message', said());
 if (I.myPlot() !== 2) throw new Error('plot not claimed');

@@ -176,7 +176,7 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 ### Admin sign-in
 - One special name makes an "Admin code" box appear. The right code starts the game as an admin. A wrong code shows a message and does not start.
 - **The name and code are not written in this folder on purpose. Adriana knows them. Ask her if you need them for testing, and never commit them.**
-- In the code they exist only as two scrambled numbers (`ADMIN_NAME`, `ADMIN_KEY`) made by `scramble()`. The check is `scramble(name.toLowerCase())` and `scramble(name.toLowerCase() + '#' + code)`. To change them, compute new numbers with the same function.
+- In the code they exist only as scrambled numbers made by `scramble()`, one pair per admin in `ADMINS`. A second admin, Ellie, was added on 6 October 2026 at Adriana's request with the same powers (her name and code are known to Adriana; not written here). The check is `scramble(name.toLowerCase())` and `scramble(name.toLowerCase() + '#' + code)`. To change them, compute new numbers with the same function.
 - This hides them from a quick look. It is **not real security**, and she was told so. Before admins get real powers in a shared game, the check must move to a server.
 - An admin's name tag shows the part before the `@` plus a yellow "Admin" badge. Only that plain name is remembered, so the admin types the full name and code every time. Leaving signs the admin out.
 - Small quirk: the tag keeps the capital letters as typed.

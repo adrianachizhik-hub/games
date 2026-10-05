@@ -2351,11 +2351,15 @@ const World = (function () {
     h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
     return 4294967296 * (2097151 & h2) + (h1 >>> 0);
   };
-  const ADMIN_NAME = 1869928790200511, ADMIN_KEY = 8246370880143628;
+  const ADMINS = [                                       // each admin: [scrambled name, scrambled name + '#' + code]
+    [1869928790200511, 8246370880143628],                // Adriana
+    [2807844638872252, 4072327928453000]                 // Ellie, added 6 October 2026 at Adriana's request
+  ];
   const codeEl = $('code'), codeMsg = $('codeMsg');
   let isAdmin = false;
   const typedName = () => (nameEl.value || '').replace(/\s+/g, ' ').trim().slice(0, 16);
-  const isAdminName = () => scramble(typedName().toLowerCase()) === ADMIN_NAME;
+  const adminFor = () => ADMINS.find((a) => a[0] === scramble(typedName().toLowerCase()));
+  const isAdminName = () => !!adminFor();
   nameEl.addEventListener('input', () => {              // the code box appears only while the admin name is typed in
     const wanted = isAdminName();
     if (codeEl.hidden !== wanted) return;
@@ -3624,7 +3628,7 @@ const World = (function () {
     }
     confirmEl.hidden = true;
     if (isAdminName()) {
-      if (scramble(typed.toLowerCase() + '#' + codeEl.value.trim()) !== ADMIN_KEY) {
+      if (scramble(typed.toLowerCase() + '#' + codeEl.value.trim()) !== adminFor()[1]) {
         codeMsg.textContent = codeEl.value ? 'That code is not right. Try again.' : 'Type the admin code to play.';
         codeEl.hidden = false; codeMsg.hidden = false; codeEl.value = ''; codeEl.focus();
         return;
