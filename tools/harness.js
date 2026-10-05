@@ -579,6 +579,41 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   els.plotDone.fire('click', ev({}));
 }
 
+// ---- the inventory bar ----
+{
+  I.goTo(7); const hm = I.plotWorld(I.myPlot(), 0, 2); I.p.x = hm.x; I.p.z = hm.z; I.p.y = 6.3; I.update(1 / 60, 0);
+  const items = () => [...els.invItems.children].map((b) => b.children[1].textContent + (b.children[2] && b.children[2].className !== 'invcount' ? ' (' + b.children[2].textContent + ')' : '') + ([...b.children].find((c) => c.className === 'invcount') || { textContent: '' }).textContent);
+  I.renderInventory();
+  console.log('inventory shown', !els.inv.hidden, '| stacks:', items().join(', '));
+  if (els.inv.hidden || !items().length) throw new Error('stored dragons should be in the inventory');
+  // buy an upgrader and keep it
+  const rr = (() => { for (let r = 1; r < 20000; r++) { const st = I.stockFor(r); if (st.counts[2] && st.counts[0]) return r; } })(); I.setStockRound(rr);
+  I.p.x = I.upFront.x; I.p.z = I.upFront.z; for (let k = 0; k < 12; k++) raf(46000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(46300);
+  I.giveCoins(-I.coins() + 3000); const own0 = I.upgradersOwned[2];
+  els.upList.children[2].children[1].fire('click', ev({}));
+  console.log('buy a Legendary upgrader: coins', I.coins().toFixed(0), '| owned', own0, '->', I.upgradersOwned[2], '| asks', JSON.stringify(els.upPickT.textContent));
+  els.upCancel.fire('click', ev({})); window.fire('keydown', ev({ code: 'Escape' }));
+  console.log('Back, keep it: owned', I.upgradersOwned[2], '| inventory:', items().filter((t) => /upgrader/.test(t)).join(', '));
+  if (I.upgradersOwned[2] !== own0 + 1 || !items().some((t) => /^Legendary upgrader/.test(t))) throw new Error('a kept upgrader should be in the inventory');
+  // use it from the inventory, on a dragon that already has an upgrader
+  const withUp = I.dragonUpgrades.findIndex((u) => u >= 0 && u !== 2), oldUp = I.dragonUpgrades[withUp];
+  const upBtn = [...els.invItems.children].find((b) => /^Legendary upgrader/.test(b.children[1].textContent)); upBtn.fire('click', ev({ detail: 1 }));
+  console.log('click it in the inventory: panel', JSON.stringify(els.upTitle.textContent), '| asks', JSON.stringify(els.upPickT.textContent));
+  els.upDragons.children[withUp].fire('click', ev({}));
+  console.log('give it to dragon', withUp, '(had a', I.UPGRADERS[oldUp].name, 'upgrader): now', I.UPGRADERS[I.dragonUpgrades[withUp]].name, '| Legendary owned', I.upgradersOwned[2], '| old one back:', I.UPGRADERS[oldUp].name, I.upgradersOwned[oldUp], '| panel closed', !I.upShopOpen(), '| message', said());
+  if (I.dragonUpgrades[withUp] !== 2 || I.upgradersOwned[2] !== own0 || I.upgradersOwned[oldUp] < 1) throw new Error('using an upgrader from the inventory went wrong');
+  // a dragon from the inventory onto the plot
+  I.p.x = hm.x; I.p.z = hm.z; I.update(1 / 60, 0);
+  const dragBtn = () => [...els.invItems.children].find((b) => / dragon$/.test(b.children[1].textContent));
+  const full = I.dragonPlaced.filter(Boolean).length >= I.plotSlots(); dragBtn().fire('click', ev({ detail: 1 }));
+  console.log('click a dragon in the inventory, plot', full ? 'full' : 'has room', ': placed', I.dragonPlaced.filter(Boolean).length, 'of', I.plotSlots(), '| message', said());
+  I.giveCoins(1e6); const sg2 = I.signSpot(); I.p.x = sg2.x; I.p.z = sg2.z; for (let k = 0; k < 12; k++) raf(47000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' }));
+  I.p.x = hm.x; I.p.z = hm.z; I.update(1 / 60, 0); const p0 = I.dragonPlaced.filter(Boolean).length, n0 = els.invItems.children.length; dragBtn().fire('click', ev({ detail: 1 }));
+  console.log('bought a space, click again: placed', p0, '->', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| saved upgraders', store['mutation-mayhem-upgraders']);
+  if (I.dragonPlaced.filter(Boolean).length !== p0 + 1) throw new Error('clicking a dragon in the inventory should place it');
+  I.setStockRound(null); I.giveCoins(-I.coins());
+}
+
 // ---- and once more, as a device with saved progress ----
 if (process.env.SAVED !== '1') {
   const r = require('child_process').spawnSync(process.execPath, [__filename, file], { env: Object.assign({}, process.env, { SAVED: '1' }), encoding: 'utf8' });

@@ -75,9 +75,11 @@
   .who:empty { display: none; }
   .coins {                                  /* coins, under the name: how many, and how many a second your dragons make */
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 7px;
+    gap: 2px 7px;
     width: max-content;
+    max-width: 100%;
     margin: 0 0 8px;
     padding: 3px 13px 3px 6px;
     border-radius: 999px;
@@ -206,6 +208,56 @@
     width: max-content;
   }
   #carry[hidden], #toast[hidden] { display: none; }
+  /* The inventory bar along the bottom */
+  #inv {
+    position: fixed;
+    left: 50%;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(600px, calc(100% - 32px));
+    padding: 6px 10px 6px 12px;
+    border: 3px solid #0d2f37;
+    border-radius: 16px;
+    background: var(--panel);
+    color: var(--panel-ink);
+  }
+  #inv[hidden], body:not(.playing) #inv, body.shopping #inv { display: none; }
+  #inv .invlabel { font-size: 0.8rem; font-weight: 600; writing-mode: vertical-rl; transform: rotate(180deg); opacity: 0.8; }
+  #invItems { display: flex; gap: 6px; overflow-x: auto; padding: 7px 4px 2px; }
+  .invitem {
+    position: relative;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 76px;
+    padding: 5px 4px 4px;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+    color: #0d2f37;
+    background: #fff;
+    border: 2px solid #0d2f37;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .invitem small { font-size: 0.65rem; font-weight: 500; opacity: 0.8; }
+  .invicon { width: 26px; height: 20px; border-radius: 6px; border: 3px solid #0d2f37; }
+  .invcount { position: absolute; top: -7px; right: -6px; padding: 0 6px; border-radius: 999px; background: #0d2f37; color: #ffd23f; font-size: 0.72rem; }
+  .invitem:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+  body.hasinv #carry, body.hasinv #shopOpen { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }   /* sit above the bar */
+  body.hasinv #toast { bottom: calc(168px + env(safe-area-inset-bottom, 0px)); }
+  body.hasinv .keys { max-width: calc(50% - 320px); }
+  @media (max-width: 1100px) { body.hasinv .keys { display: none; } }
+  body.touch #inv { bottom: calc(184px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
+  body.touch.hasinv #carry, body.touch.hasinv #shopOpen { bottom: calc(282px + env(safe-area-inset-bottom, 0px)); }
+  body.touch.hasinv #toast { bottom: calc(338px + env(safe-area-inset-bottom, 0px)); }
   body.touch #carry { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
   body.touch #toast { bottom: calc(254px + env(safe-area-inset-bottom, 0px)); }
   #shopOpen kbd { margin-left: 8px; padding: 1px 8px; border-radius: 7px; background: #0d2f37; color: #ffd23f; font: inherit; font-size: 0.85rem; }
@@ -722,10 +774,11 @@
 
 <div id="carry" role="status" hidden><span id="carryDot"></span><span id="carryText"></span></div>
 <p id="toast" aria-live="polite" hidden></p>
+<div id="inv" role="group" aria-label="Inventory" hidden><span class="invlabel">Inventory</span><div id="invItems"></div></div>
 <button id="shopOpen" type="button" hidden><span id="shopOpenLabel">Open the avatar shop</span><kbd>Enter</kbd></button>
 <div id="plotMenu" role="dialog" aria-labelledby="plotTitle" hidden>
   <h2 id="plotTitle">Your plot</h2>
-  <p class="sub">Dragons on your plot earn coins. Dragons in storage don't.</p>
+  <p class="sub">Dragons on your plot earn coins. Dragons in your inventory don't.</p>
   <p class="have"><span class="coin" aria-hidden="true"></span>You have <b id="plotCoins">0</b> coins</p>
   <p class="restock" id="plotSpace"></p>
   <p class="sub">Want more space? Walk up to the sign with your name on it.</p>
@@ -734,7 +787,7 @@
   <div class="foot"><button id="plotDone" type="button">Done</button></div>
 </div>
 <div id="upShop" role="dialog" aria-label="Upgrade shop" hidden>
-  <h2>Upgrade shop</h2>
+  <h2 id="upTitle">Upgrade shop</h2>
   <p class="sub">An upgrader makes one dragon earn more coins. Better upgraders boost more.</p>
   <p class="have"><span class="coin" aria-hidden="true"></span>You have <b id="upCoins">0</b> coins</p>
   <p class="restock" id="upRestock"></p>
@@ -2363,6 +2416,7 @@ const World = (function () {
   let myPlot = -1;
   let riding = null, flying = false, tapT = 0, jumpWas = false, jumpTapped = false;   // riding (below); jumpTapped: a tap is kept even if it falls between two frames
   const ownDragons = [], dragonUpgrades = [], dragonPlaced = [], plotPets = [], flyers = [];
+  const upgradersOwned = [0, 0, 0, 0, 0];                // upgraders bought but not used yet, waiting in the inventory
   const MAX_SLOTS = 24;
   let plotSlots = 5, placedSaved = null;                 // how many dragons fit on your plot; which ones are on it (null: not saved yet)
   const PLOT_HALF = PLOT / 2 - 0.4;
@@ -2386,6 +2440,7 @@ const World = (function () {
     });
     const sl = +localStorage.getItem('mutation-mayhem-slots');
     if (sl >= 5 && sl <= MAX_SLOTS) plotSlots = Math.floor(sl);
+    (JSON.parse(localStorage.getItem('mutation-mayhem-upgraders') || '[]') || []).slice(0, 5).forEach((n, i) => { upgradersOwned[i] = Number.isInteger(n) && n > 0 ? n : 0; });
     const pl = localStorage.getItem('mutation-mayhem-placed');
     if (pl) placedSaved = JSON.parse(pl);
   } catch (e) { /* nothing saved, start fresh */ }
@@ -2455,6 +2510,7 @@ const World = (function () {
     try {
       localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons));
       localStorage.setItem('mutation-mayhem-upgrades', JSON.stringify(dragonUpgrades)); localStorage.setItem('mutation-mayhem-slots', String(plotSlots));
+      localStorage.setItem('mutation-mayhem-upgraders', JSON.stringify(upgradersOwned));
       localStorage.setItem('mutation-mayhem-placed', JSON.stringify(dragonPlaced.map((on, i) => (on ? i : -1)).filter((i) => i >= 0)));
     } catch (e) { /* not saved, still playable */ }
   }
@@ -2560,9 +2616,9 @@ const World = (function () {
         const kind = pickDragon(hatching.tier);
         const room = placedCount() < plotSlots, i = ownDragons.length;
         ownDragons.push(kind); dragonUpgrades.push(-1); dragonPlaced.push(room); saveProgress();
-        if (room) addPet(kind, true, i);
+        if (room) addPet(kind, true, i); else renderInventory();
         toast('You hatched a ' + DRAGON_KINDS[kind].name + ' dragon! (' + EGG_TIERS[hatching.tier].name + ') It makes ' + DRAGON_COINS[kind] + ' coin' + (DRAGON_COINS[kind] === 1 ? '' : 's') + ' every ' + PAYOUT_SECONDS + ' seconds.'
-          + (room ? '' : ' Your plot is full, so it went into storage. Open your plot to swap dragons.'), room ? 5 : 7);
+          + (room ? '' : ' Your plot is full, so it went into your inventory.'), room ? 5 : 7);
         hatching = null;
       }
     }
@@ -2759,41 +2815,52 @@ const World = (function () {
     if (secs === RESTOCK_SECONDS && upChoice < 0) upRows.forEach((r, i) => { r.left.textContent = stockLeft(i) ? stockLeft(i) + ' left' : 'Out of stock'; });
   }
   function showUpList() { upChoice = -1; upList.hidden = false; upPick.hidden = true; refreshUpShop(); }
-  function chooseUpgrader(i) {                            // step two: which dragon gets it?
+  function chooseUpgrader(i) {                            // buy one: it goes into your inventory, and you can use it straight away
     const u = UPGRADERS[i];
     if (!stockLeft(i)) return;
     if (coins < u.price) { toast('You don\'t have enough money.', 3); return; }
-    if (!ownDragons.length) { toast('Hatch a dragon first, then come back for an upgrader.', 4); return; }
+    coins -= u.price; upgradersOwned[i]++; bought[i] = (bought[i] || 0) + 1;
+    saveProgress(); saveCoins(); renderInventory();
+    try { localStorage.setItem('mutation-mayhem-bought', JSON.stringify({ round: boughtRound, counts: bought })); } catch (e) { /* not saved */ }
+    toast('You bought a ' + u.name + ' upgrader! It\'s in your inventory.', 3);
+    if (ownDragons.length) pickFor(i, 'Use your new ' + u.name + ' upgrader (×' + u.boost + ') now? Pick a dragon, or press Back to keep it in your inventory.');
+    else refreshUpShop();
+  }
+  function pickFor(i, title) {                           // which dragon gets upgrader i?
+    const u = UPGRADERS[i];
     upChoice = i; upList.hidden = true; upPick.hidden = false;
-    $('upPickT').textContent = 'Which dragon gets the ' + u.name + ' upgrader (×' + u.boost + ')?';
+    $('upPickT').textContent = title;
     while (upDragons.firstChild) upDragons.removeChild(upDragons.firstChild);
     ownDragons.forEach((k, d) => {
-      const b = document.createElement('button'), cur = dragonUpgrades[d], base = DRAGON_COINS[k], where = dragonPlaced[d] ? '' : ' (in storage)';
+      const b = document.createElement('button'), cur = dragonUpgrades[d], base = DRAGON_COINS[k], where = dragonPlaced[d] ? '' : ' (in inventory)';
       b.type = 'button';
-      if (cur >= i) { b.disabled = true; b.textContent = DRAGON_KINDS[k].name + ' dragon' + where + ' · already has a ' + UPGRADERS[cur].name + ' upgrader'; }
+      if (cur === i) { b.disabled = true; b.textContent = DRAGON_KINDS[k].name + ' dragon' + where + ' · already has a ' + u.name + ' upgrader'; }
       else b.textContent = DRAGON_KINDS[k].name + ' dragon' + where + ' · ' + fmtRate(base * (cur >= 0 ? UPGRADERS[cur].boost : 1)) + ' → ' + fmtRate(base * u.boost) + ' every ' + PAYOUT_SECONDS + ' seconds';
       b.addEventListener('click', () => applyUpgrade(d));
       upDragons.appendChild(b);
     });
   }
-  function applyUpgrade(d) {
-    const u = UPGRADERS[upChoice];
-    if (!u || dragonUpgrades[d] >= upChoice || !stockLeft(upChoice)) return;
-    if (coins < u.price) { toast('You don\'t have enough money.', 3); return; }
-    coins -= u.price; dragonUpgrades[d] = upChoice; bought[upChoice] = (bought[upChoice] || 0) + 1;
-    saveProgress(); saveCoins();
-    try { localStorage.setItem('mutation-mayhem-bought', JSON.stringify({ round: boughtRound, counts: bought })); } catch (e) { /* not saved */ }
-    toast('Your ' + DRAGON_KINDS[ownDragons[d]].name + ' dragon now makes ' + fmtRate(DRAGON_COINS[ownDragons[d]] * u.boost) + ' coins every ' + PAYOUT_SECONDS + ' seconds!', 4);
-    showUpList();
+  function applyUpgrade(d) {                             // a dragon's old upgrader, if it had one, goes back into the inventory
+    const i = upChoice, u = UPGRADERS[i];
+    if (!u || upgradersOwned[i] < 1 || dragonUpgrades[d] === i) return;
+    const old = dragonUpgrades[d];
+    upgradersOwned[i]--; if (old >= 0) upgradersOwned[old]++;
+    dragonUpgrades[d] = i;
+    saveProgress(); renderInventory();
+    toast('Your ' + DRAGON_KINDS[ownDragons[d]].name + ' dragon now makes ' + fmtRate(DRAGON_COINS[ownDragons[d]] * u.boost) + ' coins every ' + PAYOUT_SECONDS + ' seconds!'
+      + (old >= 0 ? ' Its ' + UPGRADERS[old].name + ' upgrader went back to your inventory.' : ''), 5);
+    if (upFromInv) closeUpShop(); else showUpList();
   }
-  function openUpShop() {
+  let upFromInv = false;                                 // the panel was opened from the inventory, just to use an upgrader
+  function openUpShop(useUpgrader) {                    // useUpgrader: opened from the inventory to use that upgrader
     if (menuOpen() || shopping || !started) return;
-    upShopOpen = true; walking = false;
+    upShopOpen = true; walking = false; upFromInv = useUpgrader !== undefined;
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
     shopBtn.hidden = true; upEl.hidden = false;
     document.body.classList.add('shopping');
-    showUpList();
+    $('upTitle').textContent = upFromInv ? 'Use an upgrader' : 'Upgrade shop';
+    if (upFromInv) { refreshUpShop(); pickFor(useUpgrader, 'Which dragon gets your ' + UPGRADERS[useUpgrader].name + ' upgrader (×' + UPGRADERS[useUpgrader].boost + ')?'); } else showUpList();
     $('upDone').focus();
   }
   function closeUpShop() {
@@ -2803,7 +2870,7 @@ const World = (function () {
     canvas.focus();
   }
   $('upDone').addEventListener('click', closeUpShop);
-  $('upCancel').addEventListener('click', showUpList);
+  $('upCancel').addEventListener('click', () => (upFromInv ? closeUpShop() : showUpList()));
 
   /* ---------- Your plot's menu: which dragons are on it, and more space ---------- */
   /* Stand on your plot and press "Open my plot". Only dragons on the plot earn coins; the rest wait in storage.
@@ -2823,23 +2890,24 @@ const World = (function () {
     ownDragons.map((k, i) => i).sort((a, b) => (dragonPlaced[b] - dragonPlaced[a]) || (dragonValue(b) - dragonValue(a))).forEach((i) => {
       const k = ownDragons[i], row = document.createElement('div'), what = document.createElement('div'), name = document.createElement('b'), note = document.createElement('small'), btn = document.createElement('button');
       row.className = 'uprow' + (dragonPlaced[i] ? '' : ' out'); what.className = 'what';
-      name.textContent = DRAGON_KINDS[k].name + ' dragon' + (dragonPlaced[i] ? '' : ' (in storage)');
+      name.textContent = DRAGON_KINDS[k].name + ' dragon' + (dragonPlaced[i] ? '' : ' (in inventory)');
       note.textContent = fmtRate(dragonValue(i)) + ' coins every ' + PAYOUT_SECONDS + ' seconds' + (dragonUpgrades[i] >= 0 ? ' · ' + UPGRADERS[dragonUpgrades[i]].name + ' upgrader' : '');
-      btn.type = 'button'; btn.textContent = dragonPlaced[i] ? 'Store' : 'Place';
+      btn.type = 'button'; btn.textContent = dragonPlaced[i] ? 'To inventory' : 'Place';
       btn.addEventListener('click', () => (dragonPlaced[i] ? storeDragon(i) : placeDragon(i)));
       what.appendChild(name); what.appendChild(note); row.appendChild(what); row.appendChild(btn); plotList.appendChild(row);
     });
   }
   function placeDragon(i) {
     if (dragonPlaced[i]) return;
-    if (placedCount() >= plotSlots) { toast('Your plot is full. Store a dragon or buy more space first.', 4); return; }
-    dragonPlaced[i] = true; addPet(ownDragons[i], true, i); saveProgress(); refreshPlotMenu();
+    if (myPlot < 0) { toast('Walk onto a plot first, then you can put dragons on it.', 4); return; }
+    if (placedCount() >= plotSlots) { toast('Your plot is full. Put a dragon in your inventory or buy more space first.', 4); return; }
+    dragonPlaced[i] = true; addPet(ownDragons[i], true, i); saveProgress(); renderInventory(); if (plotMenuOpen) refreshPlotMenu();
   }
   function storeDragon(i) {
     if (!dragonPlaced[i]) return;
     const at = plotPets.findIndex((d) => d.index === i);
     if (at >= 0) { if (plotPets[at] === riding) return; scene.remove(plotPets.splice(at, 1)[0].root); }
-    dragonPlaced[i] = false; saveProgress(); refreshPlotMenu();
+    dragonPlaced[i] = false; saveProgress(); renderInventory(); if (plotMenuOpen) refreshPlotMenu();
   }
   function buySpace() {
     if (plotSlots >= MAX_SLOTS) return;
@@ -2866,6 +2934,45 @@ const World = (function () {
     canvas.focus();
   }
   $('plotDone').addEventListener('click', closePlotMenu);
+
+  /* ---------- The inventory bar ---------- */
+  /* Along the bottom: dragons that aren't on your plot, and upgraders you haven't used. Matching ones stack.
+     Click a dragon to put it on your plot; click an upgrader to choose which dragon gets it. */
+  const invEl = $('inv'), invItems = $('invItems');
+  const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+  const UP_COLOURS = [0x9a6a3f, 0x8a5ad6, 0xe8c53a, 0xc8901e, 0xef6fae];
+  function invButton(title, sub, count, icon, onClick) {
+    const b = document.createElement('button'), ic = document.createElement('span'), t = document.createElement('span'), st = document.createElement('small');
+    b.type = 'button'; b.className = 'invitem'; b.title = title + (sub ? ', ' + sub : '');
+    ic.className = 'invicon'; Object.assign(ic.style, icon);
+    t.textContent = title; st.textContent = sub;
+    b.appendChild(ic); b.appendChild(t); if (sub) b.appendChild(st);
+    if (count > 1) { const c = document.createElement('span'); c.className = 'invcount'; c.textContent = '×' + count; b.appendChild(c); }
+    b.addEventListener('click', (e) => { onClick(); if (e.detail > 0) b.blur(); });
+    invItems.appendChild(b);
+  }
+  function renderInventory() {
+    while (invItems.firstChild) invItems.removeChild(invItems.firstChild);
+    const groups = new Map();                            // same colour and same upgrader: one stack
+    ownDragons.forEach((k, i) => { if (dragonPlaced[i]) return; const key = k + '|' + dragonUpgrades[i]; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i); });
+    groups.forEach((list) => {
+      const i = list[0], c = DRAGON_KINDS[ownDragons[i]];
+      invButton(c.name + ' dragon', dragonUpgrades[i] >= 0 ? UPGRADERS[dragonUpgrades[i]].name + ' upgrader' : '', list.length,
+        { background: hex(c.body), borderColor: hex(c.wing) }, () => placeDragon(i));
+    });
+    upgradersOwned.forEach((n, i) => {
+      if (n > 0) invButton(UPGRADERS[i].name + ' upgrader', '×' + UPGRADERS[i].boost + ' coins', n, { background: hex(UP_COLOURS[i]), borderRadius: '50%' }, () => useUpgrader(i));
+    });
+    const any = invItems.children.length > 0;
+    invEl.hidden = !any;
+    document.body.classList[any ? 'add' : 'remove']('hasinv');
+  }
+  function useUpgrader(i) {
+    if (!ownDragons.length) { toast('Hatch a dragon first, then you can use your upgrader.', 4); return; }
+    if (riding) { toast('Get off your dragon first.', 3); return; }
+    openUpShop(i);
+  }
+  renderInventory();
 
   /* ---------- Lucky blocks ---------- */
   /* Yellow "?" blocks hidden around the island. Walk into one to pick it up, carry it to your plot before its
@@ -3434,7 +3541,7 @@ const World = (function () {
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, UPGRADERS, dragonUpgrades, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
-    carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
+    upgradersOwned, renderInventory, carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();
