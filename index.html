@@ -73,6 +73,22 @@
     font-weight: 600;
   }
   .who:empty { display: none; }
+  .coins {                                  /* coins, under the name: how many, and how many a second your dragons make */
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: max-content;
+    margin: 0 0 8px;
+    padding: 3px 13px 3px 6px;
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--panel-ink);
+    font-size: 0.98rem;
+    font-weight: 600;
+  }
+  .coin { width: 18px; height: 18px; border-radius: 50%; background: #ffc21f; border: 2px solid #b8860b; box-shadow: inset 0 0 0 2px #ffe07a; }
+  #coinRate { font-weight: 500; opacity: 0.8; }
+  #coinRate:not(:empty)::before { content: '·'; margin-right: 6px; }
   .who .badge {                             /* shown next to an admin's name */
     margin-left: 8px;
     padding: 1px 9px;
@@ -650,6 +666,7 @@
 
 <div class="where">
   <p class="who" id="who"></p>
+  <p class="coins" id="coins"><span class="coin" aria-hidden="true"></span><b id="coinCount">0</b> coins<span id="coinRate"></span></p>
   <p class="zone" id="zone" aria-live="polite"></p>
   <div class="places" id="places" role="group" aria-label="Jump to a place"></div>
   <p class="hint" id="hint" aria-live="polite"></p>
@@ -2312,6 +2329,25 @@ const World = (function () {
     (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k) => { if (DRAGON_KINDS[k]) ownDragons.push(k); });
   } catch (e) { /* nothing saved, start fresh */ }
   if (myPlot >= 0) ownDragons.slice(-24).forEach((k) => addPet(k, false));
+  /* Coins. Every dragon you own makes coins each second while you play; rarer dragons make more
+     (jade a little more than diamond, being the rarer of the two). Kept on this device. */
+  const COINS_PER_SECOND = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60 };
+  let coins = 0, coinsShown = -1, rateShown = -1, coinSaveT = 0;
+  try { coins = Math.max(0, +localStorage.getItem('mutation-mayhem-coins') || 0); } catch (e) { /* none saved */ }
+  const coinRate = () => ownDragons.reduce((sum, k) => sum + (COINS_PER_SECOND[k] || 0), 0);
+  const coinCountEl = $('coinCount'), coinRateEl = $('coinRate');
+  function saveCoins() { try { localStorage.setItem('mutation-mayhem-coins', String(Math.floor(coins))); } catch (e) { /* not saved, still playable */ } }
+  window.addEventListener('pagehide', saveCoins);        // closing the tab keeps the last few seconds too
+  function earn(dt) {                                   // dt here is real time, so slow computers earn as fast as quick ones
+    if (started) {
+      coins += coinRate() * dt;
+      coinSaveT += dt;
+      if (coinSaveT > 5) { coinSaveT = 0; saveCoins(); }
+    }
+    const c = Math.floor(coins), r = coinRate();
+    if (c !== coinsShown) { coinsShown = c; coinCountEl.textContent = c.toLocaleString('en-US'); }
+    if (r !== rateShown) { rateShown = r; coinRateEl.textContent = r ? '+' + r.toLocaleString('en-US') + ' a second' : 'hatch dragons to earn'; }
+  }
   function nameMyPlot() { if (myPlot >= 0) paintSign(myPlot, playerName + '\'s Plot'); }   // the sign says whose plot it is
   function saveProgress() {
     try { localStorage.setItem('mutation-mayhem-plot', String(myPlot)); localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons)); } catch (e) { /* not saved, still playable */ }
@@ -2413,7 +2449,7 @@ const World = (function () {
         scene.remove(hatching.mesh);
         const kind = pickDragon(hatching.tier);
         ownDragons.push(kind); saveProgress(); addPet(kind, true);
-        toast('You hatched a ' + DRAGON_KINDS[kind].name + ' dragon! (' + EGG_TIERS[hatching.tier].name + ')', 5);
+        toast('You hatched a ' + DRAGON_KINDS[kind].name + ' dragon! (' + EGG_TIERS[hatching.tier].name + ') It makes ' + COINS_PER_SECOND[kind] + ' coin' + (COINS_PER_SECOND[kind] === 1 ? '' : 's') + ' a second.', 5);
         hatching = null;
       }
     }
@@ -2699,7 +2735,7 @@ const World = (function () {
   function leave() {
     if (!started) return;
     closeShop(); shopBtn.hidden = true; avatar.visible = false;
-    dropEgg(); dismount(true); toastEl.hidden = true;
+    dropEgg(); dismount(true); saveCoins(); toastEl.hidden = true;
     started = false; isAdmin = false; setRadar(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
@@ -2966,8 +3002,9 @@ const World = (function () {
   let last = performance.now(), frame = 0, coverTurn = 0.9;
   function tick(now) {
     requestAnimationFrame(tick);
-    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)), time = now / 1000;
+    const real = Math.max(0, (now - last) / 1000), dt = Math.min(0.05, real), time = now / 1000;
     last = now;
+    earn(Math.min(real, 5));                              // coins follow the real clock (a long gap, like a hidden tab, counts as 5 seconds at most)
     resize();
     if (started && !shopping) update(dt, time);
     else if (!started) {                                  // the front cover: circle the island from the air
@@ -2994,7 +3031,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, COINS_PER_SECOND, earn,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();

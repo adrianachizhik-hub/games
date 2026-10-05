@@ -186,6 +186,7 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 - **Shopkeeper:** a stylish girl behind the blue stall's counter (pink jacket, white top, purple skirt, gold belt, white boots, sunglasses, gold jewellery, teal beret and handbag, long high ponytail with pink tips). She sways and waves when the player is near. She has no name yet.
 
 ### Saved on the device (`localStorage`)
+- `mutation-mayhem-coins`: whole coins. Every dragon you own earns coins each second while you play (`COINS_PER_SECOND`: green and red 1, blue and purple 3, bronze and silver 8, gold and ruby 20, diamond 50, jade 60). Counted on the real clock in `tick` (`earn`), so slow devices earn as fast; a gap such as a hidden tab counts 5 seconds at most; nothing is earned on the front cover. Saved every 5 seconds, on Leave and when the tab closes. Coins can't be spent on anything yet.
 - `mutation-mayhem-name`: the player's display name.
 - `mutation-mayhem-name-locked`: `'1'` once the player answered "I'm sure" to "Are you sure <name> is your name? You can't change it later." (asked the first time a name is used, Back or I'm sure). After that the name box is filled in and any other name is refused with "Your name is X. Names can't be changed." (capitals don't matter). An empty name plays as "Player" and locks nothing. The admin name skips the question, is never locked, and never replaces a locked name. Clearing the site's data in the browser is the only way to unlock, which Adriana has not been told how to do.
 - `mutation-mayhem-avatar`: the `AV` object as JSON.
@@ -197,7 +198,7 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 **Not built**
 - The starter pets (dog, cat, parrot) and pets following you. Dragons from eggs do live on your plot (see "Dragons and eggs").
 - The red, green, and yellow shops. Their purposes are undecided, though one is presumably the pet shop.
-- Coins, prices, buying.
+- Spending coins: prices and buying (coins are earned by dragons, see Saved on the device).
 - Mutation blocks, mutations, rarities.
 - Admin commands other than the egg radar.
 - Saving coins and other progress (the name, avatar, plot and dragons are saved).

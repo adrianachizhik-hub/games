@@ -92,7 +92,7 @@ const wl = {};
 const window = { THREE, matchMedia: () => ({ matches: false }), addEventListener(n, f) { (wl[n] = wl[n] || []).push(f); }, fire(n, e) { (wl[n] || []).forEach((f) => f(e)); }, innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1 };
 // SAVED=1: a device that has played before, with a claimed plot and some dragons already saved.
 // Without it the device starts fresh, and at the very end the harness runs itself again with SAVED=1.
-const store = process.env.SAVED !== '1' ? {} : { 'mutation-mayhem-plot': '2', 'mutation-mayhem-dragons': JSON.stringify(['green', 'ruby', 'blue']) };
+const store = process.env.SAVED !== '1' ? {} : { 'mutation-mayhem-plot': '2', 'mutation-mayhem-dragons': JSON.stringify(['green', 'ruby', 'blue']), 'mutation-mayhem-coins': '500' };
 const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
 const sandbox = { localStorage, window, document, THREE, performance: { now: () => 0 }, requestAnimationFrame: (f) => { raf = f; }, console, Math, Float32Array, Uint8Array, Uint16Array, Uint8ClampedArray, Map, Set, Infinity };
 vm.createContext(sandbox);
@@ -304,6 +304,9 @@ if (process.env.SAVED === '1') {
   console.log('saved progress: plot', I.myPlot() + 1, '| dragons', JSON.stringify(I.ownDragons), '| on the plot', I.plotPets.map((d) => d.kind).join(','));
   if (I.myPlot() !== 2 || I.plotPets.length !== 3) throw new Error('saved plot or dragons did not come back');
   els.start.fire('click', ev({ pointerType: 'mouse' })); I.goTo(7); I.mount(I.plotPets[1]); I.update(1 / 60, 0); raf(30000); raf(30016);
+  { const c0 = I.coins(); for (let f = 0; f < 300; f++) I.earn(1 / 60);
+    console.log('saved progress coins: rate', I.coinRate(), '(green 1 + ruby 20 + blue 3) | earned in 5 s', (I.coins() - c0).toFixed(0), '| saved', store['mutation-mayhem-coins']);
+    if (I.coinRate() !== 24 || Math.abs(I.coins() - c0 - 120) > 1) throw new Error('coin rate wrong for saved dragons'); }
   console.log('ride a saved dragon: riding', I.riding().kind, '| sign on the saved plot', JSON.stringify(I.signLabels[2]));
   if (I.signLabels[2] !== I.name() + "'s Plot") throw new Error('saved plot sign not named');
   I.dismount(true); process.exit(0);
@@ -311,7 +314,7 @@ if (process.env.SAVED === '1') {
 
 // ---- dragon eggs: claim a plot, find eggs, carry them home, hatch ----
 const E = I.EGG_TIERS, said = () => JSON.stringify(els.toast.hidden ? '' : els.toast.textContent);
-const tick = (secs) => { for (let f = 0; f < secs * 60; f++) { I.update(1 / 60, f / 60); I.eggsAnimate(1 / 60, f / 60); } };
+const tick = (secs) => { for (let f = 0; f < secs * 60; f++) { I.update(1 / 60, f / 60); I.eggsAnimate(1 / 60, f / 60); I.earn(1 / 60); } };
 const stand = (spot) => { I.p.x = spot.x; I.p.z = spot.z; I.p.y = spot.y; I.p.vy = 0; I.p.onGround = true; I.p.dungeon = !!spot.dungeon; I.p.inLid = !!spot.cave; I.p.inCave = !!spot.cave; };
 const zonesOf = (t) => { const z = {}; t.spots.forEach((s) => { stand(s); const n = I.zoneName(); z[n] = (z[n] || 0) + 1; }); return JSON.stringify(z); };
 I.goTo(0);
@@ -339,6 +342,8 @@ console.log('walk into my plot        : carrying', !!I.carrying(), '| hatching',
 tick(2);
 console.log('2 seconds later          : dragons', JSON.stringify(I.ownDragons), '| pets on plot', I.plotPets.length, '| message', said(), '| egg back out elsewhere', common.g.visible && common.spot !== oldSpot);
 if (I.ownDragons.length !== 1 || !['green', 'red'].includes(I.ownDragons[0])) throw new Error('common egg did not hatch a green or red dragon');
+{ const c0 = I.coins(); tick(10); console.log('coins with one', I.ownDragons[0], 'dragon : rate', I.coinRate(), 'a second | earned in 10 s', (I.coins() - c0).toFixed(1), '| shown', JSON.stringify(els.coinCount.textContent), JSON.stringify(els.coinRate.textContent));
+  if (Math.abs(I.coins() - c0 - 10) > 0.2) throw new Error('a common dragon should make 1 coin a second'); }
 // a prismatic egg in the mine, and nobody takes it home
 const pris = I.eggs.find((e) => e.tier === 4); stand(pris.spot); tick(0.1);
 const pc = I.carrying(); console.log('touch the Prismatic egg  : carrying', !!pc, '| time', pc && pc.total, 's | zone', I.zoneName());
