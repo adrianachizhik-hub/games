@@ -210,6 +210,15 @@
   #talk .talkrow[hidden] { display: none; }
   #talk button { font: inherit; font-weight: 600; padding: 6px 14px; border: 3px solid #0d2f37; border-radius: 12px; cursor: pointer; color: #0d2f37; }
   #talkYes { background: #ffd23f; }
+  #keypad { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(300px, calc(100vw - 32px)); padding: 14px 18px; border: 4px solid #0d2f37; border-radius: 18px; background: #2a2f33; color: #fff; box-shadow: 0 6px 0 #0d2f37; z-index: 30; }
+  #keypad[hidden] { display: none; }
+  #keypad h2 { margin: 0 0 4px; font-size: 1.3rem; } #keypad .sub { margin: 0 0 10px; opacity: 0.85; }
+  #kpScreen { margin: 0 0 12px; padding: 8px; border-radius: 10px; background: #0d1a0a; color: #39ff14; font: 700 2rem/1 "Courier New", monospace; letter-spacing: 0.5em; text-align: center; }
+  #kpKeys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  #kpKeys button, #kpClose { font: inherit; font-weight: 700; font-size: 1.2rem; padding: 10px 0; border: 3px solid #0d2f37; border-radius: 12px; background: #d8dde2; color: #0d2f37; cursor: pointer; }
+  #kpKeys button.ok { background: #39ff14; } #keypad .foot { margin-top: 10px; } #kpClose { width: 100%; font-size: 1rem; background: #fff; }
+  #talk #talkSkip { position: absolute; top: 8px; right: 10px; padding: 2px 10px; font-size: 0.85rem; background: #fff; }
+  #talkSkip[hidden] { display: none; }
   #talkNo { background: #fff; }
   #talk button:focus-visible, #talkBtn:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
   #shopOpen[hidden], #avatarShop[hidden], #upShop[hidden], #upList[hidden], #upPick[hidden], #plotMenu[hidden], #secretShop[hidden], #sellShop[hidden], #allShop[hidden], .effect[hidden] { display: none; }
@@ -653,6 +662,8 @@
   }
   .for-touch { display: none; }
   body.touch.playing #jump, body.touch.playing #stick { display: block; }
+  #dive { position: fixed; right: calc(30px + env(safe-area-inset-right, 0px)); bottom: calc(190px + env(safe-area-inset-bottom, 0px)); width: 72px; height: 72px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.75); background: rgba(16, 52, 60, 0.3); color: #fff; font: inherit; font-weight: 600; display: none; touch-action: none; }
+  body.touch.playing #dive:not([hidden]) { display: block; }
   body.touch .keys, body.touch .places .num, body.touch .for-mouse { display: none; }
   body.touch .places button { padding-left: 13px; }
   body.touch .for-touch { display: block; }
@@ -919,6 +930,7 @@
 
 <div id="stick"><div id="knob"></div></div>
 <button id="jump" type="button">Jump</button>
+<button id="dive" type="button" hidden>Down</button>
 <button id="leave" type="button">Leave</button>
 
 <div id="admin" hidden>
@@ -940,6 +952,7 @@
 <div id="talk" role="dialog" aria-labelledby="talkWho" hidden>
   <p class="talkwho" id="talkWho"></p>
   <p id="talkText"></p>
+  <button id="talkSkip" type="button" hidden>Skip ⏭</button>
   <div class="talkrow"><button id="talkYes" type="button"></button><button id="talkNo" type="button"></button></div>
 </div>
 <button id="shopOpen" type="button" hidden><span id="shopOpenLabel">Open the avatar shop</span><kbd>Enter</kbd></button>
@@ -975,7 +988,15 @@
   <p class="have"><span class="coin" aria-hidden="true"></span>You have <b id="secretCoins">0</b> coins</p>
   <p class="restock" id="secretRes"></p>
   <div class="uprow"><div class="what"><b>Fire resistance</b><small>Reach into the fire village's bonfire. Lasts 5 minutes; buying more adds time.</small></div><button id="secretBuy" type="button"></button></div>
+  <div class="uprow"><div class="what"><b>Radioactive resistant upgrader</b><small>Lets you into the nuke bunker without the radiation bouncing you back. Lasts 5 minutes; buying more adds time.</small></div><button id="secretBuyRad" type="button"></button></div>
   <div class="foot"><button id="secretDone" type="button">Done</button></div>
+</div>
+<div id="keypad" role="dialog" aria-label="Bunker keypad" hidden>
+  <h2>Bunker keypad</h2>
+  <p class="sub">Type the 4-number code.</p>
+  <div id="kpScreen">----</div>
+  <div id="kpKeys"></div>
+  <div class="foot"><button id="kpClose" type="button">Close</button></div>
 </div>
 <div id="upShop" role="dialog" aria-label="Upgrade shop" hidden>
   <h2 id="upTitle">Upgrade shop</h2>
@@ -1096,6 +1117,7 @@ const World = (function () {
   /* The flat sand circle for the plots and shops. It sits as near the middle of
      the island as the river allows: x, z, radius and ground height. */
   const HUB = { x: 26, z: -26, r: 33, h: 6.3 };
+  const BUNKER = { x: 84, z: 84, r: 10, h: 3.4 };          // the nuke bunker, on the far north-east corner
   function mountainAt(x, z) {                            // the peaks blended into one range
     let s = 0;
     for (const pk of PEAKS) {
@@ -1151,6 +1173,8 @@ const World = (function () {
     }
     const hubK = 1 - smoothstep(HUB.r, HUB.r + 8, Math.hypot(x - HUB.x, z - HUB.z));
     if (hubK > 0) h = lerp(h, HUB.h, hubK);              // level the ground for the town circle
+    const bunK = 1 - smoothstep(BUNKER.r, BUNKER.r + 6, Math.hypot(x - BUNKER.x, z - BUNKER.z));
+    if (bunK > 0) h = lerp(h, BUNKER.h, bunK);           // and for the nuke bunker
     // river from the basin to the sea
     const tr = -a.t;
     if (tr > 4) {
@@ -1226,7 +1250,7 @@ const World = (function () {
     return smoothstep(0, 9, Math.min(a.t - tA, tB - a.t));
   }
   return {
-    vnoise, fbm, smoothstep, lerp, rng, C, U, P, B, CH_T, POOL, HUB, PEAKS, axisPoint, axisCoords, coastS, mountainAt,
+    vnoise, fbm, smoothstep, lerp, rng, C, U, P, B, CH_T, POOL, HUB, BUNKER, PEAKS, axisPoint, axisCoords, coastS, mountainAt,
     riverLat, southF, jungleF, desertF,
     caveOffset, caveWidth, caveDepth, RB_AXIS, SIZE, N, CELL, V, HALF, HT, H, CE, lid, bil, lidAt,
     get tA() { return tA; }, get tB() { return tB; }
@@ -1365,6 +1389,7 @@ const World = (function () {
     if (W.lidAt(x, z)) return null;
     if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 3 || Math.hypot(x - SECRET.x, z - SECRET.z) < 3.2) return null;   // nothing grows there either (the jungle grows right up to the secret shop)
     if (Math.hypot(x - W.HUB.x, z - W.HUB.z) < W.HUB.r + 3) return null;      // keep the town circle clear
+    if (Math.hypot(x - W.BUNKER.x, z - W.BUNKER.z) < W.BUNKER.r + 4) return null;   // and the nuke bunker
     const h = W.bil(H, x, z);
     if (W.bil(HT, x, z) - h > 0.1) return null;
     const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL);
@@ -2457,6 +2482,7 @@ const World = (function () {
   /* ---------- Input ---------- */
   const keys = new Set();
   const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 }, look = { id: null, x: 0, y: 0 };
+  let touchDive = false;
   let started = false, touchJump = false, mouseDrag = false, lastMX = 0, lastMY = 0;
   const intro = $('intro'), stick = $('stick'), knob = $('knob'), jumpBtn = $('jump');
   const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -2532,6 +2558,11 @@ const World = (function () {
        Much bigger than the others (big), extremely fast, 10 billion coins a second, and it shoots lightning. The first
        admin's is a boy (deep blue, thick dark-tipped horns, a chin spike, a gold king's crown), the second admin's a girl
        (sky blue and violet, eyelashes, a silver tiara with a pink gem). Both wear a lightning saddle. */
+    /* Nuke dragons, from the nuke bunker's egg: glowing radioactive green with yellow-and-black hazard stripes and a
+       radiation sign on each side. A little better than fire dragons. The boy has black horns and a chin spike, the girl
+       eyelashes and a hazard-yellow bow. */
+    nukeboy:   { name: 'Nuke (boy)',  body: 0x39ff14, dark: 0x1a7a10, belly: 0xd8ff8a, spike: 0x1d1f22, wing: 0x7dff4a, wing2: 0x2bd60a, gem: 0xeaff7a, nuke: 'boy' },
+    nukegirl:  { name: 'Nuke (girl)', body: 0x7dff5a, dark: 0x2a9a20, belly: 0xffd6f0, spike: 0x1d1f22, wing: 0xb0ff8a, wing2: 0x5fe03a, gem: 0xeaff7a, nuke: 'girl' },
     stormboy:  { name: 'Storm (boy)',  body: 0x1f5fff, dark: 0x0a2f8a, belly: 0x9fe8ff, spike: 0xe8fbff, wing: 0x3fa0ff, wing2: 0x1a66d6, gem: 0xbff6ff, storm: 'boy', big: 2.3 },
     stormgirl: { name: 'Storm (girl)', body: 0x5aa8ff, dark: 0x3a5fd0, belly: 0xeadcff, spike: 0xffd6f5, wing: 0xa8d4ff, wing2: 0xb08cff, gem: 0xffd6f5, storm: 'girl', big: 2.3 }
   };
@@ -2542,7 +2573,8 @@ const World = (function () {
     { name: 'Legendary', shell: 0xf8e45c, spot: 0xffffff, base: 20, count: 3, hatch: [['bronze', 1], ['silver', 1]] },
     { name: 'Mythic',    shell: 0xc8901e, spot: 0xffe9a0, base: 17, count: 2, hatch: [['gold', 1], ['ruby', 1]], shiny: true },
     { name: 'Prismatic', swirl: [0xef6fae, 0xf08a2c, 0xf6c93b, 0x4fd1c5, 0x3f7fd6, 0x8a5ad6], base: 15, count: 1, hatch: [['diamond', 3], ['jade', 2]], shiny: true },
-    { name: 'Fire', shell: 0xd8241a, spot: 0xffb020, base: 15, count: 0, hatch: [['fireboy', 1], ['firegirl', 1]], shiny: true }   // only from the fire village's bonfire
+    { name: 'Fire', shell: 0xd8241a, spot: 0xffb020, base: 15, count: 0, hatch: [['fireboy', 1], ['firegirl', 1]], shiny: true },
+    { name: 'Nuke', shell: 0x39ff14, spot: 0x1d1f22, base: 13, count: 0, hatch: [['nukeboy', 1], ['nukegirl', 1]], shiny: true }   // only from the nuke bunker   // only from the fire village's bonfire
   ];
   const EXTRA_PER_UNIT = 1 / 7;                          // seconds of extra time for each unit the egg is from your plot
   const metalMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60, specular: 0x8a8a8a });
@@ -2604,6 +2636,7 @@ const World = (function () {
     .map(([lx, lz]) => ({ x: DG.x + lx, y: DG.floor, z: DG.z + lz, dungeon: true }));
 
   EGG_TIERS[5].spots = [];                              // the fire egg only ever appears in the village bonfire
+  EGG_TIERS[6].spots = [];                              // and the nuke egg only in the nuke bunker
   /* Every hiding place, from beaches to the mine, goes into one list, and any egg can turn up at any of them, at random
      (Adriana: "the prismatic doesn't just spawn in the secret mine"). Rare eggs stay rare because fewer are out at once. */
   const eggSpots = [].concat(...EGG_TIERS.map((t) => t.spots));
@@ -2692,6 +2725,23 @@ const World = (function () {
         [-0.08, 0.06, 0.2].forEach((z, k) => B(body, head, 0.05, 0.24 - k * 0.04, 0.12, k % 2 ? OR : Y, 0, 0.42, z));   // flame crest
       }
     }
+    if (c.nuke) {                                                            // nuke dragons: hazard stripes, radiation signs, glowing drips
+      [-0.36, -0.12, 0.12, 0.36].forEach((z, k) => B(body, O, 0.72, 0.06, 0.12, k % 2 ? 0x1d1f22 : 0xffd23f, 0, 1.06, z));
+      [-1, 1].forEach((s) => {
+        B(body, O, 0.03, 0.34, 0.34, 0xffd23f, s * 0.36, 0.78, 0.02);
+        B(body, O, 0.035, 0.07, 0.07, 0x1d1f22, s * 0.365, 0.78, 0.02);
+        [0, 2.094, 4.189].forEach((a) => B(body, O, 0.035, 0.11, 0.08, 0x1d1f22, s * 0.365, 0.78 + Math.cos(a) * 0.1, 0.02 + Math.sin(a) * 0.1, a, 0, 0));
+      });
+      [[-0.2, -0.3], [0.15, -0.05], [-0.1, 0.25], [0.2, 0.3]].forEach(([x, z]) => B(body, O, 0.06, 0.14, 0.06, 0xb6ff3d, x, 0.36, z));   // drips
+      if (c.nuke === 'girl') {
+        [-0.17, 0.17].forEach((x) => { for (let k = -1; k <= 1; k++) B(body, head, 0.03, 0.09, 0.02, 0x0a1a08, x + k * 0.05, 0.26, -0.29, 0, 0, k * 0.4); });
+        const bow = J(head, 0.16, 0.4, -0.02, 0, 0, -0.3);
+        B(body, bow, 0.2, 0.17, 0.08, 0xffd23f, -0.12, 0, 0, 0, 0, 0.5); B(body, bow, 0.2, 0.17, 0.08, 0xffd23f, 0.12, 0, 0, 0, 0, -0.5); B(body, bow, 0.09, 0.1, 0.1, 0x1d1f22, 0, 0, 0);
+      } else {
+        [-1, 1].forEach((s) => { const hr = J(head, s * 0.22, 0.34, 0.1, 0.75, 0, s * -0.4); B(body, hr, 0.11, 0.36, 0.11, 0x1d1f22, 0, 0.14, 0); B(body, hr, 0.08, 0.24, 0.08, 0xb6ff3d, 0, 0.36, 0.07, 0.7, 0, 0); });
+        B(body, head, 0.07, 0.2, 0.07, 0x1d1f22, 0, -0.3, -0.44, -0.4, 0, 0);
+      }
+    }
     if (c.storm) {
       B(body, neck, 0.32, 0.52, 0.3, c.body, 0, 0.56, -0.06, -0.12); B(body, neck, 0.24, 0.46, 0.04, c.belly, 0, 0.54, -0.22, -0.12);   // the long neck
       [-1, 1].forEach((s) => {                                              // a crown of horns sweeping back
@@ -2736,6 +2786,8 @@ const World = (function () {
     return (dragonGeos[kind] = { body: merge(body), wings: wings.map(merge) });
   }
   const sparkGeo = new THREE.BoxGeometry(0.05, 0.05, 0.42), sparkMat = new THREE.MeshBasicMaterial({ color: 0xbff6ff }), sparkMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const sparkMatY = new THREE.MeshBasicMaterial({ color: 0xfff27a });
+  function addSparks(d, mat) { d.sparks = []; for (let k = 0; k < 10; k++) { const m = new THREE.Mesh(sparkGeo, k % 3 ? mat : sparkMat2); m.visible = false; d.root.add(m); d.sparks.push(m); } }
   const petSize = (d) => 0.75 * (DRAGON_KINDS[d.kind].big || 1);
   function sparkStep(d, dt) {                            // every few hundredths of a second the sparks jump somewhere new
     if (!d.sparks || reduced) return;
@@ -2756,12 +2808,9 @@ const World = (function () {
     const stars = c.gem ? [[-0.55, 1.5, -0.2, 0.8], [0.6, 1.25, 0.1, 0.65], [-0.2, 1.85, 0.3, 0.5], [0.5, 0.55, -0.5, 0.55]].map(([x, y, z, k]) => twinkle(root, x, y, z, k)) : [];
     root.scale.set(0.75, 0.75, 0.75);
     scene.add(root);
-    let sparks = null;
-    if (c.storm) {                                       // little bolts that crackle around it
-      sparks = [];
-      for (let k = 0; k < 10; k++) { const m = new THREE.Mesh(sparkGeo, k % 3 ? sparkMat : sparkMat2); m.visible = false; root.add(m); sparks.push(m); }
-    }
-    return { kind, root, wings, stars, flap: 0, sparks, sparkT: 0 };
+    const d = { kind, root, wings, stars, flap: 0, sparks: null, sparkT: 0 };
+    if (c.storm) addSparks(d, sparkMat);                 // little bolts that crackle around it
+    return d;
   }
   function flapWings(d, speed, amount, time) {
     d.flap = Math.sin(time * speed) * amount;
@@ -2771,7 +2820,7 @@ const World = (function () {
   /* Your plot. Points on it are measured in the plot's own frame: lz points away from the middle of town. */
   let myPlot = -1;
   let riding = null, flying = false, tapT = 0, jumpWas = false, jumpTapped = false;   // riding (below); jumpTapped: a tap is kept even if it falls between two frames
-  const ownDragons = [], dragonUpgrades = [], dragonPlaced = [], dragonSpeed = [], dragonOutfit = [], dragonNames = [], plotPets = [], flyers = [];   // dragonNames: from a name collar, '' for none   // dragonOutfit: which outfit it wears, -1 none   // dragonSpeed: % faster, from every upgrader it was given
+  const ownDragons = [], dragonUpgrades = [], dragonPlaced = [], dragonSpeed = [], dragonOutfit = [], dragonNames = [], dragonMutation = [], plotPets = [], flyers = [];   // dragonMutation: 'lightning' or ''   // dragonNames: from a name collar, '' for none   // dragonOutfit: which outfit it wears, -1 none   // dragonSpeed: % faster, from every upgrader it was given
   const upgradersOwned = [0, 0, 0, 0, 0];                // upgraders bought but not used yet, waiting in the inventory
   const MAX_SLOTS = 24;
   let plotSlots = 5, placedSaved = null;                 // how many dragons fit on your plot; which ones are on it (null: not saved yet)
@@ -2794,12 +2843,14 @@ const World = (function () {
     const spd = JSON.parse(localStorage.getItem('mutation-mayhem-speed') || '[]') || [];
     const outf = JSON.parse(localStorage.getItem('mutation-mayhem-dragon-outfits') || '[]') || [];
     const nms = JSON.parse(localStorage.getItem('mutation-mayhem-dragon-names') || '[]') || [];
+    const muts = JSON.parse(localStorage.getItem('mutation-mayhem-mutations') || '[]') || [];
     (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k, i) => {
       if (!DRAGON_KINDS[k] || DRAGON_KINDS[k].storm) return;     // storm dragons are admin-only: they come back when an admin signs in
       ownDragons.push(k); dragonUpgrades.push(Number.isInteger(ups[i]) && ups[i] >= 0 && ups[i] < 5 ? ups[i] : -1);
       dragonSpeed.push(typeof spd[i] === 'number' && spd[i] > 0 ? spd[i] : 0);
       dragonOutfit.push(Number.isInteger(outf[i]) && outf[i] >= 0 && outf[i] < 5 ? outf[i] : -1);
       dragonNames[ownDragons.length - 1] = typeof nms[i] === 'string' ? nms[i].slice(0, 16) : '';
+      dragonMutation[ownDragons.length - 1] = muts[i] === 'lightning' ? 'lightning' : '';
     });
     const sl = +localStorage.getItem('mutation-mayhem-slots');
     if (sl >= 5 && sl <= MAX_SLOTS) plotSlots = Math.floor(sl);
@@ -2810,7 +2861,7 @@ const World = (function () {
   /* Coins. Every PAYOUT_SECONDS, the dragons on your plot pay out together: each gives its DRAGON_COINS, more for
      rarer ones (jade a little more than diamond, being the rarer of the two), times any upgrader. Stored dragons
      don't earn. Only while you play. Kept on this device. */
-  const DRAGON_COINS = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60, fireboy: 500000, firegirl: 500000, stormboy: 30000000000, stormgirl: 30000000000 };   // storm: 10 billion a second   // each dragon, every payout
+  const DRAGON_COINS = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60, fireboy: 500000, firegirl: 500000, nukeboy: 750000, nukegirl: 750000, stormboy: 30000000000, stormgirl: 30000000000 };   // storm: 10 billion a second   // each dragon, every payout
   const PAYOUT_SECONDS = 3;                              // all your dragons' coins are added up and paid together this often
   /* Upgraders, sold at the red stall. Each one boosts one dragon's coins; any upgrader fits any dragon, better ones
      boost more. A dragon holds one upgrader, and only a better one can replace it. dragonUpgrades[i] goes with
@@ -2823,7 +2874,7 @@ const World = (function () {
      upgrader after upgrader. Its coins use the best upgrader it has ever had. */
   let coins = 0, coinsShown = -1, rateShown = -1, coinSaveT = 0, payT = 0;
   try { coins = Math.max(0, +localStorage.getItem('mutation-mayhem-coins') || 0); } catch (e) { /* none saved */ }
-  const dragonValue = (i) => (DRAGON_COINS[ownDragons[i]] || 0) * (dragonUpgrades[i] >= 0 ? UPGRADERS[dragonUpgrades[i]].boost : 1);
+  const dragonValue = (i) => (DRAGON_COINS[ownDragons[i]] || 0) * (dragonUpgrades[i] >= 0 ? UPGRADERS[dragonUpgrades[i]].boost : 1) * (dragonMutation[i] === 'lightning' ? 2 : 1);   // the Lightning mutation doubles it
   const coinRate = () => ownDragons.reduce((sum, k, i) => sum + (dragonPlaced[i] ? dragonValue(i) : 0), 0);   // coins each payout, from the dragons on your plot
   /* Which dragons are on the plot: as saved, or (the first time) the ones that earn the most. Then put them there. */
   ownDragons.forEach((k, i) => { dragonPlaced[i] = false; });
@@ -2893,7 +2944,7 @@ const World = (function () {
   function saveProgress() {
     try {
       localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons));
-      localStorage.setItem('mutation-mayhem-upgrades', JSON.stringify(dragonUpgrades)); localStorage.setItem('mutation-mayhem-speed', JSON.stringify(dragonSpeed)); localStorage.setItem('mutation-mayhem-dragon-outfits', JSON.stringify(dragonOutfit)); localStorage.setItem('mutation-mayhem-dragon-names', JSON.stringify(ownDragons.map((k, i) => dragonNames[i] || ''))); localStorage.setItem('mutation-mayhem-slots', String(plotSlots));
+      localStorage.setItem('mutation-mayhem-upgrades', JSON.stringify(dragonUpgrades)); localStorage.setItem('mutation-mayhem-speed', JSON.stringify(dragonSpeed)); localStorage.setItem('mutation-mayhem-dragon-outfits', JSON.stringify(dragonOutfit)); localStorage.setItem('mutation-mayhem-dragon-names', JSON.stringify(ownDragons.map((k, i) => dragonNames[i] || ''))); localStorage.setItem('mutation-mayhem-mutations', JSON.stringify(ownDragons.map((k, i) => dragonMutation[i] || ''))); localStorage.setItem('mutation-mayhem-slots', String(plotSlots));
       localStorage.setItem('mutation-mayhem-upgraders', JSON.stringify(upgradersOwned));
       localStorage.setItem('mutation-mayhem-placed', JSON.stringify(dragonPlaced.map((on, i) => (on ? i : -1)).filter((i) => i >= 0)));
     } catch (e) { /* not saved, still playable */ }
@@ -2913,6 +2964,12 @@ const World = (function () {
     carryMeshes[egg.tier].visible = true;
     carryDot.style.background = '#' + (t.shell || t.swirl[0]).toString(16).padStart(6, '0');
     carryEl.hidden = false; carryEl.classList.remove('low'); dropBtn.hidden = false;
+    if (egg.spawned && t.name === 'Nuke') {              // an admin's nuke egg: the nuclear monster still comes after it
+      egg.nuke = true; carrying.left = carrying.total = NUKE_SECONDS; mchase = { wait: 0 };
+      toast('You grabbed a nuke egg! ' + NUKE_SECONDS + ' seconds to get it home. The nuclear monster is coming. FLY!', 5);
+      if (radarOn) setRadar(false);
+      return;
+    }
     if (egg.spawned && t.name === 'Fire') {              // an admin's fire egg: the villagers still come after it
       egg.fire = true; carrying.left = carrying.total = FIRE_SECONDS; chase = { wait: 0.25 };
       toast('You grabbed a fire egg! ' + FIRE_SECONDS + ' seconds to get it home. The villagers are coming. RUN!', 5);
@@ -2932,9 +2989,9 @@ const World = (function () {
   function dropCarried() {                               // put the egg down where you are, to pick up again later
     if (!carrying) return;
     const egg = stopCarrying();
-    if (egg.fire) {                                       // a fire egg goes back to the fire, and the villagers go home
-      villagersHome(); if (egg.spawned) respawnEgg(egg);
-      toast('You dropped the fire egg. It went back to the fire.', 3); return;
+    if (egg.fire || egg.nuke) {                           // a fire egg goes back to the fire (a nuke egg to the bunker), and the chasers go home
+      villagersHome(); monsterHome(); if (egg.spawned) respawnEgg(egg);
+      toast(egg.fire ? 'You dropped the fire egg. It went back to the fire.' : 'You dropped the nuke egg. It went back to the bunker.', 3); return;
     }
     const spot = { x: p.x, y: p.dungeon ? DG.floor : p.inCave ? W.bil(H, p.x, p.z) : standing(p.x, p.z), z: p.z, dungeon: p.dungeon, cave: p.inCave };
     placeEgg(egg, spot); egg.waitAway = true;            // not picked straight back up: walk away from it first
@@ -2983,6 +3040,7 @@ const World = (function () {
     }
     nagT -= dt;
     villagePlay(dt);
+    bunkerPlay(dt);
     luckyPlay();
     if (carryingBlock) { blockStep(dt); return; }        // hands full: no eggs until the block is open
     if (!carrying) {
@@ -2995,8 +3053,8 @@ const World = (function () {
       return;
     }
     carrying.left -= dt;
-    if (!p.dungeon && plotAt(p.x, p.z) === myPlot) { if (carrying.egg.fire) { if (carrying.egg.spawned) villagersHome(); else fireHatched(); } hatchAtHome(); return; }
-    if (carrying.left <= 0) { if (carrying.egg.fire) sendHome('Too slow! The fire egg went back to the fire, and you\'re back at your plot.'); else hatchTooSoon(); return; }
+    if (!p.dungeon && plotAt(p.x, p.z) === myPlot) { if (carrying.egg.fire) { if (carrying.egg.spawned) villagersHome(); else fireHatched(); } if (carrying.egg.nuke) { if (!carrying.egg.spawned) nukeHatched(); monsterHome(); } hatchAtHome(); return; }
+    if (carrying.left <= 0) { if (carrying.egg.fire) sendHome('Too slow! The fire egg went back to the fire, and you\'re back at your plot.'); else if (carrying.egg.nuke) sendHome('Too slow! The nuke egg went back to the bunker, and you\'re back at your plot.'); else hatchTooSoon(); return; }
     const s = Math.ceil(carrying.left);
     if (s !== carrying.shown) {
       carrying.shown = s;
@@ -3010,6 +3068,7 @@ const World = (function () {
     luckyAnimate(dt, time);
     announceStep(dt);
     villageAnimate(dt, time);
+    bunkerAnimate(dt, time);
     const tw = (s, k) => { const v = reduced ? 1 : 0.55 + 0.45 * Math.sin(time * 4 + k); s.scale.set(v, v, v); };
     for (const egg of eggs) {
       if (!egg.g.visible) continue;
@@ -3133,6 +3192,8 @@ const World = (function () {
   function zapTargets() {                                // everyone who can be hit: { name, pos, knock(dirX, dirZ) }
     const list = villagers.map((v) => ({ name: 'A villager', root: v.f.root, who: v, villager: true }));
     keepers.forEach((q) => list.push({ name: q.name, root: q.k.root, who: q }));
+    list.push({ name: 'The nuclear monster', root: monster.f.root, who: monster, villager: true, big: 2.6 });
+    plotPets.forEach((d) => { if (!d.ridden && !d.homing && !DRAGON_KINDS[d.kind].storm) list.push({ name: dragonLabel(d.index), root: d.root, who: d, pet: true }); });
     return list;
   }
   function mouthAt() {                                   // the tip of the ridden dragon's snout, in the world
@@ -3144,14 +3205,21 @@ const World = (function () {
     const { dx, dy, dz, len, o } = ray, from = mouthAt();
     let best = null, bt = Infinity;
     for (const t of zapTargets()) {
-      const c = t.root.position, ox = c.x - o.x, oy = c.y + 1 - o.y, oz = c.z - o.z;
+      const c = t.root.position, k = t.big || 1, ox = c.x - o.x, oy = c.y + (t.pet ? 0.7 : 1) * k - o.y, oz = c.z - o.z;
       const along = (ox * dx + oy * dy + oz * dz) / len, miss = ox * ox + oy * oy + oz * oz - along * along;
-      if (along > 0 && miss < 1.3 * 1.3 && along < bt && Math.hypot(c.x - p.x, c.z - p.z) < ZAP_RANGE) { bt = along; best = t; }
+      if (along > 0 && miss < 1.3 * 1.3 * k * k && along < bt && Math.hypot(c.x - p.x, c.z - p.z) < ZAP_RANGE) { bt = along; best = t; }
     }
     let to;
     if (best) { const c = best.root.position; to = { x: c.x, y: c.y + 1, z: c.z }; }
     else to = { x: o.x + dx / len * 40, y: o.y + dy / len * 40, z: o.z + dz / len * 40 };   // nobody there: it crackles off into the air
     shootBolt(from, to);
+    if (best && best.pet) {                              // one of your dragons: it gets the Lightning mutation (twice the coins)
+      const i = best.who.index;
+      if (dragonMutation[i] === 'lightning') { toast('ZAP! ' + best.name + ' already has the Lightning mutation.', 3); return; }
+      dragonMutation[i] = 'lightning'; saveProgress(); dressPet(best.who); renderInventory();
+      toast('⚡ ZAP! Your ' + DRAGON_KINDS[ownDragons[i]].name + ' dragon got the LIGHTNING mutation! It makes twice as many coins now.', 5);
+      return;
+    }
     if (best) {
       const ax = best.root.position.x - p.x, az = best.root.position.z - p.z, al = Math.hypot(ax, az) || 1;
       knock(best, ax / al, az / al);
@@ -3224,7 +3292,9 @@ const World = (function () {
   function flyStep(dt, down) {                             // hold Jump to climb, let go to glide down slowly
     const big = DRAGON_KINDS[riding.kind].big || 1, climb = 24 * big;   // bigger dragons climb faster
     if (liftT > 0) liftT -= dt;
-    p.vy += ((down || liftT > 0 ? climb : -2.5) - p.vy) * Math.min(1, dt * 4);
+    const dive = keys.has('KeyC') || keys.has('ControlLeft') || touchDive;   // hold C (or the Down button) to dive
+    if (dive) liftT = 0;
+    p.vy += ((dive ? -45 * big : down || liftT > 0 ? climb : -2.5) - p.vy) * Math.min(1, dt * (dive ? 6 : 4));
     p.y = Math.min(200, p.y + p.vy * dt);
     const g = standing(p.x, p.z);
     if (p.y <= g) { p.y = g; p.vy = 0; flying = false; p.onGround = true; }
@@ -3245,7 +3315,7 @@ const World = (function () {
   }
   let rideT = 0;
   function rideHint() {
-    if (riding) return (DRAGON_KINDS[riding.kind].storm ? (document.body.classList.contains('touch') ? 'Tap' : 'Click') + ' someone to shoot lightning! ' : '') + (flying ? 'Hold Jump to fly higher. Land to get off.' : 'Jump twice to fly. Jump once to get off.');
+    if (riding) return (DRAGON_KINDS[riding.kind].storm ? (document.body.classList.contains('touch') ? 'Tap' : 'Click') + ' someone to shoot lightning! ' : '') + (flying ? 'Hold Jump to fly higher, C to dive down. Land to get off.' : 'Jump twice to fly. Jump once to get off.');
     if (myPlot < 0) return 'Walk onto a plot in town to make it yours';
     if (myPlot >= 0 && plotPets.length && plotAt(p.x, p.z) === myPlot) return (document.body.classList.contains('touch') ? 'Tap' : 'Click') + ' a dragon to ride it';
     return '';
@@ -3380,7 +3450,8 @@ const World = (function () {
      A plot starts with room for 5, and each extra space costs twice the one before (500, 1,000, 2,000 ...). */
   const plotEl = $('plotMenu'), plotList = $('plotList');
   let plotMenuOpen = false;
-  const menuOpen = () => upShopOpen || plotMenuOpen || secretOpen || sellOpen || allOpen;
+  let keypadOpen = false;                                // the nuke bunker's keypad
+  const menuOpen = () => upShopOpen || plotMenuOpen || secretOpen || sellOpen || allOpen || keypadOpen;
   const spacePrice = () => 500 * Math.pow(2, plotSlots - 5);
   const buyLabel = () => (plotSlots >= MAX_SLOTS ? 'Your plot is as big as it gets' : 'Buy 1 more space · ' + fmt(spacePrice()) + ' coins');
   const signSpot = () => plotWorld(myPlot, 3.1, -PLOT / 2 - 1.9);   // in front of your plot's sign, on the town side
@@ -3486,11 +3557,11 @@ const World = (function () {
   const sellEl = $('sellShop'), sellList = $('sellList');
   let sellOpen = false;
   const sellPrice = (i) => Math.max(1, Math.round(dragonValue(i) * SELL_TIMES));
-  function dragonLabel(i) { const k = DRAGON_KINDS[ownDragons[i]].name; return dragonNames[i] ? dragonNames[i] + ' (' + k + ')' : k + ' dragon'; }   // "Sparky (Ruby)" once it has a name
+  function dragonLabel(i) { const k = (dragonMutation[i] === 'lightning' ? '⚡ Lightning ' : '') + DRAGON_KINDS[ownDragons[i]].name; return dragonNames[i] ? dragonNames[i] + ' (' + k + ')' : k + ' dragon'; }   // "Sparky (Ruby)" once it has a name
   function removeDragon(i) {                             // the dragon at ownDragons[i] is gone; everything after it moves up one
     const at = plotPets.findIndex((d) => d.index === i);
     if (at >= 0) scene.remove(plotPets.splice(at, 1)[0].root);
-    [ownDragons, dragonUpgrades, dragonPlaced, dragonSpeed, dragonOutfit, dragonNames].forEach((a) => a.splice(i, 1));
+    [ownDragons, dragonUpgrades, dragonPlaced, dragonSpeed, dragonOutfit, dragonNames, dragonMutation].forEach((a) => a.splice(i, 1));
     plotPets.forEach((d) => { if (d.index > i) d.index--; });
     saveProgress(); renderInventory();
   }
@@ -3725,6 +3796,7 @@ const World = (function () {
     if (d.collar) { d.root.remove(d.collar); d.collar = null; }
     const i = dragonOutfit[d.index];
     if (i >= 0 && OUTFITS[i]) { d.outfit = outfitModel(i); d.root.add(d.outfit); }
+    if (dragonMutation[d.index] === 'lightning' && !d.sparks) addSparks(d, sparkMatY);   // Lightning mutation: yellow sparks crackle round it
     const nm = dragonNames[d.index];
     if (nm) {
       d.collar = new THREE.Group();
@@ -4012,7 +4084,7 @@ const World = (function () {
   let chase = null;                                      // { wait } while the villagers are after you
   function villagersHome() { chase = null; villagers.forEach((v) => { v.x = v.home.x; v.z = v.home.z; v.stun = 0; v.hop = 0; v.spin = 0; }); }
   function sendHome(msg) {                               // caught, or too slow: back to your plot without the egg
-    const lost = stopCarrying(); villagersHome();
+    const lost = stopCarrying(); villagersHome(); monsterHome();
     if (lost && lost.spawned) respawnEgg(lost);          // an admin's spawned fire egg is gone
     if (riding) dismount(true);
     flying = false;
@@ -4080,9 +4152,9 @@ const World = (function () {
   /* ---------- The secret shop, deep in the jungle ---------- */
   /* A hidden stall with a hooded keeper. It only serves players who own a diamond dragon. For now it sells fire
      resistance, which lasts FIRE_RES_MINUTES (bought time adds up) and lets you reach into the bonfire. */
-  const FIRE_RES_PRICE = 250000, FIRE_RES_MINUTES = 5;
-  let fireResUntil = 0;
-  try { fireResUntil = +localStorage.getItem('mutation-mayhem-fireres') || 0; } catch (e) { /* none */ }
+  const FIRE_RES_PRICE = 250000, FIRE_RES_MINUTES = 5, RAD_RES_PRICE = 1000000, RAD_RES_MINUTES = 5;
+  let fireResUntil = 0, radResUntil = 0;
+  try { fireResUntil = +localStorage.getItem('mutation-mayhem-fireres') || 0; radResUntil = +localStorage.getItem('mutation-mayhem-radres') || 0; } catch (e) { /* none */ }
   const secretFace = Math.atan2(HUB.x - SECRET.x, HUB.z - SECRET.z), secretY = W.bil(H, SECRET.x, SECRET.z);
   const secretOut = { x: Math.sin(secretFace), z: Math.cos(secretFace) };
   const secretFront = { x: SECRET.x + secretOut.x * 3.6, z: SECRET.z + secretOut.z * 3.6 };
@@ -4108,10 +4180,10 @@ const World = (function () {
   hooded.root.position.set(SECRET.x - secretOut.x * 0.3, secretY + 0.2, SECRET.z - secretOut.z * 0.3); hooded.root.rotation.y = secretFace + Math.PI;
   const secretEl = $('secretShop');
   let secretOpen = false;
-  const fireResLeft = () => Math.max(0, fireResUntil - Date.now()) / 1000;
+  const fireResLeft = () => Math.max(0, fireResUntil - Date.now()) / 1000, radResLeft = () => Math.max(0, radResUntil - Date.now()) / 1000;
   function refreshSecret() {
     $('secretCoins').textContent = fmt(coins);
-    $('secretRes').textContent = fireResLeft() > 0 ? 'Fire resistance left: ' + clock(fireResLeft()) : '';
+    $('secretRes').textContent = [fireResLeft() > 0 ? 'Fire resistance left: ' + clock(fireResLeft()) : '', radResLeft() > 0 ? 'Radiation resistance left: ' + clock(radResLeft()) : ''].filter(Boolean).join(' · ');
   }
   function openSecret() {
     if (menuOpen() || shopping || !started) return;
@@ -4140,11 +4212,173 @@ const World = (function () {
   $('secretDone').addEventListener('click', closeSecret);
   $('secretBuy').addEventListener('click', buyFireRes);
   $('secretBuy').textContent = fmt(FIRE_RES_PRICE) + ' coins';
+  function buyRadRes() {
+    if (coins < RAD_RES_PRICE) { toast('You don\'t have enough money.', 3); return; }
+    coins -= RAD_RES_PRICE; saveCoins();
+    radResUntil = Math.max(Date.now(), radResUntil) + RAD_RES_MINUTES * 60000;
+    try { localStorage.setItem('mutation-mayhem-radres', String(radResUntil)); } catch (e) { /* not saved */ }
+    toast('You are radioactive resistant for ' + clock(radResLeft()) + '!', 4);
+    refreshSecret();
+  }
+  $('secretBuyRad').addEventListener('click', buyRadRes);
+  $('secretBuyRad').textContent = fmt(RAD_RES_PRICE) + ' coins';
+  /* ---------- The nuke bunker (far north-east corner) ---------- */
+  /* Adriana's idea. A concrete bunker with a locked steel door. The code (5367) is on a hidden sign down in the mine.
+     Getting in also needs a radioactive resistant upgrader from the secret shop, or the radiation bounces you back.
+     Inside, a nuke egg glows on a stand. Grab it and you have NUKE_SECONDS to get it home, while the nuclear monster
+     climbs out of its toxic pit behind the bunker and chases you. Its speed and start (MONSTER_SPEED, MONSTER_RING)
+     were worked out so a fire dragon needs 9 Prismatic upgraders to get away from every plot. Home in time: a nuke
+     dragon, boy or girl. One nuke egg every NUKE_PERIOD seconds. */
+  const BK = W.BUNKER, bkFace = Math.atan2(HUB.x - BK.x, HUB.z - BK.z), BY = W.bil(H, BK.x, BK.z), NUKE_TIER = 6;
+  const NUKE_SECONDS = 13, NUKE_PERIOD = 600, NUKE_CODE = '5367', MONSTER_SPEED = 170, MONSTER_CATCH = 3;
+  const bkC = Math.cos(bkFace), bkS = Math.sin(bkFace);
+  const bkWorld = (lx, lz) => ({ x: BK.x + lx * bkC + lz * bkS, z: BK.z - lx * bkS + lz * bkC });   // the bunker's own frame: +z is the door side, toward town
+  const bkLocal = (x, z) => { const dx = x - BK.x, dz = z - BK.z; return { lx: dx * bkC - dz * bkS, lz: dx * bkS + dz * bkC }; };
+  const EGG_AT = { lx: 0, lz: -2 }, DEN = { lx: 0, lz: -17 }, keypadFront = bkWorld(2.1, 7.4);
+  let bunkerOpen = false, doorSlide = 0, nukeTakenRound = -1, keypadTyped = '';
+  try { nukeTakenRound = +localStorage.getItem('mutation-mayhem-nuke-taken') || -1; } catch (e) { /* none */ }
+  const nukeRound = () => Math.floor(Date.now() / 1000 / NUKE_PERIOD);
+  const nukeEggThere = () => nukeTakenRound !== nukeRound() && !(carrying && carrying.egg.nuke && !carrying.egg.spawned);
+  (function buildBunker() {
+    const parts = [], F = M4().makeTranslation(BK.x, BY, BK.z).multiply(M4().makeRotationY(bkFace));
+    const box = (w, h, d, x, y, z, color, rz) => parts.push({ g: new THREE.BoxGeometry(w, h, d), color, m: F.clone().multiply(xf(x, y, z, 1, 1, 1, 0, 0, rz || 0)), jitter: 0.06 });
+    const CON = 0x8a8f93, DARK = 0x5f6468;
+    box(12.4, 0.3, 12.4, 0, 0.0, 0, 0x6b6f72);           // floor
+    box(12, 4.4, 0.6, 0, 2.2, -5.7, CON);                 // back and side walls
+    box(0.6, 4.4, 12, -5.7, 2.2, 0, CON); box(0.6, 4.4, 12, 5.7, 2.2, 0, CON);
+    box(4.6, 4.4, 0.6, -3.7, 2.2, 5.7, CON); box(4.6, 4.4, 0.6, 3.7, 2.2, 5.7, CON);   // front, with the doorway
+    box(2.8, 1.0, 0.6, 0, 3.9, 5.7, CON);
+    box(13.2, 0.7, 13.2, 0, 4.75, 0, DARK);               // thick roof, with vents
+    [[-3, -3], [3, 2]].forEach(([x, z]) => { box(1, 0.8, 1, x, 5.5, z, 0x4a4f53); box(1.2, 0.15, 1.2, x, 5.95, z, 0x3a3f43); });
+    for (let k = 0; k < 8; k++) box(0.42, 0.5, 0.06, -1.47 + k * 0.42, 3.9, 6.03, k % 2 ? 0x1d1f22 : 0xffd23f, 0.6);   // hazard stripes over the door
+    box(1.5, 1.5, 0.06, -3.7, 2.5, 6.02, 0xffd23f);       // a radiation sign: yellow, with a black trefoil
+    box(0.24, 0.24, 0.07, -3.7, 2.5, 6.04, 0x1d1f22);
+    [0, 2.094, 4.189].forEach((a) => box(0.3, 0.4, 0.07, -3.7 + Math.sin(a) * 0.38, 2.5 + Math.cos(a) * 0.38, 6.04, 0x1d1f22, -a));
+    box(0.6, 0.8, 0.12, 2.1, 1.5, 6.06, 0x2a2f33); box(0.44, 0.2, 0.13, 2.1, 1.7, 6.07, 0x39ff14);   // the keypad
+    for (let k = 0; k < 9; k++) box(0.1, 0.08, 0.13, 1.96 + (k % 3) * 0.14, 1.48 - Math.floor(k / 3) * 0.13, 6.075, 0xd8dde2);
+    box(1.4, 1.0, 1.4, EGG_AT.lx, 0.5, EGG_AT.lz, 0x5f6468); box(1.0, 0.1, 1.0, EGG_AT.lx, 1.05, EGG_AT.lz, 0x39ff14);   // the stand
+    [[-4.6, -4.6], [4.6, -4.6], [-4.6, 4.2], [4.6, 4.2]].forEach(([x, z]) => box(0.9, 0.9, 0.9, x, 0.45, z, 0xc9a23a));   // barrels
+    [[-4.6, -4.6], [4.6, -4.6], [-4.6, 4.2], [4.6, 4.2]].forEach(([x, z]) => box(0.92, 0.12, 0.92, x, 0.6, z, 0x1d1f22));
+    scene.add(new THREE.Mesh(merge(parts), plantMat));
+    const wall = (ax, az, bx, bz) => { const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 0.8); for (let k = 0; k <= n; k++) { const w = bkWorld(ax + (bx - ax) * k / n, az + (bz - az) * k / n); addCollider(w.x, w.z, 0.5); } };
+    wall(-5.7, -5.7, 5.7, -5.7); wall(-5.7, -5.7, -5.7, 5.7); wall(5.7, -5.7, 5.7, 5.7); wall(-5.7, 5.7, -1.7, 5.7); wall(1.7, 5.7, 5.7, 5.7);
+    [[-4.6, -4.6], [4.6, -4.6], [-4.6, 4.2], [4.6, 4.2]].forEach(([x, z]) => { const w = bkWorld(x, z); addCollider(w.x, w.z, 0.6); });
+    const pitW = bkWorld(DEN.lx, DEN.lz);                 // the monster's toxic pit behind the bunker
+    const pit = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 0.3, 18), new THREE.MeshBasicMaterial({ color: 0x5aff2a }));
+    pit.position.set(pitW.x, W.bil(H, pitW.x, pitW.z) + 0.05, pitW.z); scene.add(pit);
+    const sign = document.createElement('canvas'); sign.width = 512; sign.height = 128;   // "NUKE BUNKER" over the door
+    const g = sign.getContext('2d'); g.fillStyle = '#1d1f22'; g.fillRect(0, 0, 512, 128); g.fillStyle = '#ffd23f'; g.font = '700 70px "Trebuchet MS", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('NUKE BUNKER', 256, 66);
+    const sm = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sign) }));
+    const sw = bkWorld(0, 6.09); sm.position.set(sw.x, BY + 4.75, sw.z); sm.rotation.y = bkFace; scene.add(sm);
+  })();
+  const bunkerDoor = new THREE.Group();                  // the steel door slides sideways into the wall when it opens
+  block(bunkerDoor, lam(0x9aa0a6), 2.8, 3.4, 0.3, 0, 1.7, 0); block(bunkerDoor, lam(0xffd23f), 2.8, 0.3, 0.32, 0, 2.6, 0); block(bunkerDoor, lam(0x1d1f22), 2.8, 0.15, 0.32, 0, 2.6, 0.0);
+  scene.add(bunkerDoor); bunkerDoor.rotation.y = bkFace;
+  function placeDoor() { const w = bkWorld(doorSlide * 3, 5.7); bunkerDoor.position.set(w.x, BY, w.z); }
+  placeDoor();
+  const nukeEggMesh = new THREE.Mesh(eggGeo[NUKE_TIER], eggMat(NUKE_TIER)), eggW = bkWorld(EGG_AT.lx, EGG_AT.lz);
+  nukeEggMesh.position.set(eggW.x, BY + 1.1, eggW.z); nukeEggMesh.scale.set(1.2, 1.2, 1.2); scene.add(nukeEggMesh);
+  const bunkerLight = new THREE.PointLight(0x39ff14, 1.4, 16, 2); bunkerLight.position.set(eggW.x, BY + 3, eggW.z); scene.add(bunkerLight);
+  /* The code, on a hidden sign down in the mine, on the left wall, past the boarded-up tunnel. */
+  (function mineSign() {
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 384;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#5a3d22'; g.fillRect(0, 0, 512, 384); g.strokeStyle = '#3a2614'; g.lineWidth = 16; g.strokeRect(8, 8, 496, 368);
+    g.fillStyle = '#ffe9a0'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '700 150px "Trebuchet MS", sans-serif'; g.fillText(NUKE_CODE, 256, 150);
+    g.font = '700 40px "Trebuchet MS", sans-serif'; g.fillText('Go to the nuke bunker', 256, 268); g.fillText('and put it in.', 256, 318);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.65), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }));
+    m.position.set(DG.x - DG.hx + 0.08, DG.floor + 2.1, DG.z + 14.9); m.rotation.y = Math.PI / 2; scene.add(m);
+  })();
+  /* The nuclear monster: a huge glowing green brute with yellow eyes and spikes down its back. */
+  const monster = { f: figure({ skin: lam('#6dff3a'), shirt: lam('#2a3a1a'), pants: lam('#1d2a12'), face: lam(0xffe14a) }), x: 0, z: 0, stun: 0, hop: 0, spin: 0 };
+  block(monster.f.head, new THREE.MeshBasicMaterial({ color: 0xffe14a }), 0.14, 0.1, 0.03, -0.12, 0.3, -0.27); block(monster.f.head, new THREE.MeshBasicMaterial({ color: 0xffe14a }), 0.14, 0.1, 0.03, 0.12, 0.3, -0.27);
+  [0.4, 0.75, 1.1, 1.4].forEach((y) => block(monster.f.root, lam('#1d1f22'), 0.12, 0.3, 0.12, 0, y + 0.2, 0.24, 0.5, 0, 0));
+  block(monster.f.armL, lam('#6dff3a'), 0.3, 0.3, 0.3, 0, -0.85, 0); block(monster.f.armR, lam('#6dff3a'), 0.3, 0.3, 0.3, 0, -0.85, 0);   // big fists
+  monster.f.root.scale.set(2.6, 2.6, 2.6);
+  let mchase = null;                                     // { wait } while the monster is after you
+  function monsterHome() { mchase = null; const w = bkWorld(DEN.lx, DEN.lz); monster.x = w.x; monster.z = w.z; monster.stun = 0; monster.hop = 0; monster.spin = 0; }
+  monsterHome();
+  function grabNukeEgg() {
+    const egg = { tier: NUKE_TIER, nuke: true, lucky: true, taken: false, g: { visible: false }, spot: { x: eggW.x, y: BY, z: eggW.z } };
+    pickUp(egg);
+    carrying.left = carrying.total = NUKE_SECONDS;
+    mchase = { wait: 0.02 };                            // it climbs out of the pit straight away
+    toast('You grabbed the NUKE EGG! ' + NUKE_SECONDS + ' seconds to get it home. The nuclear monster is coming. FLY!', 5);
+  }
+  function nukeHatched() { nukeTakenRound = nukeRound(); try { localStorage.setItem('mutation-mayhem-nuke-taken', String(nukeTakenRound)); } catch (e) { /* not saved */ } }
+  function bunkerPlay(dt) {                              // from eggsPlay: the locked door, the radiation, grabbing the egg, the monster
+    const l = bkLocal(p.x, p.z), low = p.y < BY + 5.2 && !p.dungeon;
+    if (low && Math.abs(l.lx) < 1.6 && l.lz < 6.4 && l.lz > 4.6 && !bunkerOpen) {   // the locked door
+      const w = bkWorld(l.lx, 6.5); p.x = w.x; p.z = w.z;
+      if (nagT <= 0) { toast('The door is locked. Type the code on the keypad.', 3); nagT = 4; }
+    } else if (low && Math.abs(l.lx) < 6.3 && l.lz < 6.5 && l.lz > -6.3 && Date.now() >= radResUntil) {   // the radiation bounces you back out
+      const w = bkWorld(l.lx * 0.3, 8.5); p.x = w.x; p.z = w.z; p.vy = 4; p.onGround = false;
+      if (nagT <= 0) { toast('Too much radiation! You need a radioactive resistant upgrader from the secret shop.', 4); nagT = 4; }
+    }
+    if (bunkerOpen && nukeEggThere() && !carrying && !carryingBlock && low && Math.hypot(p.x - eggW.x, p.z - eggW.z) < 1.8) {
+      if (myPlot < 0) { if (nagT <= 0) { toast('Claim a plot first, so you have somewhere to take the nuke egg!', 5); nagT = 6; } }
+      else grabNukeEgg();
+    }
+    if (!mchase) return;
+    if (!carrying || !carrying.egg.nuke) { monsterHome(); return; }
+    if (mchase.wait > 0) { mchase.wait -= dt; return; }
+    if (monster.stun > 0) return;                        // knocked back by lightning
+    const vx = p.x - monster.x, vz = p.z - monster.z, dist = Math.hypot(vx, vz), st = Math.min(dist, MONSTER_SPEED * dt);
+    if (dist > 0) { monster.x += vx / dist * st; monster.z += vz / dist * st; }
+    if (Math.hypot(p.x - monster.x, p.z - monster.z) < MONSTER_CATCH) sendHome('The nuclear monster caught you! You\'re back at your plot, without the nuke egg.');
+  }
+  function bunkerAnimate(dt, time) {
+    doorSlide += ((bunkerOpen ? 1 : 0) - doorSlide) * Math.min(1, dt * 2); placeDoor();
+    nukeEggMesh.visible = nukeEggThere();
+    nukeEggMesh.rotation.y = reduced ? 0 : time * 0.8;
+    bunkerLight.intensity = 1.2 + (reduced ? 0 : Math.sin(time * 3) * 0.4);
+    const y = Math.max(W.bil(H, monster.x, monster.z), SWIM), running = !!mchase && mchase.wait <= 0;
+    monster.f.root.position.set(monster.x, y + (monster.hop || 0) + (!mchase && !reduced ? Math.abs(Math.sin(time * 1.5)) * 0.2 : 0), monster.z);
+    monster.f.root.rotation.y = mchase ? Math.atan2(-(p.x - monster.x), -(p.z - monster.z)) : bkFace;
+    monster.f.root.rotation.x = -(monster.spin || 0);
+    const sw = running && !reduced ? Math.sin(time * 16) * 0.9 : 0;
+    monster.f.legL.rotation.x = sw; monster.f.legR.rotation.x = -sw; monster.f.armL.rotation.x = -sw - (mchase ? 1.2 : 0); monster.f.armR.rotation.x = sw - (mchase ? 1.2 : 0);
+  }
+  function bunkerHint() {
+    if (mchase) return 'FLY! Get the nuke egg home before the nuclear monster catches you!';
+    if (Math.hypot(p.x - BK.x, p.z - BK.z) > 30 || p.dungeon) return '';
+    if (!bunkerOpen) return 'The nuke bunker. The door needs a 4-number code.';
+    if (Date.now() >= radResUntil) return 'The door is open, but the radiation will bounce you back without radioactive resistance.';
+    return nukeEggThere() ? 'The nuke egg is inside. Grab it and FLY!' : 'The nuke egg is gone. Another one comes in ' + clock(NUKE_PERIOD - (Date.now() / 1000) % NUKE_PERIOD) + '.';
+  }
+  /* The keypad by the door. */
+  const kpEl = $('keypad'), kpScreen = $('kpScreen');
+  function kpShow() { kpScreen.textContent = (keypadTyped + '----').slice(0, 4); }
+  function kpPress(k) {
+    if (k === 'C') keypadTyped = '';
+    else if (k === 'OK') {
+      if (keypadTyped === NUKE_CODE) { bunkerOpen = true; closeKeypad(); toast('ACCESS GRANTED. The bunker door slides open...', 4); return; }
+      toast('Wrong code. ACCESS DENIED.', 3); keypadTyped = '';
+    } else if (keypadTyped.length < 4) keypadTyped += k;
+    kpShow();
+  }
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].forEach((k) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = k; if (k === 'OK') b.className = 'ok';
+    b.addEventListener('click', (e) => { kpPress(k); if (e.detail > 0) b.blur(); });
+    $('kpKeys').appendChild(b);
+  });
+  function openKeypad() {
+    if (!started || keypadOpen) return;
+    keypadOpen = true; keypadTyped = ''; kpShow(); keys.clear(); walking = false;
+    shopBtn.hidden = true; kpEl.hidden = false; document.body.classList.add('shopping');
+  }
+  function closeKeypad() {
+    if (!keypadOpen) return;
+    keypadOpen = false; kpEl.hidden = true; document.body.classList.remove('shopping'); canvas.focus();
+  }
+  $('kpClose').addEventListener('click', closeKeypad);
   const effectEl = $('effect');
   let effectShown = '';
   function showEffects() {                               // timers under the coins: fire resistance and any treats
     const parts = [];
     if (fireResLeft() > 0) parts.push('Fire resistance ' + clock(fireResLeft()));
+    if (radResLeft() > 0) parts.push('Radiation resistance ' + clock(radResLeft()));
     TREATS.forEach((t) => { if (treatLeft(t.id) > 0) parts.push(t.name + ' ' + clock(treatLeft(t.id))); });
     const txt = parts.join(' · ');
     if (txt !== effectShown) { effectShown = txt; effectEl.textContent = txt; effectEl.hidden = !txt; }
@@ -4246,6 +4480,7 @@ const World = (function () {
   function sayLines(lines) {                             // start a run of lines; the answer buttons wait until the last one is said
     talkLines = lines; talkAt = 0; talkChars = 0; talkWait = 0;
     const row = talkRow(); if (row) row.hidden = lines.length > 1;
+    $('talkSkip').hidden = lines.length < 3;              // long conversations (the twins) can be skipped
     showSpeaker();
   }
   function showSpeaker() {
@@ -4271,6 +4506,12 @@ const World = (function () {
     canvas.focus();
   }
   talkBtn.addEventListener('click', (e) => { const q = talkTarget(); if (q) openTalk(q); if (e.detail > 0) talkBtn.blur(); });
+  $('talkSkip').addEventListener('click', (e) => {      // jump to the last line, with the answers showing
+    if (!talking) return;
+    talkAt = talkLines.length - 1; showSpeaker(); talkChars = talkLines[talkAt][1].length; talkText.textContent = talkLines[talkAt][1];
+    const row = talkRow(); if (row) row.hidden = false; $('talkSkip').hidden = true;
+    if (e.detail > 0) $('talkSkip').blur();
+  });
   $('talkNo').addEventListener('click', () => { if (talking && talkPicking) pickTwin(1); else closeTalk(); });
   $('talkYes').addEventListener('click', () => { if (talking && talkPicking) { pickTwin(0); return; } const q = talking; closeTalk(); if (q) q.open(); });
   function talkStep(dt, time) {                          // every frame: hold E to talk, and the words appear a few at a time
@@ -4279,7 +4520,7 @@ const World = (function () {
       const line = talkLines[talkAt][1];
       if (talkChars < line.length) { talkChars = Math.min(line.length, talkChars + dt * (reduced ? 1000 : 45)); talkText.textContent = line.slice(0, Math.ceil(talkChars)); }
       else if (talkAt < talkLines.length - 1 && (talkWait += dt) > 1.1) { talkAt++; talkChars = 0; talkWait = 0; showSpeaker(); }   // a moment to read, then the next speaker
-      else if (talkAt === talkLines.length - 1) { const row = talkRow(); if (row && row.hidden) row.hidden = false; }
+      else if (talkAt === talkLines.length - 1) { const row = talkRow(); if (row && row.hidden) row.hidden = false; if (!$('talkSkip').hidden) $('talkSkip').hidden = true; }
       if (!started || Math.hypot(p.x - talking.front.x, p.z - talking.front.z) > 7) closeTalk();   // walked away
       return;
     }
@@ -4357,7 +4598,7 @@ const World = (function () {
     avatar.visible = true;
     poseAvatar(dt, Math.atan2(-shopOut.x, -shopOut.z) + shopTurn);
   }
-  const openStall = () => { const l = $('shopOpenLabel').textContent; if (l === 'Open the Everything Shop') openAll(); else if (l === 'Open the sell shop') openSell(); else if (l === 'Open the secret shop') openSecret(); else if (l === 'Open the upgrade shop') openUpShop(); else if (l === 'Open the lucky block') { openLucky(); shopBtn.hidden = true; } else if (l === 'Open my plot') openPlotMenu(); else if (l.indexOf('Buy 1 more space') === 0) buySpace(); else openShop(); };
+  const openStall = () => { const l = $('shopOpenLabel').textContent; if (l === 'Use the keypad') openKeypad(); else if (l === 'Open the Everything Shop') openAll(); else if (l === 'Open the sell shop') openSell(); else if (l === 'Open the secret shop') openSecret(); else if (l === 'Open the upgrade shop') openUpShop(); else if (l === 'Open the lucky block') { openLucky(); shopBtn.hidden = true; } else if (l === 'Open my plot') openPlotMenu(); else if (l.indexOf('Buy 1 more space') === 0) buySpace(); else openShop(); };
   shopBtn.addEventListener('click', openStall);
   $('shopDone').addEventListener('click', closeShop);
   $('shopTurn').addEventListener('click', () => { shopTurnTo = shopTurnTo ? 0 : Math.PI; });
@@ -4574,7 +4815,7 @@ const World = (function () {
     if (!started) return;
     closeShop(); closeUpShop(); closePlotMenu(); closeTalk(); shopBtn.hidden = true; avatar.visible = false;
     if (riding && DRAGON_KINDS[riding.kind].storm) dismount(true);
-    removeStorms();
+    removeStorms(); closeKeypad(); bunkerOpen = false;
     if (realCoins !== null) { coins = realCoins; realCoins = null; }   // an admin's unlimited coins end when they leave
     while (placedCount() > plotSlots) { let w = -1; dragonPlaced.forEach((on, i) => { if (on && (w < 0 || dragonValue(i) < dragonValue(w))) w = i; }); dragonPlaced[w] = false; }   // and their unlimited plot space
     saveProgress();
@@ -4597,6 +4838,13 @@ const World = (function () {
   window.addEventListener('touchstart', () => document.body.classList.add('touch'), { passive: true, once: true });
 
   window.addEventListener('keydown', (e) => {
+    if (keypadOpen) {                                     // typing on the bunker keypad
+      if (e.code.startsWith('Digit') || e.code.startsWith('Numpad') && /\d$/.test(e.code)) kpPress(e.code.slice(-1));
+      else if (e.code === 'Backspace') { keypadTyped = keypadTyped.slice(0, -1); kpShow(); }
+      else if (e.code === 'Enter' || e.code === 'NumpadEnter') kpPress('OK');
+      else if (e.code === 'Escape') closeKeypad();
+      e.preventDefault(); return;
+    }
     if (e.target === annInput) {                         // typing an announcement
       if (e.code === 'Enter' || e.key === 'Enter') { e.preventDefault(); sendAnnouncement(); }
       else if (e.code === 'Escape') { annInput.blur(); canvas.focus(); }
@@ -4675,6 +4923,9 @@ const World = (function () {
   canvas.addEventListener('pointercancel', release);
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   jumpBtn.addEventListener('pointerdown', (e) => { touchJump = true; jumpTapped = true; e.preventDefault(); });
+  const diveBtn = $('dive');                             // touch: hold to dive down while flying
+  diveBtn.addEventListener('pointerdown', (e) => { touchDive = true; e.preventDefault(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((n) => diveBtn.addEventListener(n, () => { touchDive = false; }));
   ['pointerup', 'pointercancel', 'pointerleave'].forEach((n) => jumpBtn.addEventListener(n, () => { touchJump = false; }));
 
   const placeBox = $('places');
@@ -4722,6 +4973,7 @@ const World = (function () {
     else if ((jumpDown || jumpPress) && p.onGround) { p.vy = 10; p.onGround = false; }
     const g = p.dungeon ? DG.floor : standing(p.x, p.z);
     if (flying) flyStep(dt, jumpDown);
+    if (diveBtn.hidden === flying) { diveBtn.hidden = !flying; if (!flying) touchDive = false; }
     else if (climbing) {                                       // up the ladder
       p.vy = 0; p.onGround = false; p.y += 5.5 * dt;
       if (p.y > DG.top - 1.9) leaveDungeon();
@@ -4790,13 +5042,14 @@ const World = (function () {
   const hintEl = $('hint');
   let hint = '';
   function showZone() {
-    const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : started ? villageHint() || rideHint() : '';
+    const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : started ? villageHint() || bunkerHint() || rideHint() : '';
     if (tip !== hint) { hint = tip; hintEl.textContent = tip; }
     const free = started && !shopping && !menuOpen() && !talking && !carrying && !riding && !p.dungeon && !p.inCave;
     const onPlot = free && myPlot >= 0 && plotAt(p.x, p.z) === myPlot;
     const dShop = Math.hypot(p.x - shopFront.x, p.z - shopFront.z), dUp = Math.hypot(p.x - upFront.x, p.z - upFront.z);
     const dSign = myPlot >= 0 && plotSlots < MAX_SLOTS && !isAdmin ? Math.hypot(p.x - signSpot().x, p.z - signSpot().z) : Infinity;
     const atSecret = free && !carryingBlock && Math.hypot(p.x - secretFront.x, p.z - secretFront.z) < 3.6;
+    const atKeypad = started && !shopping && !menuOpen() && !talking && !carrying && !bunkerOpen && Math.hypot(p.x - keypadFront.x, p.z - keypadFront.z) < 2.6;
     const dSell = Math.hypot(p.x - sellFront.x, p.z - sellFront.z), dAll = Math.hypot(p.x - allFront.x, p.z - allFront.z);
     const near = Math.min(dShop, dUp, dSign, dSell, dAll);
     const atAll = free && !carryingBlock && dAll < 3.6 && dAll === near;
@@ -4804,9 +5057,9 @@ const World = (function () {
     const atShop = free && !carryingBlock && dShop < 3.6 && dShop === near, atUp = free && !carryingBlock && dUp < 3.6 && dUp === near;
     const atPlot = onPlot && !atShop && !atUp;
     const atSign = free && !carryingBlock && !atPlot && dSign < 2.6 && dSign === near;
-    const label = atAll ? 'Open the Everything Shop' : atSell ? 'Open the sell shop' : atSecret ? 'Open the secret shop' : atUp ? 'Open the upgrade shop' : atPlot && carryingBlock ? 'Open the lucky block' : atPlot ? 'Open my plot' : atSign ? buyLabel() : 'Open the avatar shop';   // one button, for wherever you are
+    const label = atKeypad ? 'Use the keypad' : atAll ? 'Open the Everything Shop' : atSell ? 'Open the sell shop' : atSecret ? 'Open the secret shop' : atUp ? 'Open the upgrade shop' : atPlot && carryingBlock ? 'Open the lucky block' : atPlot ? 'Open my plot' : atSign ? buyLabel() : 'Open the avatar shop';   // one button, for wherever you are
     if ($('shopOpenLabel').textContent !== label) $('shopOpenLabel').textContent = label;
-    const anyBtn = atShop || atUp || atPlot || atSign || atSecret || atSell || atAll;
+    const anyBtn = atShop || atUp || atPlot || atSign || atSecret || atSell || atAll || atKeypad;
     if (shopBtn.hidden === anyBtn) shopBtn.hidden = !anyBtn;
     showEffects();
     if (carryingBlock) carryEl.hidden = atPlot;           // at home the "Open the lucky block" button takes the note's place
@@ -4922,7 +5175,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

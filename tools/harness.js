@@ -698,6 +698,10 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   if (els.talkYes.textContent !== 'Show me the shop' || !talk()) throw new Error('after picking, the shop button should show');
   els.talkYes.fire('click', ev({})); frames(3); console.log('"Show me the shop": Everything Shop open', I.allOpen()); if (!I.allOpen()) throw new Error('the twins should open the Everything Shop');
   window.fire('keydown', ev({ code: 'Escape' })); frames(12);
+  els.talkBtn.fire('click', ev({})); frames(20); console.log('talk to the twins again: skip button shown', !els.talkSkip.hidden);
+  els.talkSkip.fire('click', ev({})); console.log('press Skip:', els.talkWho.textContent + ':', JSON.stringify(els.talkText.textContent), '| buttons', els.talkYes.textContent, '/', els.talkNo.textContent, '| skip hidden', els.talkSkip.hidden);
+  if (els.talkYes.textContent !== 'Lexi' || !/Who do you want/.test(els.talkText.textContent)) throw new Error('Skip should jump to the choice');
+  els.talkNo.fire('click', ev({})); frames(300); els.talkNo.fire('click', ev({})); frames(3);
   I.goTo(6); frames(5); const x1 = I.p.x, z1 = I.p.z; window.fire('keydown', ev({ code: 'KeyE' })); frames(30); window.fire('keyup', ev({ code: 'KeyE' }));
   console.log('away from the shops, E still steps sideways:', Math.hypot(I.p.x - x1, I.p.z - z1).toFixed(1), 'units');
 }
@@ -869,7 +873,18 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
       fr(90); const y1 = I.p.y; console.log('jump twice to fly, then let go: flying', I.flying(), '| climbed', (y1 - y0).toFixed(0), 'units in 1.5 s by itself');
       if (!I.flying() || y1 - y0 < 30) throw new Error('flying should take the dragon high into the air');
       window.fire('keydown', ev({ code: 'Space' })); fr(120); window.fire('keyup', ev({ code: 'Space' })); console.log('hold Jump 2 s more: height above where it took off', (I.p.y - y0).toFixed(0));
+      const yTop = I.p.y; I.keys.add('KeyC'); fr(60); I.keys.delete('KeyC'); console.log('hold C for 1 s: dived down', (yTop - I.p.y).toFixed(0), 'units | still flying', I.flying());
+      if (yTop - I.p.y < 25) throw new Error('holding C should dive down fast');
       I.p.y = y0; I.p.vy = 0; fr(3); }
+    { // zap one of your own dragons: Lightning mutation, twice the coins
+      const pet = I.plotPets.find((d) => !d.ridden && !I.DRAGON_KINDS[d.kind].storm), i = pet.index, r0 = I.coinRate();
+      I.p.x = pet.root.position.x + 10; I.p.z = pet.root.position.z; I.update(1 / 60, 0); pet.wait = 99;
+      const from = I.camera.position, tx = pet.root.position.x - from.x, ty = pet.root.position.y + 0.7 - from.y, tz = pet.root.position.z - from.z;
+      I.zap({ dx: tx, dy: ty, dz: tz, len: Math.hypot(tx, ty, tz), o: from });
+      console.log('zap my', pet.kind, 'dragon:', JSON.stringify(els.toast.textContent), '| mutation', I.dragonMutation[i], '| its coins', I.DRAGON_COINS[pet.kind], '->', I.dragonValue(i) / (I.dragonUpgrades[i] >= 0 ? I.UPGRADERS[I.dragonUpgrades[i]].boost : 1), '| plot rate', r0, '->', I.coinRate(), '| sparks', !!pet.sparks, '| saved', JSON.parse(store['mutation-mayhem-mutations'])[i]);
+      if (I.dragonMutation[i] !== 'lightning' || I.dragonValue(i) !== 2 * I.DRAGON_COINS[pet.kind] * (I.dragonUpgrades[i] >= 0 ? I.UPGRADERS[I.dragonUpgrades[i]].boost : 1)) throw new Error('lightning should mutate the dragon and double its coins');
+      for (let k = 0; k < 30; k++) I.zapStep(1 / 60);
+    }
     const v = I.villagers[0]; I.p.x = v.x + 12; I.p.z = v.z; I.update(1 / 60, 0);
     const from = I.camera.position, tx = v.f.root.position.x - from.x, ty = v.f.root.position.y + 1 - from.y, tz = v.f.root.position.z - from.z;
     const vx0 = v.x, vz0 = v.z; I.zap({ dx: tx, dy: ty, dz: tz, len: Math.hypot(tx, ty, tz), o: from });
@@ -943,6 +958,62 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   if (I.ownDragons.length !== before + 1 || !/^fire(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.fireEggThere()) throw new Error('a fast dragon should get the fire egg home and hatch a fire dragon');
   const n50 = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(5); n50[d] = (n50[d] || 0) + 1; } console.log('fire egg hatches:', Object.keys(n50).map((k) => k + ' ' + (n50[k] / 200).toFixed(0) + '%').join(', '));
   I.setFireClock(null);
+}
+
+// ---- the nuke bunker: the keypad, the radiation, the nuke egg and the nuclear monster ----
+{
+  let T = 120000; const fr = (n = 1) => { for (let k = 0; k < n; k++) { I.update(1 / 60, 0); I.eggsAnimate(1 / 60, 0); } }, hud = (n = 12) => { for (let k = 0; k < n; k++) raf(T += 16); };
+  const BK = I.BK, by = W.bil(W.H, BK.x, BK.z), stand = (w, y) => { I.p.x = w.x; I.p.z = w.z; I.p.y = y === undefined ? W.bil(W.H, w.x, w.z) : y; I.p.vy = 0; I.p.onGround = true; I.p.dungeon = I.p.inCave = I.p.inLid = false; };
+  const lab = () => document.getElementById('shopOpenLabel').textContent;
+  if (I.riding()) I.dismount(true);
+  console.log('nuke bunker at', BK.x, BK.z, '| ground levelled to', by.toFixed(2), '(asked', BK.h + ')', '| distance from town', Math.hypot(BK.x - W.HUB.x, BK.z - W.HUB.z).toFixed(0));
+  if (Math.abs(by - BK.h) > 0.05) throw new Error('the bunker ground should be level');
+  const kp = I.bkWorld(2.1, 7.4); stand(kp); hud();
+  console.log('at the bunker keypad: button', JSON.stringify(lab()), '| hint', JSON.stringify(els.hint.textContent));
+  if (lab() !== 'Use the keypad') throw new Error('no keypad button');
+  stand(I.bkWorld(0, 5.5)); fr(); console.log('walk into the locked door: pushed back to', I.bkLocal(I.p.x, I.p.z).lz.toFixed(1), '| message', said());
+  if (I.bkLocal(I.p.x, I.p.z).lz < 6.4) throw new Error('the locked door should stop you');
+  stand(kp); hud(); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); hud(2);
+  console.log('keypad open', I.keypadOpen());
+  ['Digit1', 'Digit2', 'Digit3', 'Digit4'].forEach((c) => window.fire('keydown', ev({ code: c }))); window.fire('keydown', ev({ code: 'Enter' }));
+  console.log('type 1234: door open', I.bunkerOpen(), '| message', said(), '| jumped somewhere', I.zoneName());
+  if (I.bunkerOpen()) throw new Error('a wrong code should not open the door');
+  ['5', '3', '6', '7'].forEach((k) => I.kpPress(k)); I.kpPress('OK'); hud(60);
+  console.log('type 5367: door open', I.bunkerOpen(), '| keypad closed', !I.keypadOpen(), '| message', said());
+  if (!I.bunkerOpen()) throw new Error('5367 should open the door');
+  I.setRadRes(0); stand(I.bkWorld(0, 4)); fr(); console.log('walk in with no radiation resistance: bounced to', I.bkLocal(I.p.x, I.p.z).lz.toFixed(1), '| message', said());
+  if (I.bkLocal(I.p.x, I.p.z).lz < 6.5) throw new Error('radiation should bounce you back');
+  stand(I.secretFront); hud(); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); hud(2);
+  I.setCoins(5e6); els.secretBuyRad.fire('click', ev({})); console.log('secret shop: buy a radioactive resistant upgrader:', said(), '| left', I.radResLeft().toFixed(0), 's | effects', JSON.stringify(els.effect.textContent));
+  if (I.radResLeft() < 290) throw new Error('radiation resistance should last 5 minutes');
+  window.fire('keydown', ev({ code: 'Escape' }));
+  stand(I.bkWorld(0, 2)); fr(); console.log('walk in with resistance: inside', I.bkLocal(I.p.x, I.p.z).lz.toFixed(1), '| nuke egg there', I.nukeEggThere(), '| hint', JSON.stringify((hud(), els.hint.textContent)));
+  console.log('monster at its pit:', I.bkLocal(I.monster.x, I.monster.z).lz.toFixed(1), I.monster.x, I.monster.z);
+  stand(I.eggW); fr(2);
+  console.log('step onto the stand: carrying', I.carrying() && I.EGG_TIERS[I.carrying().egg.tier].name, 'egg,', I.carrying() && I.carrying().total, 's | monster chasing', !!I.mchase(), '|', said());
+  if (!I.carrying() || I.carrying().total !== 13 || !I.mchase()) throw new Error('grabbing the nuke egg should give 13 seconds and start the monster');
+  let n = 0; while (I.carrying() && n++ < 600) fr();
+  console.log('stand still: caught after', (n / 60).toFixed(2), 's | home', I.plotAt(I.p.x, I.p.z) === I.myPlot(), '| egg back', I.nukeEggThere(), '|', said());
+  if (I.carrying() || !/nuclear monster caught/.test(said())) throw new Error('the monster should catch you');
+  // fly it home on a fire dragon with 8, then 9 Prismatic upgraders (each +10% speed)
+  const flyHome = (ups) => {
+    const hp = I.plotWorld(I.myPlot(), 0, 2); stand(hp, 6.3); fr(2);
+    const pet = I.plotPets.find((d) => !d.homing && !I.DRAGON_KINDS[d.kind].storm), kind0 = pet.kind; pet.kind = 'fireboy'; I.dragonSpeed[pet.index] = ups * 10; I.mount(pet); const spd = I.rideSpeed(true).toFixed(0);
+    const tj = () => { window.fire('keydown', ev({ code: 'Space' })); fr(1); window.fire('keyup', ev({ code: 'Space' })); fr(1); };
+    tj(); fr(6); tj(); fr(30);
+    I.p.x = I.eggW.x; I.p.z = I.eggW.z; I.p.y = by + 2; fr(1);
+    const got = !!I.carrying(); I.keys.add('KeyW'); I.keys.add('ShiftLeft'); let k = 0;
+    const door = I.bkWorld(0, 9);                       // out through the door first, then straight home
+    while (I.carrying() && k++ < 60 * 16) { I.p.yaw = I.bkLocal(I.p.x, I.p.z).lz < 6.5 ? face(door.x, door.z) : face(hp.x, hp.z); if (I.p.y < W.bil(W.HT, I.p.x, I.p.z) + 12) I.keys.add('Space'); else I.keys.delete('Space'); fr(); } I.keys.clear();
+    const out = { speed: spd, got, secs: (k / 60).toFixed(1), msg: said(), last: I.ownDragons.slice(-1)[0] };
+    if (I.riding()) I.dismount(true); pet.kind = kind0; I.dragonSpeed[pet.index] = 0; return out;
+  };
+  const r8 = flyHome(8); console.log('fire dragon + 8 Prismatic (speed', r8.speed + '): grabbed', r8.got, '| after', r8.secs, 's:', r8.msg);
+  if (!/caught/.test(r8.msg)) throw new Error('8 upgraders should not be enough');
+  const before = I.ownDragons.length, r9 = flyHome(9); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
+  console.log('fire dragon + 9 Prismatic (speed', r9.speed + '): grabbed', r9.got, '| home after', r9.secs, 's |', r9.msg, '| dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], 'earning', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], '| egg gone till next time', !I.nukeEggThere());
+  if (I.ownDragons.length !== before + 1 || !/^nuke(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.nukeEggThere()) throw new Error('9 upgraders should get the nuke egg home');
+  const n50 = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(I.NUKE_TIER); n50[d] = (n50[d] || 0) + 1; } console.log('nuke egg hatches:', Object.keys(n50).map((k) => k + ' ' + (n50[k] / 200).toFixed(0) + '%').join(', '));
 }
 
 // ---- and once more, as a device with saved progress ----

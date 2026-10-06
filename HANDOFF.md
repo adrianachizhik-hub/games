@@ -83,6 +83,19 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 - **Keepers: the twins Lexi and Max** (Adriana's names and idea: "identical twins that argue over who will take the customer"). Same face, clothes (yellow T-shirt, orange shorts) and auburn hair colour, both with freckles; Lexi has long hair with a pink clip, Max swoopy hair (her request). Talking (button "Talk to Lexi and Max") plays an argument, line by line (Claude's words), then you pick Lexi or Max; the winner cheers, the other sulks, then "Show me the shop". Talking supports several speakers via `lines` and a choice via `pick` in `keepers`.
 - **Outfits** (`OUTFITS`, owned counts in `mutation-mayhem-outfits`, what each dragon wears in `mutation-mayhem-dragon-outfits`, parallel to the dragon list): party hat 1,000, bow tie 2,500, sunglasses 5,000, cape 10,000, crown 50,000. After buying you pick a dragon; one outfit per dragon, and a swapped-off outfit goes back to you.
 
+**The nuke bunker and the nuke egg** (6 October 2026, Adriana's idea; section "The nuke bunker"):
+- A concrete bunker on the far north-east corner (`W.BUNKER`, 84, 84; the ground there is levelled in the World script, so some plants and hiding places moved a little). Hazard stripes, a radiation sign, a "NUKE BUNKER" sign, barrels, and a locked steel door with a keypad.
+- The code is **5367** (her number). It's written on a hidden sign in the mine (left wall, past the boarded-up tunnel): "5367 / Go to the nuke bunker and put it in." At the door the button says "Use the keypad"; typing 5367 (buttons or number keys, Enter) slides the door open until Leave.
+- Getting in also needs a **Radioactive resistant upgrader** from the secret shop (1,000,000 coins, 5 minutes, adds up; `mutation-mayhem-radres`); without it the radiation bounces you back out.
+- Inside, the nuke egg glows on a stand. Grab it: **13 seconds** to get home, and the **nuclear monster** (a huge glowing green brute) climbs out of its toxic pit behind the bunker and chases you (`MONSTER_SPEED` 170, pit 15 behind the egg). Worked out so a fire dragon needs 9 Prismatic upgraders from the four far plots and 8 from the three nearest (Adriana asked for 9). Caught, too slow, or dropped: back to your plot, egg back in the bunker. Home: a **nuke dragon**, boy or girl 50/50 (glowing green, hazard stripes, radiation signs; boy black horns and chin spike, girl eyelashes and a yellow bow), 750,000 coins a payday and a little faster than fire dragons. One nuke egg every 10 minutes (`mutation-mayhem-nuke-taken`). Admins can spawn a Nuke egg too; the monster still chases.
+- Storm-dragon lightning bounces the monster back for a moment too.
+
+**Lightning mutation** (Adriana: "if an admin zaps someone's dragon it gets the lightning mutation"): riding a Storm dragon, click one of your own dragons on the plot. It gets the Lightning mutation for good (`dragonMutation`, `mutation-mayhem-mutations`): twice the coins, yellow sparks around it, "⚡ Lightning" in its name in lists. Without a server it only reaches the admin's own dragons; with one it would work on other players' dragons.
+
+**Diving** (her request, for the slow glide down): while flying, hold C (or Ctrl, or the "Down" button on touch screens) to dive fast.
+
+**Skip** button on long conversations (the twins): jumps to the last line with the answers showing.
+
 **Dropping an egg** (Adriana's request): while carrying an egg a Drop button (or G) puts it on the ground where you stand; walk away and come back to pick it up (its timer starts again). A fire egg dropped goes back to the fire and the villagers go home.
 
 **Flying higher** (her bug report: dragons barely left the ground): taking off now climbs by itself for 1.4 s, holding Jump climbs at 24 (times the dragon's size), letting go glides down slowly, and the ceiling is 200.
