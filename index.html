@@ -237,6 +237,11 @@
     white-space: nowrap;
   }
   #carry.low { border-color: #ef6b4f; background: #b8392a; color: #fff; }
+  #dropBtn { font: inherit; font-size: 0.9rem; font-weight: 700; padding: 3px 12px; border: 2px solid #0d2f37; border-radius: 999px; background: #fff; color: #0d2f37; cursor: pointer; pointer-events: auto; }
+  #dropBtn kbd { font: inherit; font-size: 0.75rem; padding: 0 5px; border-radius: 5px; background: #0d2f37; color: #fff; }
+  #dropBtn[hidden] { display: none; }
+  body.touch #dropBtn kbd { display: none; }
+  body:not(.admin) #places { display: none; }      /* only admins jump to places (Adriana's rule) */
   #carryDot { width: 16px; height: 20px; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%; flex: none; border: 2px solid rgba(255, 255, 255, 0.7); }
   #toast {
     bottom: calc(150px + env(safe-area-inset-bottom, 0px));
@@ -928,7 +933,7 @@
   </div>
 </div>
 
-<div id="carry" role="status" hidden><span id="carryDot"></span><span id="carryText"></span></div>
+<div id="carry" role="status" hidden><span id="carryDot"></span><span id="carryText"></span><button id="dropBtn" type="button" hidden>Drop <kbd>G</kbd></button></div>
 <p id="toast" aria-live="polite" hidden></p>
 <div id="inv" role="group" aria-label="Inventory" hidden><span class="invlabel">Inventory</span><div id="invItems"></div></div>
 <button id="talkBtn" type="button" hidden><span id="talkLabel">Talk</span><kbd>Hold E</kbd></button>
@@ -2491,7 +2496,7 @@ const World = (function () {
     [2807844638872252, 4072327928453000]                 // Ellie, added 6 October 2026 at Adriana's request
   ];
   const codeEl = $('code'), codeMsg = $('codeMsg');
-  let isAdmin = false;
+  let isAdmin = false, adminNo = -1;                    // adminNo: which admin (their place in ADMINS)
   const typedName = () => (nameEl.value || '').replace(/\s+/g, ' ').trim().slice(0, 16);
   const adminFor = () => ADMINS.find((a) => a[0] === scramble(typedName().toLowerCase()));
   const isAdminName = () => !!adminFor();
@@ -2524,8 +2529,11 @@ const World = (function () {
     firegirl: { name: 'Fire (girl)', body: 0xff2a4a, dark: 0xc0103a, belly: 0xffb0a0, spike: 0xffd23f, wing: 0xff6a2a, wing2: 0xffb02a, gem: 0xffe08a, fire: 'girl' },
     /* The Storm dragon, for admins only (Adriana's request, from a picture of a tall golden dragon on a mountain): electric
        blue, a long proud neck, a crown of swept-back horns, huge wings, lightning stripes and sparks crackling round it.
-       Much bigger than the others (big), super fast, 10 billion coins a second, and it shoots lightning. */
-    storm:    { name: 'Storm', body: 0x1f6fff, dark: 0x0b3a9e, belly: 0x9fe8ff, spike: 0xe8fbff, wing: 0x46b4ff, wing2: 0x1f7ae0, gem: 0xbff6ff, storm: true, big: 2.3 }
+       Much bigger than the others (big), extremely fast, 10 billion coins a second, and it shoots lightning. The first
+       admin's is a boy (deep blue, thick dark-tipped horns, a chin spike, a gold king's crown), the second admin's a girl
+       (sky blue and violet, eyelashes, a silver tiara with a pink gem). Both wear a lightning saddle. */
+    stormboy:  { name: 'Storm (boy)',  body: 0x1f5fff, dark: 0x0a2f8a, belly: 0x9fe8ff, spike: 0xe8fbff, wing: 0x3fa0ff, wing2: 0x1a66d6, gem: 0xbff6ff, storm: 'boy', big: 2.3 },
+    stormgirl: { name: 'Storm (girl)', body: 0x5aa8ff, dark: 0x3a5fd0, belly: 0xeadcff, spike: 0xffd6f5, wing: 0xa8d4ff, wing2: 0xb08cff, gem: 0xffd6f5, storm: 'girl', big: 2.3 }
   };
   /* base: seconds to get home before it hatches; hatch: which dragons, and how likely each is */
   const EGG_TIERS = [
@@ -2646,7 +2654,7 @@ const World = (function () {
     [-0.17, 0.17].forEach((x) => { B(body, head, 0.16, 0.18, 0.04, EYE_W, x, 0.13, -0.27); B(body, head, 0.08, 0.12, 0.03, EYE_D, x + (x < 0 ? 0.02 : -0.02), 0.12, -0.295); });
     [-0.18, 0.18].forEach((x) => B(body, head, 0.08, 0.28, 0.08, HORN, x, 0.38, 0.1, 0.5, 0, x < 0 ? 0.25 : -0.25));
     [-0.12, 0.12].forEach((x) => B(body, head, 0.04, 0.07, 0.04, HORN, x, -0.2, -0.47));   // little teeth
-    [[-0.12, 1.0, 0.17], [-0.38, 1.05, 0.15], [0.12, 1.08, 0.15], [0.36, 1.08, 0.13]].forEach(([z, y, s]) => B(body, O, 0.06, s, s, c.spike, 0, y, z, PI4));
+    [[-0.12, 1.0, 0.17], [-0.38, 1.05, 0.15], [0.12, 1.08, 0.15], [0.36, 1.08, 0.13]].filter(([z]) => !c.storm || Math.abs(z) > 0.3).forEach(([z, y, s]) => B(body, O, 0.06, s, s, c.spike, 0, y, z, PI4));   // (not under a storm dragon's saddle)
     B(body, neck, 0.06, 0.12, 0.12, c.spike, 0, 0.3, 0.12, PI4);
     B(body, head, 0.06, 0.12, 0.12, c.spike, 0, 0.32, 0.18, PI4);
     let t = J(O, 0, 0.78, 0.5);                                              // tail: thinner blocks, bending up at the end
@@ -2688,11 +2696,34 @@ const World = (function () {
       B(body, neck, 0.32, 0.52, 0.3, c.body, 0, 0.56, -0.06, -0.12); B(body, neck, 0.24, 0.46, 0.04, c.belly, 0, 0.54, -0.22, -0.12);   // the long neck
       [-1, 1].forEach((s) => {                                              // a crown of horns sweeping back
         const hr = J(head, s * 0.19, 0.3, 0.14, 0.95, 0, s * -0.28);
-        B(body, hr, 0.1, 0.44, 0.1, HORN, 0, 0.2, 0); B(body, hr, 0.07, 0.34, 0.07, HORN, 0, 0.5, 0.09, 0.45, 0, 0);
+        const hw = c.storm === 'boy' ? 1.35 : 0.85;
+        B(body, hr, 0.1 * hw, 0.44, 0.1 * hw, HORN, 0, 0.2, 0); B(body, hr, 0.07 * hw, 0.34, 0.07 * hw, c.storm === 'boy' ? 0x16213a : HORN, 0, 0.5, 0.09, 0.45, 0, 0);
         B(body, head, 0.05, 0.24, 0.05, HORN, s * 0.3, 0.16, 0.18, 0.9, 0, s * -0.9);
         B(body, head, 0.04, 0.18, 0.04, HORN, s * 0.29, 0.02, 0.22, 1.1, 0, s * -1.1);
       });
-      [[-0.3, 1.12, 0.28], [-0.05, 1.16, 0.32], [0.2, 1.14, 0.28], [0.42, 1.1, 0.22]].forEach(([z, y, k]) => B(body, O, 0.06, k, k, c.spike, 0, y, z, PI4));   // tall fins down the back
+      [[-0.44, 1.12, 0.3], [0.44, 1.1, 0.24]].forEach(([z, y, k]) => B(body, O, 0.06, k, k, c.spike, 0, y, z, PI4));   // tall fins before and after the saddle
+      const girl = c.storm === 'girl', seat = girl ? 0x3a1f5a : 0x15203a, trim = girl ? 0xe8eef6 : 0xffc21f, bolt = 0xfff27a, bolt2 = girl ? 0xff8fd6 : 0xfff27a;
+      B(body, O, 0.64, 0.04, 0.6, trim, 0, 1.07, 0.0);                     // the lightning saddle: trim, seat, front and back
+      B(body, O, 0.58, 0.1, 0.54, seat, 0, 1.12, 0.0);
+      B(body, O, 0.22, 0.16, 0.08, trim, 0, 1.22, -0.25);
+      B(body, O, 0.5, 0.14, 0.07, seat, 0, 1.21, 0.27); B(body, O, 0.52, 0.03, 0.08, trim, 0, 1.29, 0.27);
+      [-1, 1].forEach((s) => {                                              // flaps down each side with a lightning bolt on
+        B(body, O, 0.04, 0.38, 0.42, seat, s * 0.37, 0.92, 0.0);
+        [[1.0, -0.06, 0.55, bolt], [0.92, 0.02, -0.55, bolt2], [0.84, -0.05, 0.55, bolt]].forEach(([y, z, r, col]) => B(body, O, 0.02, 0.13, 0.06, col, s * 0.395, y, z, r, 0, 0));
+        B(body, O, 0.06, 0.32, 0.04, trim, s * 0.3, 0.94, -0.24);            // a strap and buckle
+      });
+      if (girl) {                                                           // the girl: eyelashes and a silver tiara with a pink gem
+        [-0.17, 0.17].forEach((x) => { for (let k = -1; k <= 1; k++) B(body, head, 0.03, 0.1, 0.02, 0x1a1030, x + k * 0.05, 0.27, -0.29, 0, 0, k * 0.4); });
+        B(body, head, 0.52, 0.06, 0.06, 0xe8eef6, 0, 0.34, -0.2);
+        [[-0.2, 0.08], [-0.1, 0.14], [0, 0.24], [0.1, 0.14], [0.2, 0.08]].forEach(([x, h]) => B(body, head, 0.06, h, 0.05, 0xe8eef6, x, 0.36 + h / 2, -0.2));
+        B(body, head, 0.11, 0.11, 0.06, 0xff4fa8, 0, 0.44, -0.23, 0, 0, PI4);
+        [-0.15, 0.15].forEach((x) => B(body, head, 0.06, 0.06, 0.05, 0xbff6ff, x, 0.38, -0.23, 0, 0, PI4));
+      } else {                                                              // the boy: a chin spike and a gold king's crown with a blue gem
+        B(body, head, 0.07, 0.22, 0.07, c.spike, 0, -0.31, -0.44, -0.4, 0, 0);
+        B(body, head, 0.5, 0.13, 0.5, 0xffc21f, 0, 0.37, -0.02);
+        [[-0.21, -0.23], [0.21, -0.23], [-0.21, 0.19], [0.21, 0.19], [0, -0.23], [0, 0.19]].forEach(([x, z]) => B(body, head, 0.08, 0.2, 0.08, 0xffc21f, x, 0.53, z));
+        B(body, head, 0.12, 0.12, 0.05, 0x1f6fff, 0, 0.37, -0.28, 0, 0, PI4); [-0.17, 0.17].forEach((x) => B(body, head, 0.07, 0.07, 0.04, 0xe2483d, x, 0.37, -0.28, 0, 0, PI4));
+      }
       [-1, 1].forEach((s) => [[0.86, -0.32, 0.5], [0.72, -0.14, -0.5], [0.86, 0.04, 0.5], [0.72, 0.22, -0.5]].forEach(([y, z, r]) => B(body, O, 0.03, 0.26, 0.07, 0xfff27a, s * 0.36, y, z, r, 0, 0)));   // lightning stripes
       [-1, 1].forEach((s, i) => {                                           // huge wings: more sail and long finger bones
         B(wings[i], O, 0.72, 0.07, 0.07, c.dark, 1.2 * s, 0.08, 0, 0, 0, s * 0.25);
@@ -2764,7 +2795,7 @@ const World = (function () {
     const outf = JSON.parse(localStorage.getItem('mutation-mayhem-dragon-outfits') || '[]') || [];
     const nms = JSON.parse(localStorage.getItem('mutation-mayhem-dragon-names') || '[]') || [];
     (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k, i) => {
-      if (!DRAGON_KINDS[k] || k === 'storm') return;     // storm dragons are admin-only: they come back when an admin signs in
+      if (!DRAGON_KINDS[k] || DRAGON_KINDS[k].storm) return;     // storm dragons are admin-only: they come back when an admin signs in
       ownDragons.push(k); dragonUpgrades.push(Number.isInteger(ups[i]) && ups[i] >= 0 && ups[i] < 5 ? ups[i] : -1);
       dragonSpeed.push(typeof spd[i] === 'number' && spd[i] > 0 ? spd[i] : 0);
       dragonOutfit.push(Number.isInteger(outf[i]) && outf[i] >= 0 && outf[i] < 5 ? outf[i] : -1);
@@ -2779,7 +2810,7 @@ const World = (function () {
   /* Coins. Every PAYOUT_SECONDS, the dragons on your plot pay out together: each gives its DRAGON_COINS, more for
      rarer ones (jade a little more than diamond, being the rarer of the two), times any upgrader. Stored dragons
      don't earn. Only while you play. Kept on this device. */
-  const DRAGON_COINS = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60, fireboy: 500000, firegirl: 500000, storm: 30000000000 };   // storm: 10 billion a second   // each dragon, every payout
+  const DRAGON_COINS = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60, fireboy: 500000, firegirl: 500000, stormboy: 30000000000, stormgirl: 30000000000 };   // storm: 10 billion a second   // each dragon, every payout
   const PAYOUT_SECONDS = 3;                              // all your dragons' coins are added up and paid together this often
   /* Upgraders, sold at the red stall. Each one boosts one dragon's coins; any upgrader fits any dragon, better ones
      boost more. A dragon holds one upgrader, and only a better one can replace it. dragonUpgrades[i] goes with
@@ -2800,13 +2831,14 @@ const World = (function () {
   else ownDragons.map((k, i) => i).sort((a, b) => dragonValue(b) - dragonValue(a)).slice(0, plotSlots).forEach((i) => { dragonPlaced[i] = true; });
   while (dragonPlaced.filter(Boolean).length > plotSlots) dragonPlaced[dragonPlaced.lastIndexOf(true)] = false;
   const placedCount = () => dragonPlaced.filter(Boolean).length;
-  let stormCount = 0;                                    // how many Storm dragons the admins of this device have (kept apart from the normal list)
-  try { stormCount = Math.max(0, Math.floor(+localStorage.getItem('mutation-mayhem-storm') || 0)); } catch (e) { /* none */ }
+  let stormCount = 0;                                    // how many Storm dragons the signed-in admin has (each admin's kept apart, not in the normal list)
+  const stormKey = () => 'mutation-mayhem-storm-' + adminNo, stormKind = () => (adminNo === 1 ? 'stormgirl' : 'stormboy');   // first admin a boy, second a girl
   function addStorms() {                                 // an admin signs in: their storm dragons join the list, on the plot
-    for (let k = 0; k < stormCount; k++) { ownDragons.push('storm'); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(true); }
+    try { stormCount = Math.max(0, Math.floor(+localStorage.getItem(stormKey()) || 0)); } catch (e) { stormCount = 0; }
+    for (let k = 0; k < stormCount; k++) { ownDragons.push(stormKind()); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(true); }
   }
   function removeStorms() {                              // an admin leaves: the storm dragons go away with them
-    for (let i = ownDragons.length - 1; i >= 0; i--) if (ownDragons[i] === 'storm') removeDragon(i);
+    for (let i = ownDragons.length - 1; i >= 0; i--) if (DRAGON_KINDS[ownDragons[i]].storm) removeDragon(i);
   }
   const slotLimit = () => (isAdmin ? Infinity : plotSlots);   // admins: unlimited space on their plot
   const coinCountEl = $('coinCount'), coinRateEl = $('coinRate');
@@ -2880,7 +2912,7 @@ const World = (function () {
     carrying = { egg, left: total, total, shown: -1 };
     carryMeshes[egg.tier].visible = true;
     carryDot.style.background = '#' + (t.shell || t.swirl[0]).toString(16).padStart(6, '0');
-    carryEl.hidden = false; carryEl.classList.remove('low');
+    carryEl.hidden = false; carryEl.classList.remove('low'); dropBtn.hidden = false;
     if (egg.spawned && t.name === 'Fire') {              // an admin's fire egg: the villagers still come after it
       egg.fire = true; carrying.left = carrying.total = FIRE_SECONDS; chase = { wait: 0.25 };
       toast('You grabbed a fire egg! ' + FIRE_SECONDS + ' seconds to get it home. The villagers are coming. RUN!', 5);
@@ -2893,9 +2925,22 @@ const World = (function () {
   function stopCarrying() {
     if (!carrying) return null;
     const egg = carrying.egg;
-    carryMeshes[egg.tier].visible = false; carryEl.hidden = true; carrying = null;
+    carryMeshes[egg.tier].visible = false; carryEl.hidden = true; carrying = null; dropBtn.hidden = true;
     return egg;
   }
+  const dropBtn = $('dropBtn');
+  function dropCarried() {                               // put the egg down where you are, to pick up again later
+    if (!carrying) return;
+    const egg = stopCarrying();
+    if (egg.fire) {                                       // a fire egg goes back to the fire, and the villagers go home
+      villagersHome(); if (egg.spawned) respawnEgg(egg);
+      toast('You dropped the fire egg. It went back to the fire.', 3); return;
+    }
+    const spot = { x: p.x, y: p.dungeon ? DG.floor : p.inCave ? W.bil(H, p.x, p.z) : standing(p.x, p.z), z: p.z, dungeon: p.dungeon, cave: p.inCave };
+    placeEgg(egg, spot); egg.waitAway = true;            // not picked straight back up: walk away from it first
+    toast('You dropped the ' + EGG_TIERS[egg.tier].name + ' egg. Walk back to it to pick it up again.', 3);
+  }
+  dropBtn.addEventListener('click', (e) => { dropCarried(); if (e.detail > 0) dropBtn.blur(); });
   function pickDragon(tier) {
     const list = EGG_TIERS[tier].hatch, sum = list.reduce((a, h) => a + h[1], 0);
     let r = Math.random() * sum;
@@ -2922,6 +2967,7 @@ const World = (function () {
     if (egg && !egg.lucky) placeEgg(egg, egg.spot);
   }
   function jumpTo(i) {
+    if (!isAdmin) { toast('Only admins can jump to places. Walk there, or ride your dragon!', 3); return; }   // Adriana's rule
     if (carrying) { toast('You can\'t jump to places while carrying an egg. Run!', 3); return; }
     if (carryingBlock) { toast('You can\'t jump to places while carrying a lucky block. Take it home!', 3); return; }
     if (riding) dismount(true);
@@ -2941,6 +2987,7 @@ const World = (function () {
     if (carryingBlock) { blockStep(dt); return; }        // hands full: no eggs until the block is open
     if (!carrying) {
       for (const egg of eggs) {
+        if (egg.waitAway) { if (Math.hypot(p.x - egg.spot.x, p.z - egg.spot.z) > 2.5) egg.waitAway = false; else continue; }
         if (egg.taken || !!egg.spot.dungeon !== p.dungeon || Math.abs(p.y - egg.spot.y) > 2.2 || Math.hypot(p.x - egg.spot.x, p.z - egg.spot.z) > 1.4) continue;
         if (myPlot < 0) { if (nagT <= 0) { toast('Claim a plot first: walk onto any plot in town. Then come back for this egg!', 5); nagT = 6; } break; }
         pickUp(egg); break;
@@ -3034,7 +3081,7 @@ const World = (function () {
      let go to glide down. Jump once on the ground to hop off: the dragon then flies home to your plot.
      Dragons are too big for the cave, so riding stops at its mouth. */
   const RIDE_REACH = 10, RIDE_SIZE = 1.45;              // how close you must be to climb on, and how big it grows to carry you
-  const rideSpeed = (run) => { const t = tierOf(riding.kind), up = (1 + (dragonSpeed[riding.index] || 0) / 100) * (1 + treatSpeed()); if (DRAGON_KINDS[riding.kind].storm) return up * (flying ? 220 : 60) * (run ? 1.5 : 1); return up * (flying ? (30 + t * 5) * (run ? 1.5 : 1) : (18 + t * 2) * (run ? 1.5 : 1)); };
+  const rideSpeed = (run) => { const t = tierOf(riding.kind), up = (1 + (dragonSpeed[riding.index] || 0) / 100) * (1 + treatSpeed()); if (DRAGON_KINDS[riding.kind].storm) return up * (flying ? 600 : 140) * (run ? 1.5 : 1); /* admin dragons: extremely fast */ return up * (flying ? (30 + t * 5) * (run ? 1.5 : 1) : (18 + t * 2) * (run ? 1.5 : 1)); };
   function mount(d) {
     riding = d; d.ridden = true; d.homing = false; flying = false; tapT = 0;
     p.x = d.root.position.x; p.z = d.root.position.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true;
@@ -3167,15 +3214,18 @@ const World = (function () {
   function rideJump(dt, down, pressed) {
     if (flying) return;
     if (pressed) {
-      if (tapT > 0) { flying = true; tapT = 0; p.vy = 6; p.onGround = false; return; }
+      if (tapT > 0) { flying = true; tapT = 0; p.vy = 14; liftT = 1.4; p.onGround = false; return; }   // take off with a big climb
       tapT = 0.35;
       if (p.onGround) { p.vy = 7; p.onGround = false; }   // the dragon hops
     }
     if (tapT > 0) { tapT -= dt; if (tapT <= 0 && !flying) dismount(false); }
   }
-  function flyStep(dt, down) {                             // hold Jump to climb, let go to glide down
-    p.vy += ((down ? 13 : -4) - p.vy) * Math.min(1, dt * 4);
-    p.y = Math.min(130, p.y + p.vy * dt);
+  let liftT = 0;                                          // just after take-off it keeps climbing by itself
+  function flyStep(dt, down) {                             // hold Jump to climb, let go to glide down slowly
+    const big = DRAGON_KINDS[riding.kind].big || 1, climb = 24 * big;   // bigger dragons climb faster
+    if (liftT > 0) liftT -= dt;
+    p.vy += ((down || liftT > 0 ? climb : -2.5) - p.vy) * Math.min(1, dt * 4);
+    p.y = Math.min(200, p.y + p.vy * dt);
     const g = standing(p.x, p.z);
     if (p.y <= g) { p.y = g; p.vy = 0; flying = false; p.onGround = true; }
   }
@@ -3448,7 +3498,7 @@ const World = (function () {
     $('sellCoins').textContent = fmt(coins);
     while (sellList.firstChild) sellList.removeChild(sellList.firstChild);
     if (!ownDragons.length) { const p0 = document.createElement('p'); p0.className = 'sub'; p0.textContent = 'You have no dragons to sell.'; sellList.appendChild(p0); }
-    ownDragons.map((k, i) => i).filter((i) => ownDragons[i] !== 'storm').sort((a, b) => sellPrice(b) - sellPrice(a)).forEach((i) => {   // admin storm dragons can't be sold
+    ownDragons.map((k, i) => i).filter((i) => !DRAGON_KINDS[ownDragons[i]].storm).sort((a, b) => sellPrice(b) - sellPrice(a)).forEach((i) => {   // admin storm dragons can't be sold
       const k = ownDragons[i], row = document.createElement('div'), what = document.createElement('div'), name = document.createElement('b'), note = document.createElement('small'), btn = document.createElement('button');
       row.className = 'uprow'; what.className = 'what';
       name.textContent = dragonLabel(i);
@@ -4418,17 +4468,17 @@ const World = (function () {
     toast('A ' + t.name + ' egg appeared in front of you!', 3);
   }
   const addRow = adminSection('Add a dragon to your base'), addPick = document.createElement('select'), addBtn = document.createElement('button');
-  Object.keys(DRAGON_KINDS).filter((k) => k !== 'storm').forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = DRAGON_KINDS[k].name; addPick.appendChild(o); });
+  Object.keys(DRAGON_KINDS).filter((k) => !DRAGON_KINDS[k].storm).forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = DRAGON_KINDS[k].name; addPick.appendChild(o); });
   addPick.setAttribute('aria-label', 'Dragon to add'); addBtn.type = 'button'; addBtn.className = 'small'; addBtn.textContent = 'Add';
   addRow.appendChild(addPick); addRow.appendChild(addBtn);
   addBtn.addEventListener('click', (e) => { adminAddDragon(addPick.value); if (e.detail > 0) addBtn.blur(); });
   const stormBtn = document.createElement('button');
   stormBtn.type = 'button'; stormBtn.className = 'storm'; stormBtn.textContent = '⚡ Add a Storm dragon (admins only)';
-  stormBtn.addEventListener('click', (e) => { adminAddDragon('storm'); if (e.detail > 0) stormBtn.blur(); });
+  stormBtn.addEventListener('click', (e) => { adminAddDragon(stormKind()); if (e.detail > 0) stormBtn.blur(); });
   $('adminCommands').appendChild(stormBtn);
   function adminAddDragon(kind) {
     if (!isAdmin || !started || !DRAGON_KINDS[kind]) return;
-    if (kind === 'storm') { stormCount++; try { localStorage.setItem('mutation-mayhem-storm', String(stormCount)); } catch (e) { /* not saved */ } }
+    if (DRAGON_KINDS[kind].storm) { if (kind !== stormKind()) return; stormCount++; try { localStorage.setItem(stormKey(), String(stormCount)); } catch (e) { /* not saved */ } }
     const i = ownDragons.length, place = myPlot >= 0;
     ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(place); saveProgress();
     if (place) addPet(kind, true, i); else renderInventory();
@@ -4491,7 +4541,7 @@ const World = (function () {
         codeEl.hidden = false; codeMsg.hidden = false; codeEl.value = ''; codeEl.focus();
         return;
       }
-      isAdmin = true;
+      isAdmin = true; adminNo = ADMINS.indexOf(adminFor());
     }
     started = true;
     playerName = (isAdmin ? typed.charAt(0).toUpperCase() + typed.split('@')[0].slice(1) : typed) || 'Player';   // an admin shows as the part before the @
@@ -4529,7 +4579,7 @@ const World = (function () {
     while (placedCount() > plotSlots) { let w = -1; dragonPlaced.forEach((on, i) => { if (on && (w < 0 || dragonValue(i) < dragonValue(w))) w = i; }); dragonPlaced[w] = false; }   // and their unlimited plot space
     saveProgress();
     dropEgg(); dropBlock(); villagersHome(); dismount(true); releasePlot(); saveCoins(); closeSecret(); closeSell(); closeAll(); toastEl.hidden = true;
-    started = false; isAdmin = false; setRadar(false); setSeeAll(false);
+    started = false; isAdmin = false; adminNo = -1; setRadar(false); setSeeAll(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
     document.body.classList.remove('playing');
@@ -4574,6 +4624,7 @@ const World = (function () {
     if (e.key === '/' || e.code === 'Slash') { e.preventDefault(); setChatOpen(true); keys.clear(); chatInput.focus(); return; }   // jump to the chat box   // the menu's own buttons take the keys
     if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openStall(); return; }
     if (e.code.startsWith('Digit')) { jumpTo(+e.code.slice(5) - 1); return; }
+    if (e.code === 'KeyG' && carrying) { dropCarried(); return; }
     if (e.code === 'Space' && !e.repeat) jumpTapped = true;
     keys.add(e.code);
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -4871,7 +4922,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

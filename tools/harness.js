@@ -355,6 +355,15 @@ console.log('touch a Common egg       : carrying', !!c, '| time', c && c.total, 
 const bx0 = I.p.x; window.fire('keydown', ev({ code: 'Digit8' })); window.fire('keyup', ev({ code: 'Digit8' }));
 console.log('press 8 while carrying   : moved', I.p.x !== bx0, '| message', said());
 if (I.p.x !== bx0) throw new Error('jumped while carrying');
+{ // the Drop button: the egg goes down where you stand; walk away and back to pick it up again
+  console.log('drop button shown while carrying:', !els.dropBtn.hidden);
+  window.fire('keydown', ev({ code: 'KeyG' })); window.fire('keyup', ev({ code: 'KeyG' })); tick(0.2);
+  console.log('press G: carrying', !!I.carrying(), '| egg on the ground here', common.g.visible && Math.hypot(common.spot.x - I.p.x, common.spot.z - I.p.z) < 0.01, '| still not picked up after standing on it', !I.carrying(), '| drop button hidden', els.dropBtn.hidden, '|', said());
+  if (I.carrying() || !common.g.visible) throw new Error('G should drop the egg');
+  const sx = I.p.x, sz = I.p.z; I.p.x += 4; tick(0.1); I.p.x = sx; I.p.z = sz; tick(0.1);
+  console.log('walk away and back: carrying again', !!I.carrying());
+  if (!I.carrying()) throw new Error('should pick the dropped egg up again');
+}
 const oldSpot = common.spot; I.p.x = home.x; I.p.z = home.z; I.p.y = 6.3; I.p.dungeon = false; I.p.inCave = I.p.inLid = false; tick(0.1);
 console.log('walk into my plot        : carrying', !!I.carrying(), '| hatching', !!I.hatching(), '| message', said());
 tick(2);
@@ -844,9 +853,9 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     // the Storm dragon: admins only, big, fast, 10 billion a second, shoots lightning
     const stormBtn = els.adminCommands.children.find((c) => /Storm dragon/.test(c.textContent)), n0 = I.ownDragons.length, rate0 = I.coinRate();
     stormBtn.fire('click', ev({ detail: 1 }));
-    const sp = I.plotPets.find((d) => d.kind === 'storm');
-    console.log('add a Storm dragon:', I.ownDragons.length - n0, 'added | on the plot', !!sp, '| saved count', store['mutation-mayhem-storm'], '| coins each payday +' + (I.coinRate() - rate0).toLocaleString('en-US'), '| sparks', sp && sp.sparks.length);
-    if (!sp || I.coinRate() - rate0 !== 30e9 || store['mutation-mayhem-storm'] !== '1') throw new Error('the storm dragon should be on the plot making 10 billion a second');
+    const sp = I.plotPets.find((d) => I.DRAGON_KINDS[d.kind].storm), skey = 'mutation-mayhem-storm-' + I.adminNo();
+    console.log('add a Storm dragon:', I.ownDragons.length - n0, 'added | on the plot', !!sp, '| kind', sp && sp.kind, '| saved count', store[skey], '| coins each payday +' + (I.coinRate() - rate0).toLocaleString('en-US'), '| sparks', sp && sp.sparks.length);
+    if (!sp || I.coinRate() - rate0 !== 30e9 || store[skey] !== '1') throw new Error('the storm dragon should be on the plot making 10 billion a second');
     for (let k = 0; k < 40; k++) raf(97000 + k * 16);
     console.log('size on the plot:', sp.root.scale.x.toFixed(2), '(normal 0.75) | sparks showing', sp.sparks.filter((m) => m.visible).length);
     if (sp.root.scale.x < 1.5) throw new Error('the storm dragon should be much bigger');
@@ -855,6 +864,12 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     I.mount(sp); for (let k = 0; k < 60; k++) raf(98000 + k * 16);
     console.log('riding it: scale', sp.root.scale.x.toFixed(2), '| walk speed', I.rideSpeed(false), '(a jade walks 26)');
     if (I.rideSpeed(false) < 50) throw new Error('storm dragons should be super fast');
+    { const y0 = I.p.y; let T = 99500; const fr = (n) => { for (let k = 0; k < n; k++) raf(T += 16); };
+      window.fire('keydown', ev({ code: 'Space' })); fr(2); window.fire('keyup', ev({ code: 'Space' })); fr(4); window.fire('keydown', ev({ code: 'Space' })); fr(2); window.fire('keyup', ev({ code: 'Space' }));
+      fr(90); const y1 = I.p.y; console.log('jump twice to fly, then let go: flying', I.flying(), '| climbed', (y1 - y0).toFixed(0), 'units in 1.5 s by itself');
+      if (!I.flying() || y1 - y0 < 30) throw new Error('flying should take the dragon high into the air');
+      window.fire('keydown', ev({ code: 'Space' })); fr(120); window.fire('keyup', ev({ code: 'Space' })); console.log('hold Jump 2 s more: height above where it took off', (I.p.y - y0).toFixed(0));
+      I.p.y = y0; I.p.vy = 0; fr(3); }
     const v = I.villagers[0]; I.p.x = v.x + 12; I.p.z = v.z; I.update(1 / 60, 0);
     const from = I.camera.position, tx = v.f.root.position.x - from.x, ty = v.f.root.position.y + 1 - from.y, tz = v.f.root.position.z - from.z;
     const vx0 = v.x, vz0 = v.z; I.zap({ dx: tx, dy: ty, dz: tz, len: Math.hypot(tx, ty, tz), o: from });
@@ -864,9 +879,9 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     if (Math.hypot(v.x - vx0, v.z - vz0) < 3 || Math.hypot(v.x - I.p.x, v.z - I.p.z) < 12) throw new Error('lightning should bounce the villager backwards');
     for (let k = 0; k < 200; k++) I.zapStep(1 / 60); console.log('bolts gone', I.bolts.length === 0, '| knocked list empty', I.knocked.length === 0);
     els.leave.fire('click', ev({ detail: 1 }));
-    console.log('leave: storm dragons gone from the list', !I.ownDragons.includes('storm'), '| saved list has none', !JSON.parse(store['mutation-mayhem-dragons']).includes('storm'), '| still counted for admins', I.stormCount(), '| own coins kept', Number(store['mutation-mayhem-coins']) >= 30e9);
-    if (I.ownDragons.includes('storm') || JSON.parse(store['mutation-mayhem-dragons']).includes('storm')) throw new Error('non-admins must not get storm dragons');
-    playAgain(); reclaim(); console.log('admin back: storm dragons', I.ownDragons.filter((k) => k === 'storm').length, '| on the plot', I.plotPets.filter((d) => d.kind === 'storm').length);
+    console.log('leave: storm dragons gone from the list', !I.ownDragons.some((k) => I.DRAGON_KINDS[k].storm), '| saved list has none', !JSON.parse(store['mutation-mayhem-dragons']).some((k) => /^storm/.test(k)), '| still counted for admins', I.stormCount(), '| own coins kept', Number(store['mutation-mayhem-coins']) >= 30e9);
+    if (I.ownDragons.some((k) => I.DRAGON_KINDS[k].storm) || JSON.parse(store['mutation-mayhem-dragons']).some((k) => /^storm/.test(k))) throw new Error('non-admins must not get storm dragons');
+    playAgain(); reclaim(); console.log('admin back: storm dragons', I.ownDragons.filter((k) => I.DRAGON_KINDS[k].storm).length, '| on the plot', I.plotPets.filter((d) => I.DRAGON_KINDS[d.kind].storm).length);
     btn(/Lucky blocks/).fire('click', ev({ detail: 1 })); console.log('switch the map markers off:', I.seeAllOn());
     btn(/Lucky blocks/).fire('click', ev({ detail: 1 }));
   }
