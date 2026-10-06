@@ -491,6 +491,7 @@
     cursor: pointer;
   }
   #adminCommands button[aria-pressed="true"] { background: #ffd23f; }
+  #adminCommands button.storm { background: #1f6fff; color: #fff; border-color: #0b3a9e; }
   #adminCommands .adminhead { margin: 6px 0 -2px; font-size: 0.9rem; font-weight: 700; }
   #adminCommands .adminrow { display: flex; flex-wrap: wrap; gap: 5px; }
   #adminCommands button.small { font-size: 0.8rem; padding: 4px 9px; border-width: 2px; border-radius: 9px; }
@@ -2520,7 +2521,11 @@ const World = (function () {
     /* Fire dragons, from the fire village's egg: neon red with flame stripes and flames along the back. The girl has
        eyelashes, a pink bow and a pinker red; the boy big dark horns, a flame crest and a chin spike. */
     fireboy:  { name: 'Fire (boy)',  body: 0xff1a1a, dark: 0x8a0a10, belly: 0xffc060, spike: 0xffd23f, wing: 0xff5a10, wing2: 0xffa020, gem: 0xffe08a, fire: 'boy' },
-    firegirl: { name: 'Fire (girl)', body: 0xff2a4a, dark: 0xc0103a, belly: 0xffb0a0, spike: 0xffd23f, wing: 0xff6a2a, wing2: 0xffb02a, gem: 0xffe08a, fire: 'girl' }
+    firegirl: { name: 'Fire (girl)', body: 0xff2a4a, dark: 0xc0103a, belly: 0xffb0a0, spike: 0xffd23f, wing: 0xff6a2a, wing2: 0xffb02a, gem: 0xffe08a, fire: 'girl' },
+    /* The Storm dragon, for admins only (Adriana's request, from a picture of a tall golden dragon on a mountain): electric
+       blue, a long proud neck, a crown of swept-back horns, huge wings, lightning stripes and sparks crackling round it.
+       Much bigger than the others (big), super fast, 10 billion coins a second, and it shoots lightning. */
+    storm:    { name: 'Storm', body: 0x1f6fff, dark: 0x0b3a9e, belly: 0x9fe8ff, spike: 0xe8fbff, wing: 0x46b4ff, wing2: 0x1f7ae0, gem: 0xbff6ff, storm: true, big: 2.3 }
   };
   /* base: seconds to get home before it hatches; hatch: which dragons, and how likely each is */
   const EGG_TIERS = [
@@ -2632,7 +2637,7 @@ const World = (function () {
     B(body, O, 0.56, 0.1, 0.84, c.belly, 0, 0.44, 0);
     B(body, O, 0.5, 0.42, 0.06, c.belly, 0, 0.74, -0.51);
     [[-0.25, -0.32], [0.25, -0.32], [-0.25, 0.32], [0.25, 0.32]].forEach(([x, z]) => { const j = J(O, x, 0.55, z); B(body, j, 0.22, 0.5, 0.24, c.dark, 0, -0.25, 0); B(body, j, 0.24, 0.06, 0.08, HORN, 0, -0.47, -0.14); });
-    const neck = J(O, 0, 0.92, -0.42), head = J(neck, 0, 0.48, -0.18);
+    const neck = J(O, 0, 0.92, -0.42), head = J(neck, 0, c.storm ? 0.82 : 0.48, c.storm ? -0.12 : -0.18);   // the storm dragon holds its head up high on a long neck
     B(body, neck, 0.34, 0.5, 0.32, c.body, 0, 0.18, -0.05, -0.35); B(body, neck, 0.26, 0.42, 0.04, c.belly, 0, 0.16, -0.22, -0.35);
     B(body, head, 0.56, 0.48, 0.52, c.body, 0, 0.06, 0);
     B(body, head, 0.4, 0.26, 0.3, c.body, 0, -0.04, -0.38);                  // snout
@@ -2679,7 +2684,38 @@ const World = (function () {
         [-0.08, 0.06, 0.2].forEach((z, k) => B(body, head, 0.05, 0.24 - k * 0.04, 0.12, k % 2 ? OR : Y, 0, 0.42, z));   // flame crest
       }
     }
+    if (c.storm) {
+      B(body, neck, 0.32, 0.52, 0.3, c.body, 0, 0.56, -0.06, -0.12); B(body, neck, 0.24, 0.46, 0.04, c.belly, 0, 0.54, -0.22, -0.12);   // the long neck
+      [-1, 1].forEach((s) => {                                              // a crown of horns sweeping back
+        const hr = J(head, s * 0.19, 0.3, 0.14, 0.95, 0, s * -0.28);
+        B(body, hr, 0.1, 0.44, 0.1, HORN, 0, 0.2, 0); B(body, hr, 0.07, 0.34, 0.07, HORN, 0, 0.5, 0.09, 0.45, 0, 0);
+        B(body, head, 0.05, 0.24, 0.05, HORN, s * 0.3, 0.16, 0.18, 0.9, 0, s * -0.9);
+        B(body, head, 0.04, 0.18, 0.04, HORN, s * 0.29, 0.02, 0.22, 1.1, 0, s * -1.1);
+      });
+      [[-0.3, 1.12, 0.28], [-0.05, 1.16, 0.32], [0.2, 1.14, 0.28], [0.42, 1.1, 0.22]].forEach(([z, y, k]) => B(body, O, 0.06, k, k, c.spike, 0, y, z, PI4));   // tall fins down the back
+      [-1, 1].forEach((s) => [[0.86, -0.32, 0.5], [0.72, -0.14, -0.5], [0.86, 0.04, 0.5], [0.72, 0.22, -0.5]].forEach(([y, z, r]) => B(body, O, 0.03, 0.26, 0.07, 0xfff27a, s * 0.36, y, z, r, 0, 0)));   // lightning stripes
+      [-1, 1].forEach((s, i) => {                                           // huge wings: more sail and long finger bones
+        B(wings[i], O, 0.72, 0.07, 0.07, c.dark, 1.2 * s, 0.08, 0, 0, 0, s * 0.25);
+        B(wings[i], O, 0.78, 0.04, 0.62, c.wing, 1.2 * s, 0.04, 0.33, 0, 0, s * 0.25);
+        B(wings[i], O, 0.52, 0.04, 0.38, c.wing2, 1.1 * s, 0.02, 0.78, 0, 0, s * 0.25);
+        B(wings[i], O, 0.06, 0.06, 0.95, c.dark, 1.52 * s, 0.17, 0.36);
+        B(wings[i], O, 0.08, 0.2, 0.08, HORN, 1.56 * s, 0.24, -0.12);
+      });
+    }
     return (dragonGeos[kind] = { body: merge(body), wings: wings.map(merge) });
+  }
+  const sparkGeo = new THREE.BoxGeometry(0.05, 0.05, 0.42), sparkMat = new THREE.MeshBasicMaterial({ color: 0xbff6ff }), sparkMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const petSize = (d) => 0.75 * (DRAGON_KINDS[d.kind].big || 1);
+  function sparkStep(d, dt) {                            // every few hundredths of a second the sparks jump somewhere new
+    if (!d.sparks || reduced) return;
+    d.sparkT -= dt;
+    if (d.sparkT > 0) return;
+    d.sparkT = 0.06 + Math.random() * 0.05;
+    for (const m of d.sparks) {
+      m.visible = Math.random() < 0.6;
+      m.position.set((Math.random() - 0.5) * 1.3, 0.5 + Math.random() * 1.5, -1 + Math.random() * 1.9);
+      m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    }
   }
   function makeDragon(kind) {
     const c = DRAGON_KINDS[kind], geo = dragonGeo(kind), mat = c.gem ? gemMat : c.metal ? metalMat : plantMat;
@@ -2689,7 +2725,12 @@ const World = (function () {
     const stars = c.gem ? [[-0.55, 1.5, -0.2, 0.8], [0.6, 1.25, 0.1, 0.65], [-0.2, 1.85, 0.3, 0.5], [0.5, 0.55, -0.5, 0.55]].map(([x, y, z, k]) => twinkle(root, x, y, z, k)) : [];
     root.scale.set(0.75, 0.75, 0.75);
     scene.add(root);
-    return { kind, root, wings, stars, flap: 0 };
+    let sparks = null;
+    if (c.storm) {                                       // little bolts that crackle around it
+      sparks = [];
+      for (let k = 0; k < 10; k++) { const m = new THREE.Mesh(sparkGeo, k % 3 ? sparkMat : sparkMat2); m.visible = false; root.add(m); sparks.push(m); }
+    }
+    return { kind, root, wings, stars, flap: 0, sparks, sparkT: 0 };
   }
   function flapWings(d, speed, amount, time) {
     d.flap = Math.sin(time * speed) * amount;
@@ -2723,7 +2764,7 @@ const World = (function () {
     const outf = JSON.parse(localStorage.getItem('mutation-mayhem-dragon-outfits') || '[]') || [];
     const nms = JSON.parse(localStorage.getItem('mutation-mayhem-dragon-names') || '[]') || [];
     (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k, i) => {
-      if (!DRAGON_KINDS[k]) return;
+      if (!DRAGON_KINDS[k] || k === 'storm') return;     // storm dragons are admin-only: they come back when an admin signs in
       ownDragons.push(k); dragonUpgrades.push(Number.isInteger(ups[i]) && ups[i] >= 0 && ups[i] < 5 ? ups[i] : -1);
       dragonSpeed.push(typeof spd[i] === 'number' && spd[i] > 0 ? spd[i] : 0);
       dragonOutfit.push(Number.isInteger(outf[i]) && outf[i] >= 0 && outf[i] < 5 ? outf[i] : -1);
@@ -2738,7 +2779,7 @@ const World = (function () {
   /* Coins. Every PAYOUT_SECONDS, the dragons on your plot pay out together: each gives its DRAGON_COINS, more for
      rarer ones (jade a little more than diamond, being the rarer of the two), times any upgrader. Stored dragons
      don't earn. Only while you play. Kept on this device. */
-  const DRAGON_COINS = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60, fireboy: 500000, firegirl: 500000 };   // each dragon, every payout
+  const DRAGON_COINS = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60, fireboy: 500000, firegirl: 500000, storm: 30000000000 };   // storm: 10 billion a second   // each dragon, every payout
   const PAYOUT_SECONDS = 3;                              // all your dragons' coins are added up and paid together this often
   /* Upgraders, sold at the red stall. Each one boosts one dragon's coins; any upgrader fits any dragon, better ones
      boost more. A dragon holds one upgrader, and only a better one can replace it. dragonUpgrades[i] goes with
@@ -2759,6 +2800,14 @@ const World = (function () {
   else ownDragons.map((k, i) => i).sort((a, b) => dragonValue(b) - dragonValue(a)).slice(0, plotSlots).forEach((i) => { dragonPlaced[i] = true; });
   while (dragonPlaced.filter(Boolean).length > plotSlots) dragonPlaced[dragonPlaced.lastIndexOf(true)] = false;
   const placedCount = () => dragonPlaced.filter(Boolean).length;
+  let stormCount = 0;                                    // how many Storm dragons the admins of this device have (kept apart from the normal list)
+  try { stormCount = Math.max(0, Math.floor(+localStorage.getItem('mutation-mayhem-storm') || 0)); } catch (e) { /* none */ }
+  function addStorms() {                                 // an admin signs in: their storm dragons join the list, on the plot
+    for (let k = 0; k < stormCount; k++) { ownDragons.push('storm'); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(true); }
+  }
+  function removeStorms() {                              // an admin leaves: the storm dragons go away with them
+    for (let i = ownDragons.length - 1; i >= 0; i--) if (ownDragons[i] === 'storm') removeDragon(i);
+  }
   const slotLimit = () => (isAdmin ? Infinity : plotSlots);   // admins: unlimited space on their plot
   const coinCountEl = $('coinCount'), coinRateEl = $('coinRate');
   const fmtRate = (r) => (Math.round(r * 10) / 10).toLocaleString('en-US');
@@ -2778,7 +2827,11 @@ const World = (function () {
       while (payT >= PAYOUT_SECONDS) {                    // payday
         payT -= PAYOUT_SECONDS;
         const r = coinRate() * treatCoins();
-        if (r > 0) { coins += r; saveCoins(); coinPop(r); }
+        if (r > 0) {
+          if (coins === Infinity && realCoins !== null) { realCoins += r; try { localStorage.setItem('mutation-mayhem-coins', String(Math.floor(realCoins))); } catch (e) { /* not saved */ } }   // an admin: into their own coins, kept after Leave
+          else { coins += r; saveCoins(); }
+          coinPop(r);
+        }
       }
     }
     const c = Math.floor(coins), r = coinRate() * treatCoins();
@@ -2933,6 +2986,7 @@ const World = (function () {
     }
     for (const d of plotPets) {                          // wander about the plot; rarer dragons walk faster
       if (myPlot < 0) break;
+      sparkStep(d, dt);
       if (d.ridden) continue;
       if (d.homing) {                                     // flying back to the plot after you got off
         const c = plotWorld(myPlot, 0, 0), rp = d.root.position, dx = c.x - rp.x, dz = c.z - rp.z, dist = Math.hypot(dx, dz);
@@ -2958,7 +3012,7 @@ const World = (function () {
       const w = plotWorld(myPlot, d.lx, d.lz);
       if (d.heading !== undefined) d.root.rotation.y = d.heading;
       d.pop = Math.min(1, d.pop + dt * 2.5);
-      const sc = 0.75 * (d.pop < 1 ? 0.3 + 0.7 * d.pop + Math.sin(d.pop * Math.PI) * 0.25 : 1);
+      const sc = petSize(d) * (d.pop < 1 ? 0.3 + 0.7 * d.pop + Math.sin(d.pop * Math.PI) * 0.25 : 1);
       d.root.scale.set(sc, sc, sc);
       d.root.position.set(w.x, HUB.h + 0.1 + (moving && !reduced ? Math.abs(Math.sin(time * 9 + d.phase)) * 0.06 : 0), w.z);
       flapWings(d, 2, reduced ? 0 : 0.12, time + d.phase);
@@ -2980,7 +3034,7 @@ const World = (function () {
      let go to glide down. Jump once on the ground to hop off: the dragon then flies home to your plot.
      Dragons are too big for the cave, so riding stops at its mouth. */
   const RIDE_REACH = 10, RIDE_SIZE = 1.45;              // how close you must be to climb on, and how big it grows to carry you
-  const rideSpeed = (run) => { const t = tierOf(riding.kind), up = (1 + (dragonSpeed[riding.index] || 0) / 100) * (1 + treatSpeed()); return up * (flying ? (30 + t * 5) * (run ? 1.5 : 1) : (18 + t * 2) * (run ? 1.5 : 1)); };
+  const rideSpeed = (run) => { const t = tierOf(riding.kind), up = (1 + (dragonSpeed[riding.index] || 0) / 100) * (1 + treatSpeed()); if (DRAGON_KINDS[riding.kind].storm) return up * (flying ? 220 : 60) * (run ? 1.5 : 1); return up * (flying ? (30 + t * 5) * (run ? 1.5 : 1) : (18 + t * 2) * (run ? 1.5 : 1)); };
   function mount(d) {
     riding = d; d.ridden = true; d.homing = false; flying = false; tapT = 0;
     p.x = d.root.position.x; p.z = d.root.position.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true;
@@ -2990,7 +3044,7 @@ const World = (function () {
   function dismount(home) {                              // home: put it straight back on the plot, with no flight
     const d = riding;
     if (!d) return;
-    riding = null; flying = false; tapT = 0; d.ridden = false; d.rideScale = 0; d.root.scale.set(0.75, 0.75, 0.75);   // back to pet size
+    riding = null; flying = false; tapT = 0; d.ridden = false; d.rideScale = 0; const ps = petSize(d); d.root.scale.set(ps, ps, ps);   // back to pet size
     const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);   // step off to the right
     if (!home) { p.x += rx * 1.4; p.z += rz * 1.4; pushOut(); settle(); p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true; }
     const onPlot = myPlot >= 0 && plotAt(d.root.position.x, d.root.position.z) === myPlot;
@@ -3001,13 +3055,9 @@ const World = (function () {
   }
   /* What did the click or tap land on? A ray from the camera through that point, tested against each dragon. */
   function clickAt(cx, cy) {
+    if (started && !shopping && riding && DRAGON_KINDS[riding.kind].storm) { zap(rayAt(cx, cy)); return; }
     if (!started || shopping || riding || myPlot < 0) return;
-    const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight, t = Math.tan(camera.fov ? camera.fov * Math.PI / 360 : 0.61);
-    let dx = (cx / w * 2 - 1) * t * (w / h), dy = (1 - cy / h * 2) * t, dz = -1;
-    const cp = Math.cos(p.pitch), sp = Math.sin(p.pitch), cyw = Math.cos(p.yaw), syw = Math.sin(p.yaw);
-    [dy, dz] = [dy * cp - dz * sp, dy * sp + dz * cp];   // tilt by the pitch, then turn by the yaw (the camera turns YXZ)
-    [dx, dz] = [dx * cyw + dz * syw, -dx * syw + dz * cyw];
-    const len = Math.hypot(dx, dy, dz), o = camera.position;
+    const { dx, dy, dz, len, o } = rayAt(cx, cy);
     let best = null, bt = Infinity;
     for (const d of plotPets) {
       if (d.homing) continue;
@@ -3018,6 +3068,92 @@ const World = (function () {
     if (!best) return;
     if (Math.hypot(best.root.position.x - p.x, best.root.position.z - p.z) > RIDE_REACH) { toast('Walk closer to your dragon to ride it.', 3); return; }
     mount(best);
+  }
+  function rayAt(cx, cy) {                               // the direction from the camera through a point on the screen
+    const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight, t = Math.tan(camera.fov ? camera.fov * Math.PI / 360 : 0.61);
+    let dx = (cx / w * 2 - 1) * t * (w / h), dy = (1 - cy / h * 2) * t, dz = -1;
+    const cp = Math.cos(p.pitch), sp = Math.sin(p.pitch), cyw = Math.cos(p.yaw), syw = Math.sin(p.yaw);
+    [dy, dz] = [dy * cp - dz * sp, dy * sp + dz * cp];   // tilt by the pitch, then turn by the yaw (the camera turns YXZ)
+    [dx, dz] = [dx * cyw + dz * syw, -dx * syw + dz * cyw];
+    return { dx, dy, dz, len: Math.hypot(dx, dy, dz), o: camera.position };
+  }
+
+  /* The Storm dragon's lightning: click or tap someone while riding it. A bolt shoots from its mouth, and whoever it hits
+     is bounced backwards through the air. For now that's the villagers and the shopkeepers; when the game has a server,
+     other players too. */
+  const ZAP_RANGE = 90, bolts = [], knocked = [];
+  const boltGeo = new THREE.BoxGeometry(1, 1, 1), boltMat = new THREE.MeshBasicMaterial({ color: 0xffffff }), glowMat = new THREE.MeshBasicMaterial({ color: 0x5fd0ff, transparent: true, opacity: 0.45 });
+  function zapTargets() {                                // everyone who can be hit: { name, pos, knock(dirX, dirZ) }
+    const list = villagers.map((v) => ({ name: 'A villager', root: v.f.root, who: v, villager: true }));
+    keepers.forEach((q) => list.push({ name: q.name, root: q.k.root, who: q }));
+    return list;
+  }
+  function mouthAt() {                                   // the tip of the ridden dragon's snout, in the world
+    const s = riding.rideScale || 1, f = DRAGON_KINDS[riding.kind].storm ? 1.05 : 0.95, up = DRAGON_KINDS[riding.kind].storm ? 1.72 : 1.36;
+    const r = riding.root.position;
+    return { x: r.x - Math.sin(p.yaw) * f * s, y: r.y + up * s, z: r.z - Math.cos(p.yaw) * f * s };
+  }
+  function zap(ray) {
+    const { dx, dy, dz, len, o } = ray, from = mouthAt();
+    let best = null, bt = Infinity;
+    for (const t of zapTargets()) {
+      const c = t.root.position, ox = c.x - o.x, oy = c.y + 1 - o.y, oz = c.z - o.z;
+      const along = (ox * dx + oy * dy + oz * dz) / len, miss = ox * ox + oy * oy + oz * oz - along * along;
+      if (along > 0 && miss < 1.3 * 1.3 && along < bt && Math.hypot(c.x - p.x, c.z - p.z) < ZAP_RANGE) { bt = along; best = t; }
+    }
+    let to;
+    if (best) { const c = best.root.position; to = { x: c.x, y: c.y + 1, z: c.z }; }
+    else to = { x: o.x + dx / len * 40, y: o.y + dy / len * 40, z: o.z + dz / len * 40 };   // nobody there: it crackles off into the air
+    shootBolt(from, to);
+    if (best) {
+      const ax = best.root.position.x - p.x, az = best.root.position.z - p.z, al = Math.hypot(ax, az) || 1;
+      knock(best, ax / al, az / al);
+      toast('ZAP! ' + best.name + ' got bounced backwards!', 2.5);
+    }
+  }
+  function shootBolt(a, b) {                             // a zigzag of bright blocks from a to b, with a blue glow round it
+    const g = new THREE.Group(), n = 9, pts = [a];
+    const L = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z), j = Math.min(1.2, L * 0.06);
+    for (let k = 1; k < n; k++) { const t = k / n; pts.push({ x: a.x + (b.x - a.x) * t + (Math.random() - 0.5) * j, y: a.y + (b.y - a.y) * t + (Math.random() - 0.5) * j, z: a.z + (b.z - a.z) * t + (Math.random() - 0.5) * j }); }
+    pts.push(b);
+    for (let k = 0; k < n; k++) {
+      const p0 = pts[k], p1 = pts[k + 1], seg = Math.hypot(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z) || 0.01;
+      [[boltMat, 0.12], [glowMat, 0.45]].forEach(([m, w]) => {
+        const s = new THREE.Mesh(boltGeo, m);
+        s.position.set((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2); s.lookAt(p1.x, p1.y, p1.z); s.scale.set(w, w, seg);
+        g.add(s);
+      });
+    }
+    scene.add(g); bolts.push({ g, t: 0 });
+  }
+  function knock(t, ux, uz) {                            // fly backwards in an arc, then land (shopkeepers walk back after)
+    const base = t.villager ? null : (t.who.base = t.who.base || t.root.position.clone());
+    const k = knocked.find((q) => q.t.who === t.who);
+    const entry = { t, ux, uz, time: 0, base };
+    if (k) Object.assign(k, entry); else knocked.push(entry);
+    if (t.villager) t.who.stun = 1.6;
+  }
+  function zapStep(dt) {                                 // from the main loop: bolts fade, the zapped fly
+    for (let i = bolts.length - 1; i >= 0; i--) {
+      const b = bolts[i]; b.t += dt;
+      b.g.visible = b.t < 0.35 && (reduced || Math.floor(b.t * 30) % 3 !== 2);   // flicker
+      if (b.t > 0.35) { scene.remove(b.g); bolts.splice(i, 1); }
+    }
+    for (let i = knocked.length - 1; i >= 0; i--) {
+      const k = knocked[i], w = k.who || k.t.who; k.time += dt;
+      const fly = Math.min(k.time, 0.7), push = 18 * fly - 6 * fly * fly, hop = Math.sin(Math.PI * Math.min(1, k.time / 0.7)) * 3;
+      if (k.t.villager) {
+        if (k.time <= 0.7) { w.x += k.ux * (18 - 12 * fly) * dt; w.z += k.uz * (18 - 12 * fly) * dt; }
+        w.hop = k.time < 0.7 ? hop : 0; w.spin = k.time < 0.7 ? k.time * 12 : 0;
+        if (w.stun > 0) w.stun -= dt;
+        if (k.time > 0.7 && !(w.stun > 0)) { w.hop = 0; w.spin = 0; knocked.splice(i, 1); }
+      } else {
+        const back = k.time > 1.6 ? Math.min(1, (k.time - 1.6) / 1.2) : 0, dist = push * (1 - back);   // lands, then walks back to the counter
+        k.t.root.position.set(k.base.x + k.ux * dist, k.base.y + (k.time < 0.7 ? hop : 0), k.base.z + k.uz * dist);
+        k.t.root.rotation.x = k.time < 0.7 ? -k.time * 9 : 0;
+        if (back >= 1) { k.t.root.position.copy(k.base); knocked.splice(i, 1); }
+      }
+    }
   }
   const presses = new Map();                              // a click or tap is a press that hardly moved
   canvas.addEventListener('pointerdown', (e) => presses.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() }));
@@ -3046,9 +3182,10 @@ const World = (function () {
   function poseRider(dt) {                               // sit the avatar on the dragon's back, and move the dragon with you
     const d = riding;
     if (!d) { legL.rotation.z = legR.rotation.z = 0; return; }
-    d.rideScale = Math.min(RIDE_SIZE, (d.rideScale || 0.75) + dt * 2);   // it grows to riding size when you climb on
+    const big = DRAGON_KINDS[d.kind].big || 1, full = RIDE_SIZE * big;
+    d.rideScale = Math.min(full, (d.rideScale || petSize(d)) + dt * 2 * big);   // it grows to riding size when you climb on
     d.root.scale.set(d.rideScale, d.rideScale, d.rideScale);
-    avatar.position.y = p.y + d.rideScale - 0.78;                         // sit on its back
+    avatar.position.y = p.y + d.rideScale * 1.05 - 0.85;                  // sit on its back
     legL.rotation.set(-0.35, 0, -0.6); legR.rotation.set(-0.35, 0, 0.6);   // legs either side
     armL.rotation.x = armR.rotation.x = carrying || carryingBlock ? -2.95 : -0.8;
     d.root.position.set(p.x, p.y + (walking && !flying && !reduced ? Math.abs(Math.sin(stepT * 0.7)) * 0.06 : 0), p.z);
@@ -3058,7 +3195,7 @@ const World = (function () {
   }
   let rideT = 0;
   function rideHint() {
-    if (riding) return flying ? 'Hold Jump to fly higher. Land to get off.' : 'Jump twice to fly. Jump once to get off.';
+    if (riding) return (DRAGON_KINDS[riding.kind].storm ? (document.body.classList.contains('touch') ? 'Tap' : 'Click') + ' someone to shoot lightning! ' : '') + (flying ? 'Hold Jump to fly higher. Land to get off.' : 'Jump twice to fly. Jump once to get off.');
     if (myPlot < 0) return 'Walk onto a plot in town to make it yours';
     if (myPlot >= 0 && plotPets.length && plotAt(p.x, p.z) === myPlot) return (document.body.classList.contains('touch') ? 'Tap' : 'Click') + ' a dragon to ride it';
     return '';
@@ -3311,7 +3448,7 @@ const World = (function () {
     $('sellCoins').textContent = fmt(coins);
     while (sellList.firstChild) sellList.removeChild(sellList.firstChild);
     if (!ownDragons.length) { const p0 = document.createElement('p'); p0.className = 'sub'; p0.textContent = 'You have no dragons to sell.'; sellList.appendChild(p0); }
-    ownDragons.map((k, i) => i).sort((a, b) => sellPrice(b) - sellPrice(a)).forEach((i) => {
+    ownDragons.map((k, i) => i).filter((i) => ownDragons[i] !== 'storm').sort((a, b) => sellPrice(b) - sellPrice(a)).forEach((i) => {   // admin storm dragons can't be sold
       const k = ownDragons[i], row = document.createElement('div'), what = document.createElement('div'), name = document.createElement('b'), note = document.createElement('small'), btn = document.createElement('button');
       row.className = 'uprow'; what.className = 'what';
       name.textContent = dragonLabel(i);
@@ -3823,7 +3960,7 @@ const World = (function () {
     villagers.push({ f, home, x: home.x, z: home.z, phase: i * 0.8 });
   });
   let chase = null;                                      // { wait } while the villagers are after you
-  function villagersHome() { chase = null; villagers.forEach((v) => { v.x = v.home.x; v.z = v.home.z; }); }
+  function villagersHome() { chase = null; villagers.forEach((v) => { v.x = v.home.x; v.z = v.home.z; v.stun = 0; v.hop = 0; v.spin = 0; }); }
   function sendHome(msg) {                               // caught, or too slow: back to your plot without the egg
     const lost = stopCarrying(); villagersHome();
     if (lost && lost.spawned) respawnEgg(lost);          // an admin's spawned fire egg is gone
@@ -3860,6 +3997,7 @@ const World = (function () {
     if (!carrying || !carrying.egg.fire) { villagersHome(); return; }
     if (chase.wait > 0) { chase.wait -= dt; return; }
     for (const v of villagers) {                         // straight at you, faster than almost anything
+      if (v.stun > 0) continue;                           // knocked back by lightning
       const vx = p.x - v.x, vz = p.z - v.z, dist = Math.hypot(vx, vz), st = Math.min(dist, VILLAGER_SPEED * dt);
       if (dist > 0) { v.x += vx / dist * st; v.z += vz / dist * st; }
       if (Math.hypot(p.x - v.x, p.z - v.z) < CATCH_RANGE) { sendHome('The villagers caught you! You\'re back at your plot, without the fire egg.'); return; }
@@ -3873,7 +4011,8 @@ const World = (function () {
     fireEggMesh.visible = fireEggThere();
     for (const v of villagers) {
       const y = Math.max(W.bil(H, v.x, v.z), SWIM), running = !!chase && chase.wait <= 0;
-      v.f.root.position.set(v.x, y + (lit && !chase && !reduced ? Math.abs(Math.sin(time * 4 + v.phase)) * 0.3 : 0), v.z);   // they dance round the fire
+      v.f.root.position.set(v.x, y + (v.hop || 0) + (lit && !chase && !reduced ? Math.abs(Math.sin(time * 4 + v.phase)) * 0.3 : 0), v.z);   // they dance round the fire
+      v.f.root.rotation.x = -(v.spin || 0);   // tumbling after a lightning bolt
       v.f.root.rotation.y = chase ? Math.atan2(-(p.x - v.x), -(p.z - v.z)) : Math.atan2(-(VILLAGE.x - v.x), -(VILLAGE.z - v.z));
       const sw = running && !reduced ? Math.sin(time * 22 + v.phase) * 0.9 : 0;
       v.f.legL.rotation.x = sw; v.f.legR.rotation.x = -sw; v.f.armL.rotation.x = -sw;
@@ -4279,12 +4418,17 @@ const World = (function () {
     toast('A ' + t.name + ' egg appeared in front of you!', 3);
   }
   const addRow = adminSection('Add a dragon to your base'), addPick = document.createElement('select'), addBtn = document.createElement('button');
-  Object.keys(DRAGON_KINDS).forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = DRAGON_KINDS[k].name; addPick.appendChild(o); });
+  Object.keys(DRAGON_KINDS).filter((k) => k !== 'storm').forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = DRAGON_KINDS[k].name; addPick.appendChild(o); });
   addPick.setAttribute('aria-label', 'Dragon to add'); addBtn.type = 'button'; addBtn.className = 'small'; addBtn.textContent = 'Add';
   addRow.appendChild(addPick); addRow.appendChild(addBtn);
   addBtn.addEventListener('click', (e) => { adminAddDragon(addPick.value); if (e.detail > 0) addBtn.blur(); });
+  const stormBtn = document.createElement('button');
+  stormBtn.type = 'button'; stormBtn.className = 'storm'; stormBtn.textContent = '⚡ Add a Storm dragon (admins only)';
+  stormBtn.addEventListener('click', (e) => { adminAddDragon('storm'); if (e.detail > 0) stormBtn.blur(); });
+  $('adminCommands').appendChild(stormBtn);
   function adminAddDragon(kind) {
     if (!isAdmin || !started || !DRAGON_KINDS[kind]) return;
+    if (kind === 'storm') { stormCount++; try { localStorage.setItem('mutation-mayhem-storm', String(stormCount)); } catch (e) { /* not saved */ } }
     const i = ownDragons.length, place = myPlot >= 0;
     ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(place); saveProgress();
     if (place) addPet(kind, true, i); else renderInventory();
@@ -4356,7 +4500,7 @@ const World = (function () {
     who.textContent = playerName;
     nameMyPlot();
     adminEl.hidden = !isAdmin;                            // only admins get the arrow
-    if (isAdmin) { setRadar(true); setSeeAll(true); }     // admins start with the egg radar and the lucky-block map on
+    if (isAdmin) { setRadar(true); setSeeAll(true); addStorms(); }   // admins start with the egg radar and the lucky-block map on, and get their storm dragons
     if (isAdmin && realCoins === null) { realCoins = coins; coins = Infinity; }   // and unlimited coins (never saved)
     document.body.classList[isAdmin ? 'add' : 'remove']('admin');
     greetChat();
@@ -4379,6 +4523,8 @@ const World = (function () {
   function leave() {
     if (!started) return;
     closeShop(); closeUpShop(); closePlotMenu(); closeTalk(); shopBtn.hidden = true; avatar.visible = false;
+    if (riding && DRAGON_KINDS[riding.kind].storm) dismount(true);
+    removeStorms();
     if (realCoins !== null) { coins = realCoins; realCoins = null; }   // an admin's unlimited coins end when they leave
     while (placedCount() > plotSlots) { let w = -1; dragonPlaced.forEach((on, i) => { if (on && (w < 0 || dragonValue(i) < dragonValue(w))) w = i; }); dragonPlaced[w] = false; }   // and their unlimited plot space
     saveProgress();
@@ -4540,7 +4686,8 @@ const World = (function () {
     }
     if (moving && p.onGround && !reduced) bobT += dt * (swimming ? 5 : 11);
     const bob = reduced ? 0 : Math.sin(bobT) * (swimming ? 0.09 : 0.045) + (swimming ? Math.sin(time * 1.6) * 0.06 : 0);
-    camY += (p.y + EYE + (riding ? 1.3 : 0) - camY) * Math.min(1, dt * 16);
+    const rideBig = riding ? DRAGON_KINDS[riding.kind].big || 1 : 1;   // a bigger dragon: the camera sits higher and further back
+    camY += (p.y + EYE + (riding ? 1.3 + (rideBig - 1) * 3.4 : 0) - camY) * Math.min(1, dt * 16);
     walking = moving && p.onGround;
     eggsPlay(dt);
     placeCamera(dt, bob);
@@ -4548,7 +4695,7 @@ const World = (function () {
   /* The camera follows behind the avatar outdoors. In the cave and the dungeon, where there is no
      room behind you, it slides forward into the avatar's head and you see through its eyes. */
   function placeCamera(dt, bob) {
-    camD += ((p.inCave || p.dungeon ? 0 : riding ? CAM_BACK + 2.3 : CAM_BACK) - camD) * Math.min(1, dt * 5);
+    camD += ((p.inCave || p.dungeon ? 0 : riding ? CAM_BACK + 2.3 * (DRAGON_KINDS[riding.kind].big || 1) * (DRAGON_KINDS[riding.kind].big || 1) * 0.75 + 0.6 : CAM_BACK) - camD) * Math.min(1, dt * 5);
     avatar.visible = camD > 1.3;
     if (camD < 0.05) { camera.position.set(p.x, camY + bob, p.z); return; }
     const cp = Math.cos(p.pitch), vx = -Math.sin(p.yaw) * cp, vy = Math.sin(p.pitch), vz = -Math.cos(p.yaw) * cp;   // the way the view points
@@ -4716,6 +4863,7 @@ const World = (function () {
     keeperPose(dt, time);
     if (fairyBulbs.length) twinkleLights(time);
     eggsAnimate(dt, time);
+    if (bolts.length || knocked.length) zapStep(dt);
     if (frame % 3 === 0) drawMap();
     if (frame % 10 === 0) showZone();
     frame++;
@@ -4723,7 +4871,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

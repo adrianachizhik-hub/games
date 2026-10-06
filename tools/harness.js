@@ -841,6 +841,32 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     let caught = false; for (let k = 0; k < 120 && !caught; k++) { I.update(1 / 60, k / 60); caught = !I.carrying(); }
     console.log('standing still: caught', caught, '|', JSON.stringify(els.toast.textContent), '| spawned egg gone', !I.eggs.includes(fe));
     if (!caught) throw new Error('standing still, the villagers should catch you');
+    // the Storm dragon: admins only, big, fast, 10 billion a second, shoots lightning
+    const stormBtn = els.adminCommands.children.find((c) => /Storm dragon/.test(c.textContent)), n0 = I.ownDragons.length, rate0 = I.coinRate();
+    stormBtn.fire('click', ev({ detail: 1 }));
+    const sp = I.plotPets.find((d) => d.kind === 'storm');
+    console.log('add a Storm dragon:', I.ownDragons.length - n0, 'added | on the plot', !!sp, '| saved count', store['mutation-mayhem-storm'], '| coins each payday +' + (I.coinRate() - rate0).toLocaleString('en-US'), '| sparks', sp && sp.sparks.length);
+    if (!sp || I.coinRate() - rate0 !== 30e9 || store['mutation-mayhem-storm'] !== '1') throw new Error('the storm dragon should be on the plot making 10 billion a second');
+    for (let k = 0; k < 40; k++) raf(97000 + k * 16);
+    console.log('size on the plot:', sp.root.scale.x.toFixed(2), '(normal 0.75) | sparks showing', sp.sparks.filter((m) => m.visible).length);
+    if (sp.root.scale.x < 1.5) throw new Error('the storm dragon should be much bigger');
+    I.setCoins(Infinity); const own0 = I.ownCoins(); I.earn(3.01); console.log('payday while admin: own coins', own0, '->', I.ownCoins());
+    if (!(I.ownCoins() - own0 >= 30e9)) throw new Error('storm coins should go into the admin\'s own coins');
+    I.mount(sp); for (let k = 0; k < 60; k++) raf(98000 + k * 16);
+    console.log('riding it: scale', sp.root.scale.x.toFixed(2), '| walk speed', I.rideSpeed(false), '(a jade walks 26)');
+    if (I.rideSpeed(false) < 50) throw new Error('storm dragons should be super fast');
+    const v = I.villagers[0]; I.p.x = v.x + 12; I.p.z = v.z; I.update(1 / 60, 0);
+    const from = I.camera.position, tx = v.f.root.position.x - from.x, ty = v.f.root.position.y + 1 - from.y, tz = v.f.root.position.z - from.z;
+    const vx0 = v.x, vz0 = v.z; I.zap({ dx: tx, dy: ty, dz: tz, len: Math.hypot(tx, ty, tz), o: from });
+    console.log('zap a villager:', JSON.stringify(els.toast.textContent), '| bolt drawn', I.bolts.length > 0);
+    for (let k = 0; k < 60; k++) I.zapStep(1 / 60);
+    console.log('villager bounced back', Math.hypot(v.x - vx0, v.z - vz0).toFixed(1), 'units, away from me', Math.hypot(v.x - I.p.x, v.z - I.p.z) > 12);
+    if (Math.hypot(v.x - vx0, v.z - vz0) < 3 || Math.hypot(v.x - I.p.x, v.z - I.p.z) < 12) throw new Error('lightning should bounce the villager backwards');
+    for (let k = 0; k < 200; k++) I.zapStep(1 / 60); console.log('bolts gone', I.bolts.length === 0, '| knocked list empty', I.knocked.length === 0);
+    els.leave.fire('click', ev({ detail: 1 }));
+    console.log('leave: storm dragons gone from the list', !I.ownDragons.includes('storm'), '| saved list has none', !JSON.parse(store['mutation-mayhem-dragons']).includes('storm'), '| still counted for admins', I.stormCount(), '| own coins kept', Number(store['mutation-mayhem-coins']) >= 30e9);
+    if (I.ownDragons.includes('storm') || JSON.parse(store['mutation-mayhem-dragons']).includes('storm')) throw new Error('non-admins must not get storm dragons');
+    playAgain(); reclaim(); console.log('admin back: storm dragons', I.ownDragons.filter((k) => k === 'storm').length, '| on the plot', I.plotPets.filter((d) => d.kind === 'storm').length);
     btn(/Lucky blocks/).fire('click', ev({ detail: 1 })); console.log('switch the map markers off:', I.seeAllOn());
     btn(/Lucky blocks/).fire('click', ev({ detail: 1 }));
   }
