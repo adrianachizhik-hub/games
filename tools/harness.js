@@ -44,7 +44,7 @@ class Vector3 { constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.
   multiplyScalar(s) { this.x *= s; this.y *= s; this.z *= s; return this; } }
 class Color { constructor(v) { this.r = this.g = this.b = 1; if (v !== undefined) this.set(v); }
   set(v) { if (typeof v === 'string') { if (!/^#[0-9a-f]{6}$/i.test(v)) throw new Error('bad colour string ' + v); v = parseInt(v.slice(1), 16); } if (typeof v !== 'number' || isNaN(v)) throw new Error('bad colour'); this.r = ((v >> 16) & 255) / 255; this.g = ((v >> 8) & 255) / 255; this.b = (v & 255) / 255; return this; }
-  setScalar(v) { this.r = this.g = this.b = v; return this; }
+  setScalar(v) { this.r = this.g = this.b = v; return this; } clone() { return new Color().copy(this); } multiplyScalar(s) { this.r *= s; this.g *= s; this.b *= s; return this; }
   copy(c) { this.r = c.r; this.g = c.g; this.b = c.b; return this; } lerp(c, t) { this.r += (c.r - this.r) * t; this.g += (c.g - this.g) * t; this.b += (c.b - this.b) * t; return this; }
   setRGB(r, g, b) { if ([r, g, b].some((v) => typeof v !== 'number' || isNaN(v))) throw new Error('bad colour'); this.r = r; this.g = g; this.b = b; return this; } }
 class Obj { constructor() { this.position = new Vector3(); this.rotation = { x: 0, y: 0, z: 0, order: 'XYZ', set(x, y, z) { this.x = x; this.y = y; this.z = z; } }; this.scale = new Vector3(1, 1, 1); this.children = []; this.matrix = null; this.visible = true; }
@@ -773,15 +773,31 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   tabs[1].fire('click', ev({})); const d0 = I.decorMeshes().length; buyBtn(rows()[4]).fire('click', ev({})); buyBtn(rows()[1]).fire('click', ev({}));
   console.log('decorations tab:', rows().map(name).join(', '), '| bought fountain and fairy lights: on the plot', d0, '->', I.decorMeshes().length, '| fountain button now', JSON.stringify(buyBtn(rows()[4]).textContent));
   if (I.decorMeshes().length !== d0 + 2) throw new Error('decorations should appear on the plot');
-  tabs[2].fire('click', ev({})); buyBtn(rows()[4]).fire('click', ev({}));
+  tabs[2].fire('click', ev({})); buyBtn(rows()[5]).fire('click', ev({}));   // row 0 is the name collar
   const pickRows = rows(), firstPet = I.plotPets[0], idx = firstPet.index;
   console.log('outfits tab: bought a Crown -> asks', JSON.stringify(els.allList.children[0].textContent), '|', pickRows.length, 'dragons to choose from');
   pickRows[idx].children[2].fire('click', ev({}));
   console.log('put it on dragon', idx, '(' + I.ownDragons[idx] + '): wearing', I.OUTFITS[I.dragonOutfit[idx]].name, '| model on the plot has it', !!firstPet.outfit, '| crowns left to put on', I.outfitsOwned[4]);
   if (I.dragonOutfit[idx] !== 4 || !firstPet.outfit) throw new Error('the outfit should go on the dragon');
-  tabs[2].fire('click', ev({})); buyBtn(rows()[0]).fire('click', ev({})); rows()[idx].children[2].fire('click', ev({}));
+  tabs[2].fire('click', ev({})); buyBtn(rows()[1]).fire('click', ev({})); rows()[idx].children[2].fire('click', ev({}));
   console.log('then a Party hat on the same dragon: wearing', I.OUTFITS[I.dragonOutfit[idx]].name, '| the crown came back:', I.outfitsOwned[4]);
+  { // name collar: buy one, pick the dragon, type a name; one collar names one dragon
+    tabs[2].fire('click', ev({})); const c0 = I.coins();
+    console.log('outfits tab first row:', name(rows()[0]), '|', JSON.stringify(buyBtn(rows()[0]).textContent));
+    buyBtn(rows()[0]).fire('click', ev({}));
+    console.log('bought a collar: paid', c0 - I.coins(), '| asks', JSON.stringify(els.allList.children[0].textContent), '| collars', I.collarsOwned());
+    rows()[idx].children[2].fire('click', ev({}));
+    const inp = els.allList.children.find((c) => c.className === 'collarbox').children[0], ok = els.allList.children.find((c) => c.className === 'collarbox').children[1];
+    inp.value = '   '; ok.fire('click', ev({})); console.log('empty name:', said(), '| collars still', I.collarsOwned());
+    inp.value = '  Sparky   the  Brave  '; ok.fire('click', ev({}));
+    console.log('named it:', JSON.stringify(I.dragonNames[idx]), '| collars left', I.collarsOwned(), '| collar and name tag on the plot model', !!firstPet.collar, '|', said());
+    if (I.dragonNames[idx] !== 'Sparky the Brave') throw new Error('the name should be tidied (extra spaces gone): ' + I.dragonNames[idx]);
+    if (I.collarsOwned() !== 0 || !firstPet.collar) throw new Error('one collar names one dragon');
+    console.log('first row now says', JSON.stringify(buyBtn(rows()[0]).textContent), '| saved names', store['mutation-mayhem-dragon-names'].slice(0, 60));
+  }
   window.fire('keydown', ev({ code: 'Escape' })); console.log('Escape closes it:', !I.allOpen());
+  { const t0 = I.fairyBulbs().length, b = I.fairyBulbs()[0]; I.twinkleLights(1); const a = b.m.color.r + b.m.color.g + b.m.color.b; I.twinkleLights(2.3); const c = b.m.color.r + b.m.color.g + b.m.color.b;
+    console.log('fairy lights:', t0, 'bulbs | one bulb brightness', a.toFixed(2), '->', c.toFixed(2)); if (!t0 || Math.abs(a - c) < 0.01) throw new Error('fairy lights should twinkle'); }
   els.leave.fire('click', ev({ detail: 1 })); console.log('leave: decorations taken off the plot', I.decorMeshes().length === 0);
   playAgain(); reclaim(); console.log('back on a plot: decorations', I.decorMeshes().length, '| saved', store['mutation-mayhem-decor'], '| outfit saved', JSON.parse(store['mutation-mayhem-dragon-outfits'])[idx]);
   { // entrance arches: the fourth tab; buy, swap, take down, saved
@@ -816,6 +832,15 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     const after = I.UPGRADERS.map((u, i) => I.stockLeft(i)).join(',');
     console.log('restock shops: stock', before, '->', after, '|', JSON.stringify(els.toast.textContent));
     if (after !== '5,3,2,1,1') throw new Error('restock should fill every upgrader');
+    // an admin's spawned fire egg: the villagers still chase you
+    const home = I.plotWorld(I.myPlot(), 0, -8); I.goTo(7); I.p.x = home.x; I.p.z = home.z; I.p.y = 6.3; I.update(1 / 60, 0);
+    I.p.x = home.x - 30; I.p.z = home.z; I.update(1 / 60, 0); I.spawnEgg(5);
+    const fe = I.eggs[I.eggs.length - 1]; I.p.x = fe.spot.x; I.p.z = fe.spot.z; I.update(1 / 60, 0);
+    console.log('admin picks up a spawned Fire egg: carrying', !!I.carrying(), '| villagers chasing', !!I.chase(), '| seconds', I.carrying() && I.carrying().left, '|', JSON.stringify(els.toast.textContent));
+    if (!I.chase() || !I.carrying() || I.carrying().left !== I.FIRE_SECONDS) throw new Error('villagers should chase a spawned fire egg');
+    let caught = false; for (let k = 0; k < 120 && !caught; k++) { I.update(1 / 60, k / 60); caught = !I.carrying(); }
+    console.log('standing still: caught', caught, '|', JSON.stringify(els.toast.textContent), '| spawned egg gone', !I.eggs.includes(fe));
+    if (!caught) throw new Error('standing still, the villagers should catch you');
     btn(/Lucky blocks/).fire('click', ev({ detail: 1 })); console.log('switch the map markers off:', I.seeAllOn());
     btn(/Lucky blocks/).fire('click', ev({ detail: 1 }));
   }
