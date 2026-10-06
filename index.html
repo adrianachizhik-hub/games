@@ -1107,9 +1107,12 @@ const World = (function () {
     const r = Math.hypot(x, z), th = Math.atan2(z, x);
     let dth = Math.abs(th - TH0); if (dth > Math.PI) dth = 2 * Math.PI - dth;
     const R = 150 + 44 * (fbm(Math.cos(th) * 1.2 + 3.1, Math.sin(th) * 1.2 + 7.7, 3) - 0.5)
-      + 14 * Math.exp(-dth * dth / 1.3);                 // extra land under the mountains
+      + 14 * Math.exp(-dth * dth / 1.3)                  // extra land under the mountains
+      + 58 * Math.exp(-angD(th, SWAMP_TH) * angD(th, SWAMP_TH) / 0.045);   // and a new stretch of land east of the desert, for the swamp
     return 1 - r / R;
   }
+  function angD(a, b) { let d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; }
+  function swampF(x, z) { return 1 - smoothstep(SWAMP.r * 0.75, SWAMP.r * 1.25, Math.hypot(x - SWAMP.x, z - SWAMP.z)); }
   function basinRadius(ang) { return 22 + 5 * (vnoise(Math.cos(ang) * 2 + 20, Math.sin(ang) * 2 + 20) - 0.5); }
   const RB_AXIS = basinRadius(Math.atan2(-U.z, -U.x));   // basin radius where the waterfall is
   const PLUNGE = axisPoint(RB_AXIS - 4, 0);              // plunge pool under the falls
@@ -1118,6 +1121,7 @@ const World = (function () {
      the island as the river allows: x, z, radius and ground height. */
   const HUB = { x: 26, z: -26, r: 33, h: 6.3 };
   const BUNKER = { x: 84, z: 84, r: 10, h: 3.4 };          // the nuke bunker, on the far north-east corner
+  const SWAMP = { x: 174, z: 36, r: 34 }, SWAMP_TH = Math.atan2(36, 174);   // the swamp, on new land east of the desert
   function mountainAt(x, z) {                            // the peaks blended into one range
     let s = 0;
     for (const pk of PEAKS) {
@@ -1138,7 +1142,7 @@ const World = (function () {
   }
   function bankF(x, z) { const a = axisCoords(x, z); return smoothstep(-7, 7, a.lat - riverLat(-a.t)); }
   function jungleF(x, z) { return southF(x, z) * bankF(x, z); }
-  function desertF(x, z) { return southF(x, z) * (1 - bankF(x, z)); }
+  function desertF(x, z) { return southF(x, z) * (1 - bankF(x, z)) * (1 - swampF(x, z)); }
 
   /* Height of the outer surface (what you see from outside, cave not yet carved). */
   function topHeight(x, z) {
@@ -1160,6 +1164,9 @@ const World = (function () {
         const crest = 1 - Math.abs(Math.sin(wv * 0.11));
         h += df * 3 * crest * crest;
       }
+      // the swamp: low, flat and boggy, with pools of murky water
+      const sf = swampF(x, z) * smoothstep(0.02, 0.12, s);
+      if (sf > 0) h = lerp(h, 0.35 + (fbm(x * 0.06 + 31, z * 0.06 + 17, 3) - 0.5) * 3.4, sf);
       // stream bed on top of the mountain that feeds the waterfall
       if (a.t > 10 && a.t < 52) h -= 1.5 * (1 - smoothstep(2.2, 5, Math.abs(a.lat))) * (1 - smoothstep(44, 50, a.t));
       // the basin the waterfall drops into
@@ -1250,7 +1257,7 @@ const World = (function () {
     return smoothstep(0, 9, Math.min(a.t - tA, tB - a.t));
   }
   return {
-    vnoise, fbm, smoothstep, lerp, rng, C, U, P, B, CH_T, POOL, HUB, BUNKER, PEAKS, axisPoint, axisCoords, coastS, mountainAt,
+    vnoise, fbm, smoothstep, lerp, rng, C, U, P, B, CH_T, POOL, HUB, BUNKER, SWAMP, swampF, PEAKS, axisPoint, axisCoords, coastS, mountainAt,
     riverLat, southF, jungleF, desertF,
     caveOffset, caveWidth, caveDepth, RB_AXIS, SIZE, N, CELL, V, HALF, HT, H, CE, lid, bil, lidAt,
     get tA() { return tA; }, get tB() { return tB; }
@@ -1343,6 +1350,8 @@ const World = (function () {
       }
       const gk = smoothstep(1.5 + n * 0.5, 2.3 + n * 0.5, h);
       r = lerp(r, gr, gk); g = lerp(g, gg, gk); b = lerp(b, gb, gk);
+      const swf = W.swampF(x, z) * smoothstep(-0.3, 0.1, h);   // the swamp: dark mossy mud
+      if (swf > 0) { const mn = W.vnoise(x * 0.12 + 5, z * 0.12 + 9); r = lerp(r, lerp(0.30, 0.24, mn), swf); g = lerp(g, lerp(0.34, 0.25, mn), swf); b = lerp(b, lerp(0.17, 0.13, mn), swf); }
       const rk = Math.max(smoothstep(0.80, 0.62, ny), smoothstep(25, 31, h + n * 3)) * smoothstep(0.6, 1.6, h);
       const rv = 0.86 + 0.28 * n;                      // rock on steep or high ground, red in the desert
       r = lerp(r, lerp(0.50, 0.68, df) * rv, rk); g = lerp(g, lerp(0.47, 0.43, df) * rv, rk); b = lerp(b, lerp(0.44, 0.30, df) * rv, rk);
@@ -1390,6 +1399,7 @@ const World = (function () {
     if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 3 || Math.hypot(x - SECRET.x, z - SECRET.z) < 3.2) return null;   // nothing grows there either (the jungle grows right up to the secret shop)
     if (Math.hypot(x - W.HUB.x, z - W.HUB.z) < W.HUB.r + 3) return null;      // keep the town circle clear
     if (Math.hypot(x - W.BUNKER.x, z - W.BUNKER.z) < W.BUNKER.r + 4) return null;   // and the nuke bunker
+    if (W.swampF(x, z) > 0.15) return null;                                        // the swamp has its own plants
     const h = W.bil(H, x, z);
     if (W.bil(HT, x, z) - h > 0.1) return null;
     const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL);
@@ -2021,6 +2031,9 @@ const World = (function () {
      runs from z0 to z1. "shaft" is half the width of the drop, "lad" half the
      width of the ladder shaft. */
   const DG = { x: W.POOL.x, z: W.POOL.z, floor: -12, ceil: -5.6, top: -1.6, hx: 10, z0: -1.7, z1: 17, shaft: 1.7, lad: 1.2 };
+  /* The quicksand trap in the swamp (QS), and the secret mud cavern far beneath it (MUD): a room with big muddy walls,
+     and a tunnel (west, toward the desert) that comes out in the desert at MUD_EXIT. Adriana's idea. */
+  const QS = { x: 152, z: 30, r: 2.6 }, MUD = { x: 152, z: 30, floor: -62, ceil: -50, hx: 13, hz: 10, tun: 26, tw: 1.6 }, MUD_EXIT = { x: 122, z: 27 };
   const TORCHES = [[-9.7, -8.4, 4], [-9.7, -8.4, 12.5], [9.7, -8.4, 4], [9.7, -8.4, 12.5], [-2.6, -8.4, 16.7], [2.6, -8.4, 16.7]];
   const PILLARS = [[-5, 5.5], [5, 5.5], [-5, 12], [5, 12]];
   const GOLD = [[-8.8, 15.8, 1.25], [8.8, 15.8, 0.95], [8.9, -0.6, 1.05]];   // piles in three of the corners: x, z, size
@@ -2354,7 +2367,7 @@ const World = (function () {
 
   /* ---------- Player ---------- */
   const EYE = 1.65, SWIM = -1.05, MAX_SLOPE = 1.6;
-  const p = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: 0, onGround: true, inLid: false, inCave: false, dungeon: false };
+  const p = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: 0, onGround: true, inLid: false, inCave: false, dungeon: false, mud: false };
   const CAM_BACK = 5.2;                                  // how far behind the avatar the camera sits outdoors
   let shopping = false, walking = false, running = false, camD = CAM_BACK, stride = 0, stepT = 0;
   function caveMode(x, z) {                              // would the player be inside the cave here?
@@ -2416,7 +2429,8 @@ const World = (function () {
     { name: 'Peak', x: peakSpot.x, z: peakSpot.z, yaw: yawToward(W.U.x, W.U.z), pitch: -0.2 },
     { name: 'Meadow', x: MEADOW.x, z: MEADOW.z, yaw: yawToward(W.C.x - MEADOW.x, W.C.z - MEADOW.z), pitch: 0.1 },
     { name: 'Town', x: HUB.x, z: HUB.z + HUB.r - 2.5, yaw: yawToward(0, -1), pitch: 0 },
-    { name: 'Village', x: VILLAGE.x + 17, z: VILLAGE.z - 8, yaw: yawToward(-17, 8), pitch: 0.12 }
+    { name: 'Village', x: VILLAGE.x + 17, z: VILLAGE.z - 8, yaw: yawToward(-17, 8), pitch: 0.12 },
+    { name: 'Swamp', x: W.SWAMP.x - 30, z: W.SWAMP.z - 4, yaw: yawToward(1, 0), pitch: 0.05 }
   ];
   let camY = 0;
   function spawnInTown() {                               // where everyone starts: the middle of the four shops
@@ -2429,7 +2443,7 @@ const World = (function () {
     if (!pl) return;
     if (shopping) closeShop();
     p.x = pl.x; p.z = pl.z; p.yaw = pl.yaw; p.pitch = pl.pitch; p.vy = 0; p.onGround = true;
-    p.dungeon = false;
+    p.dungeon = false; p.mud = false; sinkT = -1;
     camD = pl.cave ? 0 : CAM_BACK;
     p.inLid = W.lidAt(p.x, p.z); p.inCave = !!pl.cave && p.inLid;
     p.y = standing(p.x, p.z);
@@ -2444,6 +2458,40 @@ const World = (function () {
     blinkEl.style.transition = 'none'; blinkEl.style.opacity = '1';
     void blinkEl.offsetWidth;
     blinkEl.style.transition = ''; blinkEl.style.opacity = '0';
+  }
+  /* The quicksand: step on it (on foot) and you sink, then fall for 10 seconds down a muddy shaft into the mud cavern. */
+  let sinkT = -1;
+  const SINK = 1.6, FALL = 10;
+  function quicksandStep(dt) {
+    sinkT += dt;
+    const top = W.bil(H, QS.x, QS.z);
+    p.x = QS.x; p.z = QS.z; p.vy = 0; p.onGround = false;
+    if (sinkT < SINK) { p.y = top - sinkT / SINK * 1.9; return; }
+    if (!p.mud) { p.mud = true; p.dungeon = true; p.inCave = false; p.inLid = false; toast('Aaaah! You\'re falling down a muddy hole...', 5); }
+    const f = Math.min(1, (sinkT - SINK) / FALL);
+    p.y = lerp(top - 1.9, MUD.floor, f);
+    p.yaw += dt * 0.6;                                   // spinning slowly as you fall
+    if (f >= 1) { sinkT = -1; p.y = MUD.floor; p.onGround = true; blink(); toast('You landed in a secret mud cavern! Find the way out.', 5); }
+  }
+  function quicksandCheck() {                            // from update: stepping onto the quicksand
+    if (sinkT >= 0 || p.mud || p.dungeon || riding || flying || !p.onGround) return;
+    if (Math.hypot(p.x - QS.x, p.z - QS.z) < QS.r) { sinkT = 0; keys.clear(); toast('Oh no, QUICKSAND! You\'re sinking!', 3); }
+  }
+  function mudMove(dx, dz) {                             // inside the cavern and its tunnel
+    const m = 0.45;
+    let lx = p.x - MUD.x + dx, lz = p.z - MUD.z + dz;
+    const inTunnel = lx < -MUD.hx + 0.6 && Math.abs(lz) < MUD.tw;
+    if (inTunnel || (lx < -MUD.hx + m && Math.abs(lz) < MUD.tw - m)) { lz = clamp(lz, -MUD.tw + m, MUD.tw - m); lx = Math.max(lx, -MUD.hx - MUD.tun); }
+    else { lx = clamp(lx, -MUD.hx + m, MUD.hx - m); lz = clamp(lz, -MUD.hz + m, MUD.hz - m); }
+    p.x = MUD.x + lx; p.z = MUD.z + lz;
+    if (lx < -MUD.hx - MUD.tun + 1) leaveMud();          // the end of the tunnel: out into the desert
+  }
+  function leaveMud() {
+    p.mud = false; p.dungeon = false; p.inCave = false; p.inLid = false;
+    p.x = MUD_EXIT.x; p.z = MUD_EXIT.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true;
+    p.yaw = yawToward(-1, 0); p.pitch = 0;
+    camY = p.y + EYE; blink();
+    toast('You climbed out of the tunnel into the desert!', 4);
   }
   function enterDungeon() {                              // the pond floor gives way
     const s = DG.shaft - 0.4;
@@ -2635,6 +2683,7 @@ const World = (function () {
     .filter(([lx, lz]) => { for (let i = 0; i < dgBlocks.length; i += 3) if (Math.hypot(lx - dgBlocks[i], lz - dgBlocks[i + 1]) < dgBlocks[i + 2] + 1) return false; return true; })
     .map(([lx, lz]) => ({ x: DG.x + lx, y: DG.floor, z: DG.z + lz, dungeon: true }));
 
+  EGG_TIERS[4].spots.push(...[[-8, -6], [9, 6], [7, -7]].map(([lx, lz]) => ({ x: MUD.x + lx, y: MUD.floor, z: MUD.z + lz, dungeon: true, mud: true })));   // and in the mud cavern
   EGG_TIERS[5].spots = [];                              // the fire egg only ever appears in the village bonfire
   EGG_TIERS[6].spots = [];                              // and the nuke egg only in the nuke bunker
   /* Every hiding place, from beaches to the mine, goes into one list, and any egg can turn up at any of them, at random
@@ -2958,7 +3007,7 @@ const World = (function () {
   let carrying = null, hatching = null;
   const clock = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
   function pickUp(egg) {
-    const t = EGG_TIERS[egg.tier], home = plots[myPlot], total = Math.round(t.base + Math.hypot(egg.spot.x - home.x, egg.spot.z - home.z) * EXTRA_PER_UNIT);
+    const t = EGG_TIERS[egg.tier], home = plots[myPlot], total = Math.round(t.base + Math.hypot(egg.spot.x - home.x, egg.spot.z - home.z) * EXTRA_PER_UNIT + (egg.spot.mud ? 20 : 0));   // 20 s more from the mud cavern, to walk out
     egg.taken = true; egg.g.visible = false;
     carrying = { egg, left: total, total, shown: -1 };
     carryMeshes[egg.tier].visible = true;
@@ -2993,7 +3042,7 @@ const World = (function () {
       villagersHome(); monsterHome(); if (egg.spawned) respawnEgg(egg);
       toast(egg.fire ? 'You dropped the fire egg. It went back to the fire.' : 'You dropped the nuke egg. It went back to the bunker.', 3); return;
     }
-    const spot = { x: p.x, y: p.dungeon ? DG.floor : p.inCave ? W.bil(H, p.x, p.z) : standing(p.x, p.z), z: p.z, dungeon: p.dungeon, cave: p.inCave };
+    const spot = { x: p.x, y: p.dungeon ? (p.mud ? MUD.floor : DG.floor) : p.inCave ? W.bil(H, p.x, p.z) : standing(p.x, p.z), z: p.z, dungeon: p.dungeon, cave: p.inCave, mud: !!p.mud };
     placeEgg(egg, spot); egg.waitAway = true;            // not picked straight back up: walk away from it first
     toast('You dropped the ' + EGG_TIERS[egg.tier].name + ' egg. Walk back to it to pick it up again.', 3);
   }
@@ -3046,7 +3095,7 @@ const World = (function () {
     if (!carrying) {
       for (const egg of eggs) {
         if (egg.waitAway) { if (Math.hypot(p.x - egg.spot.x, p.z - egg.spot.z) > 2.5) egg.waitAway = false; else continue; }
-        if (egg.taken || !!egg.spot.dungeon !== p.dungeon || Math.abs(p.y - egg.spot.y) > 2.2 || Math.hypot(p.x - egg.spot.x, p.z - egg.spot.z) > 1.4) continue;
+        if (egg.taken || !!egg.spot.dungeon !== p.dungeon || !!egg.spot.mud !== !!p.mud || Math.abs(p.y - egg.spot.y) > 2.2 || Math.hypot(p.x - egg.spot.x, p.z - egg.spot.z) > 1.4) continue;
         if (myPlot < 0) { if (nagT <= 0) { toast('Claim a plot first: walk onto any plot in town. Then come back for this egg!', 5); nagT = 6; } break; }
         pickUp(egg); break;
       }
@@ -3157,7 +3206,10 @@ const World = (function () {
     if (home || onPlot) {
       const l = onPlot && !home ? plotLocal(myPlot, d.root.position.x, d.root.position.z) : { lx: 0, lz: 0 };
       d.lx = l.lx; d.lz = l.lz; d.tx = l.lx; d.tz = l.lz; d.wait = 1;
-    } else d.homing = true;                              // fly back to the plot by itself
+    } else {                                             // off your plot: it goes into your inventory (Adriana's rule)
+      storeDragon(d.index);
+      toast('Your ' + DRAGON_KINDS[d.kind].name + ' dragon went into your inventory.', 3);
+    }
   }
   /* What did the click or tap land on? A ray from the camera through that point, tested against each dragon. */
   function clickAt(cx, cy) {
@@ -3294,7 +3346,8 @@ const World = (function () {
     if (liftT > 0) liftT -= dt;
     const dive = keys.has('KeyC') || keys.has('ControlLeft') || touchDive;   // hold C (or the Down button) to dive
     if (dive) liftT = 0;
-    p.vy += ((dive ? -45 * big : down || liftT > 0 ? climb : -2.5) - p.vy) * Math.min(1, dt * (dive ? 6 : 4));
+    const sink = DRAGON_KINDS[riding.kind].storm ? 0 : -2.5;   // admin dragons hover: only diving brings them down
+    p.vy += ((dive ? -45 * big : down || liftT > 0 ? climb : sink) - p.vy) * Math.min(1, dt * (dive ? 6 : 4));
     p.y = Math.min(200, p.y + p.vy * dt);
     const g = standing(p.x, p.z);
     if (p.y <= g) { p.y = g; p.vy = 0; flying = false; p.onGround = true; }
@@ -4089,7 +4142,7 @@ const World = (function () {
     if (riding) dismount(true);
     flying = false;
     const w = plotWorld(myPlot, 0, -2);
-    p.x = w.x; p.z = w.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true; p.dungeon = false; p.inCave = false; p.inLid = false;
+    p.x = w.x; p.z = w.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true; p.dungeon = false; p.mud = false; sinkT = -1; p.inCave = false; p.inLid = false;
     camY = p.y + EYE; blink();
     toast(msg, 6);
   }
@@ -4222,6 +4275,99 @@ const World = (function () {
   }
   $('secretBuyRad').addEventListener('click', buyRadRes);
   $('secretBuyRad').textContent = fmt(RAD_RES_PRICE) + ' coins';
+  /* ---------- The swamp, the quicksand and the secret mud cavern ---------- */
+  /* Adriana's idea: a swamp on new land east of the desert (W.SWAMP), with dead trees hung with moss, reeds, lily pads
+     and murky water. Hidden in it is a patch of quicksand (QS): step on it and you sink, fall for 10 seconds, and land in
+     a mud cavern far below (MUD), with big muddy walls, glowing mushrooms, signs pointing the way out, and a tunnel that
+     comes out in the desert (MUD_EXIT). The bunker's code is on a sign down there, and a Prismatic egg can hide there. */
+  (function buildSwamp() {
+    const parts = [], R = W.rng(9191), put = (g, color, x, y, z, rx, ry, rz, sx, sy, sz) => parts.push({ g, color, m: xf(x, y, z, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0), jitter: 0.1 });
+    const spot = (test) => { for (let n = 0; n < 60; n++) { const a = R() * 6.283, r = Math.sqrt(R()) * W.SWAMP.r * 0.95, x = W.SWAMP.x + Math.cos(a) * r, z = W.SWAMP.z + Math.sin(a) * r, h = W.bil(H, x, z); if (Math.hypot(x - QS.x, z - QS.z) > QS.r + 3 && test(h)) return { x, z, h }; } return null; };
+    for (let k = 0; k < 34; k++) {                       // dead trees with hanging moss
+      const q = spot((h) => h > 0.05); if (!q) continue;
+      const tall = 5 + R() * 4, lean = (R() - 0.5) * 0.25;
+      put(new THREE.CylinderGeometry(0.22, 0.42, tall, 6), 0x3e3326, q.x, q.h + tall / 2, q.z, lean, 0, lean);
+      for (let b = 0; b < 3; b++) { const a = R() * 6.283, y = q.h + tall * (0.55 + b * 0.15), len = 1.6 + R() * 1.4;
+        put(new THREE.CylinderGeometry(0.06, 0.12, len, 4), 0x3e3326, q.x + Math.cos(a) * len * 0.4, y + 0.4, q.z + Math.sin(a) * len * 0.4, Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9);
+        put(new THREE.BoxGeometry(0.12, 0.8 + R() * 0.8, 0.12), 0x6b7a3a, q.x + Math.cos(a) * len * 0.75, y - 0.1, q.z + Math.sin(a) * len * 0.75); }
+    }
+    for (let k = 0; k < 120; k++) {                      // reeds and cattails at the water's edge
+      const q = spot((h) => h > -0.3 && h < 0.5); if (!q) continue;
+      for (let c = 0; c < 4; c++) { const ox = (R() - 0.5) * 0.7, oz = (R() - 0.5) * 0.7, t = 1 + R() * 0.9;
+        put(new THREE.BoxGeometry(0.05, t, 0.05), 0x6a8a3a, q.x + ox, Math.max(q.h, 0) + t / 2, q.z + oz, (R() - 0.5) * 0.3, 0, (R() - 0.5) * 0.3);
+        if (c === 0) put(new THREE.BoxGeometry(0.11, 0.32, 0.11), 0x5a3a1e, q.x + ox, Math.max(q.h, 0) + t + 0.1, q.z + oz); }
+    }
+    for (let k = 0; k < 50; k++) {                       // lily pads on the pools
+      const q = spot((h) => h < -0.15); if (!q) continue;
+      put(new THREE.CylinderGeometry(0.5 + R() * 0.3, 0.5, 0.04, 8), 0x4f8a2a, q.x, 0.08, q.z);
+      if (R() < 0.3) put(new THREE.BoxGeometry(0.14, 0.12, 0.14), 0xf6a5c0, q.x + 0.1, 0.16, q.z);
+    }
+    for (let k = 0; k < 12; k++) {                       // mossy logs
+      const q = spot((h) => h > 0.1); if (!q) continue;
+      put(new THREE.CylinderGeometry(0.35, 0.35, 3 + R() * 2, 7), 0x4a3a28, q.x, q.h + 0.3, q.z, 0, R() * 3, Math.PI / 2);
+      put(new THREE.BoxGeometry(1.2, 0.12, 0.5), 0x5f7a2e, q.x, q.h + 0.66, q.z, 0, R() * 3, 0);
+    }
+    for (let k = 0; k < 40; k++) {                       // toadstools
+      const q = spot((h) => h > 0.1); if (!q) continue;
+      put(new THREE.CylinderGeometry(0.06, 0.08, 0.3, 5), 0xe8dcc0, q.x, q.h + 0.15, q.z);
+      put(new THREE.ConeGeometry(0.22, 0.18, 7), k % 3 ? 0x8a5a9a : 0xb84a2a, q.x, q.h + 0.36, q.z);
+    }
+    const top = W.bil(H, QS.x, QS.z);                    // the quicksand: a smooth sandy patch with ripples (no warning sign!)
+    put(new THREE.CylinderGeometry(QS.r, QS.r, 0.1, 20), 0xb89a62, QS.x, top + 0.03, QS.z);
+    [0.8, 1.5, 2.2].forEach((r) => put(new THREE.TorusGeometry(r, 0.04, 4, 20), 0x9a7e4a, QS.x, top + 0.09, QS.z, Math.PI / 2));
+    scene.add(new THREE.Mesh(merge(parts), plantMat));
+    const murk = new THREE.Mesh(new THREE.CircleGeometry(W.SWAMP.r * 1.15, 40), new THREE.MeshLambertMaterial({ color: 0x4a5a2a, transparent: true, opacity: 0.88 }));
+    murk.rotation.x = -Math.PI / 2; murk.position.set(W.SWAMP.x, 0.06, W.SWAMP.z); murk.renderOrder = 2; scene.add(murk);   // murky green water over the swamp's pools
+  })();
+  (function buildMudCavern() {
+    const parts = [], R = W.rng(5150), F = MUD.floor, T = MUD.ceil, hx = MUD.hx, hz = MUD.hz;
+    const put = (w, h, d, x, y, z, color, ry) => parts.push({ g: new THREE.BoxGeometry(w, h, d), color, m: xf(MUD.x + x, y, MUD.z + z, 1, 1, 1, 0, ry || 0, 0), jitter: 0.12 });
+    const MUDC = [0x5a3d22, 0x4e3420, 0x6b4a2b, 0x5f4126];
+    put(hx * 2 + 2, 0.6, hz * 2 + 2, 0, F - 0.3, 0, 0x4a3320);                  // floor
+    put(hx * 2 + 2, 0.8, hz * 2 + 2, 0, T + 0.4, 0, 0x3a2818);                  // ceiling
+    const lumpy = (x0, z0, x1, z1, skip) => {             // big muddy walls, made of lumps
+      const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 1.6);
+      for (let k = 0; k <= n; k++) { const x = x0 + (x1 - x0) * k / n, z = z0 + (z1 - z0) * k / n;
+        for (let y = F; y < T; y += 2.2) if (!(skip && skip(x, z) && y < F + 3.4)) put(1.8 + R() * 0.8, 2.6, 1.8 + R() * 0.8, x + (R() - 0.5) * 0.4, y + 1.2, z + (R() - 0.5) * 0.4, MUDC[Math.floor(R() * 4)], R()); }
+    };
+    lumpy(-hx - 0.9, -hz - 0.9, hx + 0.9, -hz - 0.9); lumpy(-hx - 0.9, hz + 0.9, hx + 0.9, hz + 0.9); lumpy(hx + 0.9, -hz - 0.9, hx + 0.9, hz + 0.9);
+    lumpy(-hx - 0.9, -hz - 0.9, -hx - 0.9, hz + 0.9, (x, z) => Math.abs(z) < MUD.tw + 0.6);   // the west wall, open for the tunnel
+    for (let k = 0; k < 14; k++) put(0.12, 1 + R() * 2.2, 0.12, (R() - 0.5) * hx * 1.8, T - 1, (R() - 0.5) * hz * 1.8, 0x3a2a18);   // roots hanging from the ceiling
+    for (let k = 0; k < 10; k++) { const x = (R() - 0.5) * hx * 1.7, z = (R() - 0.5) * hz * 1.7; put(1.8 + R() * 2, 0.06, 1.2 + R() * 1.5, x, F + 0.03, z, 0x2f2a1a, R()); }   // puddles
+    const L = MUD.tun, tw = MUD.tw;                     // the tunnel, west toward the desert
+    put(L + 2, 0.5, tw * 2 + 2, -hx - L / 2, F - 0.25, 0, 0x4a3320);
+    put(L + 2, 0.6, tw * 2 + 2, -hx - L / 2, F + 3.6, 0, 0x3a2818);
+    [-1, 1].forEach((sd) => { for (let x = -hx - 1; x > -hx - L - 1; x -= 1.6) put(1.7, 3.8, 1, x, F + 1.8, sd * (tw + 0.5), MUDC[Math.floor(R() * 4)], R() * 0.3); });
+    put(0.4, 3.8, tw * 2 + 2, -hx - L - 0.8, F + 1.8, 0, 0x3a2818);
+    scene.add(new THREE.Mesh(merge(parts), plantMat));
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, W.bil(H, QS.x, QS.z) - T + 1, 14, 6, true), new THREE.MeshLambertMaterial({ color: 0x4e3420, side: THREE.BackSide }));
+    shaft.position.set(QS.x, (W.bil(H, QS.x, QS.z) + T) / 2 - 0.6, QS.z); scene.add(shaft);   // the long muddy hole you fall down
+    const glow = new THREE.MeshBasicMaterial({ color: 0x9fffd0 }), glow2 = new THREE.MeshBasicMaterial({ color: 0xffe68a });
+    for (let k = 0; k < 16; k++) {                       // glowing mushrooms, so you can see
+      const x = (R() < 0.5 ? -1 : 1) * (hx - 1.2 - R() * 1.5), z = (R() - 0.5) * hz * 1.7, m = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.3, 7), k % 3 ? glow : glow2);
+      m.position.set(MUD.x + x, F + 0.6, MUD.z + z); scene.add(m);
+      const st = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.45, 0.1), glow2); st.position.set(MUD.x + x, F + 0.22, MUD.z + z); scene.add(st);
+    }
+    for (let x = -hx - 2; x > -hx - L; x -= 6) { const m = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.25, 7), glow); m.position.set(MUD.x + x, F + 0.5, MUD.z - tw + 0.4); scene.add(m); }
+    const day = new THREE.Mesh(new THREE.PlaneGeometry(tw * 2, 3.4), new THREE.MeshBasicMaterial({ color: 0xfff4d6 }));   // daylight at the end of the tunnel
+    day.position.set(MUD.x - hx - L - 0.55, F + 1.7, MUD.z); day.rotation.y = Math.PI / 2; scene.add(day);
+    const arrowSign = (x, z, ry, text) => {               // "GET OUT THIS WAY" signs with arrows toward the tunnel
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256; const g = cv.getContext('2d');
+      g.fillStyle = '#7a5533'; g.fillRect(0, 0, 512, 256); g.strokeStyle = '#3a2614'; g.lineWidth = 14; g.strokeRect(7, 7, 498, 242);
+      g.fillStyle = '#fff4d6'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '700 54px "Trebuchet MS", sans-serif'; g.fillText(text, 256, 78);
+      g.beginPath(); g.moveTo(90, 170); g.lineTo(330, 170); g.lineTo(330, 132); g.lineTo(430, 182); g.lineTo(330, 232); g.lineTo(330, 194); g.lineTo(90, 194); g.closePath(); g.fill();
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }));
+      m.position.set(MUD.x + x, F + 2.3, MUD.z + z); m.rotation.y = ry; scene.add(m);
+    };
+    arrowSign(2, -hz + 1.1, 0, 'GET OUT THIS WAY');     // on the near wall: the arrow points west, to the tunnel
+    arrowSign(hx - 1.1, 2, -Math.PI / 2, 'GET OUT THIS WAY');
+    arrowSign(-hx - 6, -tw - 0.05, 0, 'KEEP GOING');
+    const ex = MUD_EXIT, ey = W.bil(H, ex.x, ex.z), mound = [];   // where the tunnel comes out in the desert: a rocky mound with a dark hole
+    [[0, 0, 3.4], [1.6, 1.2, 2.2], [-1.4, 1.5, 2.4], [0.8, -1.8, 2]].forEach(([dx, dz, r]) => mound.push({ g: new THREE.DodecahedronGeometry(r, 0), color: 0xa8643a, m: xf(ex.x + 2.5 + dx, ey + r * 0.4, ex.z + dz, 1, 0.7, 1, R(), R(), R()), jitter: 0.2 }));
+    mound.push({ g: new THREE.BoxGeometry(0.4, 2.2, 2.4), color: 0x1a120c, m: xf(ex.x + 0.2, ey + 1.1, ex.z, 1, 1, 1), jitter: 0 });
+    scene.add(new THREE.Mesh(merge(mound), plantMat));
+  })();
+
   /* ---------- The nuke bunker (far north-east corner) ---------- */
   /* Adriana's idea. A concrete bunker with a locked steel door. The code (5367) is on a hidden sign down in the mine.
      Getting in also needs a radioactive resistant upgrader from the secret shop, or the radiation bounces you back.
@@ -4230,11 +4376,11 @@ const World = (function () {
      were worked out so a fire dragon needs 9 Prismatic upgraders to get away from every plot. Home in time: a nuke
      dragon, boy or girl. One nuke egg every NUKE_PERIOD seconds. */
   const BK = W.BUNKER, bkFace = Math.atan2(HUB.x - BK.x, HUB.z - BK.z), BY = W.bil(H, BK.x, BK.z), NUKE_TIER = 6;
-  const NUKE_SECONDS = 13, NUKE_PERIOD = 600, NUKE_CODE = '5367', MONSTER_SPEED = 170, MONSTER_CATCH = 3;
+  const NUKE_SECONDS = 13, NUKE_PERIOD = 600, NUKE_CODE = '5367', MONSTER_SPEED = 165, MONSTER_CATCH = 3;
   const bkC = Math.cos(bkFace), bkS = Math.sin(bkFace);
   const bkWorld = (lx, lz) => ({ x: BK.x + lx * bkC + lz * bkS, z: BK.z - lx * bkS + lz * bkC });   // the bunker's own frame: +z is the door side, toward town
   const bkLocal = (x, z) => { const dx = x - BK.x, dz = z - BK.z; return { lx: dx * bkC - dz * bkS, lz: dx * bkS + dz * bkC }; };
-  const EGG_AT = { lx: 0, lz: -2 }, DEN = { lx: 0, lz: -17 }, keypadFront = bkWorld(2.1, 7.4);
+  const EGG_AT = { lx: 0, lz: -2 }, DEN = { lx: 2.6, lz: -4.6 }, keypadFront = bkWorld(2.1, 7.4);
   let bunkerOpen = false, doorSlide = 0, nukeTakenRound = -1, keypadTyped = '';
   try { nukeTakenRound = +localStorage.getItem('mutation-mayhem-nuke-taken') || -1; } catch (e) { /* none */ }
   const nukeRound = () => Math.floor(Date.now() / 1000 / NUKE_PERIOD);
@@ -4250,7 +4396,7 @@ const World = (function () {
     box(2.8, 1.0, 0.6, 0, 3.9, 5.7, CON);
     box(13.2, 0.7, 13.2, 0, 4.75, 0, DARK);               // thick roof, with vents
     [[-3, -3], [3, 2]].forEach(([x, z]) => { box(1, 0.8, 1, x, 5.5, z, 0x4a4f53); box(1.2, 0.15, 1.2, x, 5.95, z, 0x3a3f43); });
-    for (let k = 0; k < 8; k++) box(0.42, 0.5, 0.06, -1.47 + k * 0.42, 3.9, 6.03, k % 2 ? 0x1d1f22 : 0xffd23f, 0.6);   // hazard stripes over the door
+    for (let k = 0; k < 8; k++) box(0.42, 0.3, 0.06, -1.47 + k * 0.42, 4.25, 6.03, k % 2 ? 0x1d1f22 : 0xffd23f, 0.6);   // hazard stripes over the door
     box(1.5, 1.5, 0.06, -3.7, 2.5, 6.02, 0xffd23f);       // a radiation sign: yellow, with a black trefoil
     box(0.24, 0.24, 0.07, -3.7, 2.5, 6.04, 0x1d1f22);
     [0, 2.094, 4.189].forEach((a) => box(0.3, 0.4, 0.07, -3.7 + Math.sin(a) * 0.38, 2.5 + Math.cos(a) * 0.38, 6.04, 0x1d1f22, -a));
@@ -4263,13 +4409,23 @@ const World = (function () {
     const wall = (ax, az, bx, bz) => { const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 0.8); for (let k = 0; k <= n; k++) { const w = bkWorld(ax + (bx - ax) * k / n, az + (bz - az) * k / n); addCollider(w.x, w.z, 0.5); } };
     wall(-5.7, -5.7, 5.7, -5.7); wall(-5.7, -5.7, -5.7, 5.7); wall(5.7, -5.7, 5.7, 5.7); wall(-5.7, 5.7, -1.7, 5.7); wall(1.7, 5.7, 5.7, 5.7);
     [[-4.6, -4.6], [4.6, -4.6], [-4.6, 4.2], [4.6, 4.2]].forEach(([x, z]) => { const w = bkWorld(x, z); addCollider(w.x, w.z, 0.6); });
-    const pitW = bkWorld(DEN.lx, DEN.lz);                 // the monster's toxic pit behind the bunker
-    const pit = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 0.3, 18), new THREE.MeshBasicMaterial({ color: 0x5aff2a }));
-    pit.position.set(pitW.x, W.bil(H, pitW.x, pitW.z) + 0.05, pitW.z); scene.add(pit);
+    const pitW = bkWorld(DEN.lx, DEN.lz);                 // a puddle of glowing goo where the monster sleeps, inside at the back
+    const pit = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.08, 16), new THREE.MeshBasicMaterial({ color: 0x5aff2a }));
+    pit.position.set(pitW.x, BY + 0.2, pitW.z); scene.add(pit);
+    const dune = [], RR = W.rng(8484);                   // hidden: sand heaped over the roof and against the walls, so it looks like a dune with a door
+    const heap = (lx, lz, r, sy, y) => { const w = bkWorld(lx, lz); dune.push({ g: new THREE.DodecahedronGeometry(r, 1), color: [0xe0b070, 0xd8a868, 0xe8bc7c][Math.floor(RR() * 3)], m: xf(w.x, BY + y, w.z, 1, sy, 1, RR(), RR(), RR()), jitter: 0.15 }); };
+    heap(0, -1, 8.4, 0.42, 4.8); heap(-3.5, 2, 5.5, 0.45, 5); heap(3.5, -3, 5.5, 0.45, 5);   // over the roof
+    for (let k = -6; k <= 6; k += 3) { heap(k, -7.2, 3.4, 0.9, 1.4); heap(-7.2, k, 3.4, 0.9, 1.4); heap(7.2, k, 3.4, 0.9, 1.4); }   // banked up the back and sides
+    [-4.6, 4.6].forEach((x) => heap(x, 7.2, 2.9, 0.9, 1.2));   // and the front, either side of the door
+    scene.add(new THREE.Mesh(merge(dune), plantMat));
+    [[-9, 6], [9.5, 4], [-8, -9], [10, -8], [0, 11.5]].forEach(([lx, lz], k) => {   // a few dry bushes and rocks to break up the shape
+      const w = bkWorld(lx, lz), g = new THREE.Mesh(new THREE.DodecahedronGeometry(0.9 + (k % 2) * 0.5, 0), new THREE.MeshLambertMaterial({ color: k % 2 ? 0x8a7a4a : 0xa8643a }));
+      g.position.set(w.x, BY + 0.5, w.z); g.scale.set(1, 0.7, 1); scene.add(g);
+    });
     const sign = document.createElement('canvas'); sign.width = 512; sign.height = 128;   // "NUKE BUNKER" over the door
     const g = sign.getContext('2d'); g.fillStyle = '#1d1f22'; g.fillRect(0, 0, 512, 128); g.fillStyle = '#ffd23f'; g.font = '700 70px "Trebuchet MS", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('NUKE BUNKER', 256, 66);
     const sm = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sign) }));
-    const sw = bkWorld(0, 6.09); sm.position.set(sw.x, BY + 4.75, sw.z); sm.rotation.y = bkFace; scene.add(sm);
+    const sw = bkWorld(0, 6.09); sm.position.set(sw.x, BY + 3.9, sw.z); sm.rotation.y = bkFace; sm.scale.set(0.6, 0.6, 1); scene.add(sm);   // a small plate over the door
   })();
   const bunkerDoor = new THREE.Group();                  // the steel door slides sideways into the wall when it opens
   block(bunkerDoor, lam(0x9aa0a6), 2.8, 3.4, 0.3, 0, 1.7, 0); block(bunkerDoor, lam(0xffd23f), 2.8, 0.3, 0.32, 0, 2.6, 0); block(bunkerDoor, lam(0x1d1f22), 2.8, 0.15, 0.32, 0, 2.6, 0.0);
@@ -4279,7 +4435,7 @@ const World = (function () {
   const nukeEggMesh = new THREE.Mesh(eggGeo[NUKE_TIER], eggMat(NUKE_TIER)), eggW = bkWorld(EGG_AT.lx, EGG_AT.lz);
   nukeEggMesh.position.set(eggW.x, BY + 1.1, eggW.z); nukeEggMesh.scale.set(1.2, 1.2, 1.2); scene.add(nukeEggMesh);
   const bunkerLight = new THREE.PointLight(0x39ff14, 1.4, 16, 2); bunkerLight.position.set(eggW.x, BY + 3, eggW.z); scene.add(bunkerLight);
-  /* The code, on a hidden sign down in the mine, on the left wall, past the boarded-up tunnel. */
+  /* The code, on a sign in the secret mud cavern under the swamp's quicksand. */
   (function mineSign() {
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = 384;
     const g = cv.getContext('2d');
@@ -4288,7 +4444,7 @@ const World = (function () {
     g.font = '700 150px "Trebuchet MS", sans-serif'; g.fillText(NUKE_CODE, 256, 150);
     g.font = '700 40px "Trebuchet MS", sans-serif'; g.fillText('Go to the nuke bunker', 256, 268); g.fillText('and put it in.', 256, 318);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.65), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }));
-    m.position.set(DG.x - DG.hx + 0.08, DG.floor + 2.1, DG.z + 14.9); m.rotation.y = Math.PI / 2; scene.add(m);
+    m.position.set(MUD.x + 4, MUD.floor + 2.4, MUD.z + MUD.hz - 1.1); m.rotation.y = Math.PI; scene.add(m);   // on the far wall, facing in
   })();
   /* The nuclear monster: a huge glowing green brute with yellow eyes and spikes down its back. */
   const monster = { f: figure({ skin: lam('#6dff3a'), shirt: lam('#2a3a1a'), pants: lam('#1d2a12'), face: lam(0xffe14a) }), x: 0, z: 0, stun: 0, hop: 0, spin: 0 };
@@ -4303,7 +4459,7 @@ const World = (function () {
     const egg = { tier: NUKE_TIER, nuke: true, lucky: true, taken: false, g: { visible: false }, spot: { x: eggW.x, y: BY, z: eggW.z } };
     pickUp(egg);
     carrying.left = carrying.total = NUKE_SECONDS;
-    mchase = { wait: 0.02 };                            // it climbs out of the pit straight away
+    mchase = { wait: 0.05 };                            // it wakes up almost at once
     toast('You grabbed the NUKE EGG! ' + NUKE_SECONDS + ' seconds to get it home. The nuclear monster is coming. FLY!', 5);
   }
   function nukeHatched() { nukeTakenRound = nukeRound(); try { localStorage.setItem('mutation-mayhem-nuke-taken', String(nukeTakenRound)); } catch (e) { /* not saved */ } }
@@ -4334,9 +4490,11 @@ const World = (function () {
     nukeEggMesh.rotation.y = reduced ? 0 : time * 0.8;
     bunkerLight.intensity = 1.2 + (reduced ? 0 : Math.sin(time * 3) * 0.4);
     const y = Math.max(W.bil(H, monster.x, monster.z), SWIM), running = !!mchase && mchase.wait <= 0;
-    monster.f.root.position.set(monster.x, y + (monster.hop || 0) + (!mchase && !reduced ? Math.abs(Math.sin(time * 1.5)) * 0.2 : 0), monster.z);
+    const home = !mchase && Math.hypot(monster.x - bkWorld(DEN.lx, DEN.lz).x, monster.z - bkWorld(DEN.lx, DEN.lz).z) < 0.5;
+    monster.f.root.position.set(monster.x, (home ? BY + 0.1 : y) + (monster.hop || 0), monster.z);
     monster.f.root.rotation.y = mchase ? Math.atan2(-(p.x - monster.x), -(p.z - monster.z)) : bkFace;
     monster.f.root.rotation.x = -(monster.spin || 0);
+    monster.f.head.rotation.x = mchase ? 0 : 0.5 + (reduced ? 0 : Math.sin(time * 1.2) * 0.06);   // asleep: head down, breathing
     const sw = running && !reduced ? Math.sin(time * 16) * 0.9 : 0;
     monster.f.legL.rotation.x = sw; monster.f.legR.rotation.x = -sw; monster.f.armL.rotation.x = -sw - (mchase ? 1.2 : 0); monster.f.armR.rotation.x = sw - (mchase ? 1.2 : 0);
   }
@@ -4699,7 +4857,7 @@ const World = (function () {
   function spawnEgg(tier) {                              // an egg on the ground a few steps in front of you
     if (!isAdmin || !started) return;
     const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), x = p.x + fx * 3, z = p.z + fz * 3;
-    const spot = { x, y: p.dungeon ? DG.floor : p.inCave ? W.bil(H, x, z) : standing(x, z), z, dungeon: p.dungeon, cave: p.inCave };
+    const spot = p.mud ? { x: p.x, y: MUD.floor, z: p.z, dungeon: true, mud: true } : { x, y: p.dungeon ? DG.floor : p.inCave ? W.bil(H, x, z) : standing(x, z), z, dungeon: p.dungeon, cave: p.inCave };
     const t = EGG_TIERS[tier], g = new THREE.Group(), body = new THREE.Mesh(eggGeo[tier], eggMat(tier));
     g.add(body); g.scale.set(1.4, 1.4, 1.4);
     const stars = t.shiny ? [twinkle(g, -0.5, 1.1, 0, 0.7), twinkle(g, 0.45, 0.75, 0.1, 0.55), twinkle(g, 0.2, 1.35, -0.3, 0.45)] : [];
@@ -4958,7 +5116,8 @@ const World = (function () {
       const sp = (riding ? rideSpeed(run) : run ? 17 : 9.5) * (swimming ? 0.6 : 1) * Math.min(1, mag) * dt / mag;
       const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
       const dx = (fx * f + rx * s) * sp, dz = (fz * f + rz * s) * sp;
-      if (p.dungeon) { climbing = dungeonMove(dx, dz); moving = true; }
+      if (p.mud) { mudMove(dx, dz); moving = true; }
+      else if (p.dungeon) { climbing = dungeonMove(dx, dz); moving = true; }
       else {
         if (tryMove(dx, dz)) moving = true;
         else { const a = tryMove(dx, 0), b = tryMove(0, dz); moving = a || b; }
@@ -4966,14 +5125,15 @@ const World = (function () {
       }
     }
     if (!p.dungeon && p.inCave && Math.hypot(p.x - DG.x, p.z - DG.z) < 1.9) enterDungeon();   // into the pond, and through it
-    if (riding && (p.inCave || p.dungeon)) { dismount(false); toast('Dragons are too big for the cave! Yours flew home.', 4); }
+    quicksandCheck();
+    if (riding && (p.inCave || p.dungeon)) { dismount(false); toast('Dragons are too big for the cave! Yours went into your inventory.', 4); }
     const jumpDown = keys.has('Space') || touchJump, jumpPress = jumpTapped || (jumpDown && !jumpWas);
     jumpWas = jumpDown; jumpTapped = false;
     if (riding) rideJump(dt, jumpDown, jumpPress);
     else if ((jumpDown || jumpPress) && p.onGround) { p.vy = 10; p.onGround = false; }
-    const g = p.dungeon ? DG.floor : standing(p.x, p.z);
-    if (flying) flyStep(dt, jumpDown);
+    const g = p.mud ? MUD.floor : p.dungeon ? DG.floor : standing(p.x, p.z);
     if (diveBtn.hidden === flying) { diveBtn.hidden = !flying; if (!flying) touchDive = false; }
+    if (flying) flyStep(dt, jumpDown);
     else if (climbing) {                                       // up the ladder
       p.vy = 0; p.onGround = false; p.y += 5.5 * dt;
       if (p.y > DG.top - 1.9) leaveDungeon();
@@ -4987,6 +5147,7 @@ const World = (function () {
       const ce = W.bil(CE, p.x, p.z);
       if (p.y + 1.9 > ce) { p.y = Math.max(g, ce - 1.9); if (p.vy > 0) p.vy = 0; }
     }
+    if (sinkT >= 0) quicksandStep(dt);                  // sinking, then falling into the mud cavern
     if (moving && p.onGround && !reduced) bobT += dt * (swimming ? 5 : 11);
     const bob = reduced ? 0 : Math.sin(bobT) * (swimming ? 0.09 : 0.045) + (swimming ? Math.sin(time * 1.6) * 0.06 : 0);
     const rideBig = riding ? DRAGON_KINDS[riding.kind].big || 1 : 1;   // a bigger dragon: the camera sits higher and further back
@@ -5026,6 +5187,7 @@ const World = (function () {
   let zone = '';
   function zoneName() {
     const a = W.axisCoords(p.x, p.z), h = W.bil(H, p.x, p.z), s = W.coastS(p.x, p.z);
+    if (p.mud) return 'Mud cavern';
     if (p.dungeon) return 'Dungeon';
     if (p.inCave) return 'Crystal cave';
     if (Math.hypot(p.x - HUB.x, p.z - HUB.z) < HUB.r) return 'Town';
@@ -5035,6 +5197,7 @@ const World = (function () {
     if (p.y > 36) return 'Snowy peak';
     if (h < 1.9 && s < 0.22) return 'Beach';
     if (W.mountainAt(p.x, p.z) > 9) return 'Mountains';
+    if (W.swampF(p.x, p.z) > 0.5) return 'Swamp';
     if (W.desertF(p.x, p.z) > 0.5) return 'Desert';
     if (W.jungleF(p.x, p.z) > 0.5) return 'Jungle';
     return 'Meadow';
@@ -5070,7 +5233,7 @@ const World = (function () {
     zoneEl.classList.remove('in'); void zoneEl.offsetWidth; zoneEl.classList.add('in');
   }
 
-  const mapEl = $('map'), mapCtx = mapEl.getContext('2d'), MAP_R = 190, MAP_PX = 132;
+  const mapEl = $('map'), mapCtx = mapEl.getContext('2d'), MAP_R = 215, MAP_PX = 132;
   const mapBase = document.createElement('canvas');
   mapBase.width = mapBase.height = MAP_PX;
   (function paintMap() {
@@ -5175,7 +5338,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

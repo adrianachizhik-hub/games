@@ -68,6 +68,7 @@ const THREE = {
   BoxGeometry: class extends Geo { constructor(w, hh, d) { if ([w, hh, d].some((v) => typeof v !== 'number' || isNaN(v))) throw new Error('box args'); super(); const p = cyl(Math.SQRT1_2, Math.SQRT1_2, 1, 4); for (let i = 0; i < p.length; i += 3) { const x = p[i], z = p[i + 2], c = Math.SQRT1_2; p[i] = (x * c - z * c) * w; p[i + 1] *= hh; p[i + 2] = (x * c + z * c) * d; } this.attributes.position = new Attr(p, 3); } },
   ConeGeometry: class extends Geo { constructor(r, h, n) { if ([r, h, n].some((v) => typeof v !== 'number' || isNaN(v))) throw new Error('cone args'); super(); this.attributes.position = new Attr(cyl(0, r, h, n).slice(0, n * 2 * 9), 3); } },
   IcosahedronGeometry: class extends Geo { constructor(r, d) { super(d ? 80 : 20); } }, DodecahedronGeometry: class extends Geo { constructor() { super(36); } },
+  TorusGeometry: class extends Geo { constructor(r, t, a, b) { if ([r, t, a, b].some((v) => typeof v !== "number" || isNaN(v))) throw new Error("torus args"); super(a * b); } }, CircleGeometry: class extends Geo { constructor(r, n) { if ([r, n].some((v) => typeof v !== "number" || isNaN(v))) throw new Error("circle args"); super(n); } },
   PlaneGeometry: class extends Geo { constructor(w, h, a = 1, b = 1) { super(); this.attributes.position = new Attr(new Float32Array((a + 1) * (b + 1) * 3), 3); } },
   MeshBasicMaterial: mat, MeshLambertMaterial: mat, MeshStandardMaterial: mat, MeshPhongMaterial: mat, SpriteMaterial: mat, PointsMaterial: mat,
   Mesh, InstancedMesh, Sprite: class extends Obj {}, Points: class extends Obj {},
@@ -326,7 +327,7 @@ if (process.env.SAVED === '1') {
 const E = I.EGG_TIERS, said = () => JSON.stringify(els.toast.hidden ? '' : els.toast.textContent);
 const reclaim = () => { I.goTo(7); const w = I.plotWorld(2, 0, 2); I.p.x = w.x; I.p.z = w.z; I.p.y = 6.3; I.update(1 / 60, 0); };   // after Leave the plot is free again: step back onto Plot 3
 const tick = (secs) => { for (let f = 0; f < secs * 60; f++) { I.update(1 / 60, f / 60); I.eggsAnimate(1 / 60, f / 60); I.earn(1 / 60); } };
-const stand = (spot) => { I.p.x = spot.x; I.p.z = spot.z; I.p.y = spot.y; I.p.vy = 0; I.p.onGround = true; I.p.dungeon = !!spot.dungeon; I.p.inLid = !!spot.cave; I.p.inCave = !!spot.cave; };
+const stand = (spot) => { I.p.x = spot.x; I.p.z = spot.z; I.p.y = spot.y; I.p.vy = 0; I.p.onGround = true; I.p.dungeon = !!spot.dungeon; I.p.mud = !!spot.mud; I.p.inLid = !!spot.cave; I.p.inCave = !!spot.cave; };
 const zonesOf = (t) => { const z = {}; t.spots.forEach((s) => { stand(s); const n = I.zoneName(); z[n] = (z[n] || 0) + 1; }); return JSON.stringify(z); };
 I.goTo(0);
 console.log('egg hiding places:'); E.forEach((t, i) => console.log(' ', t.name.padEnd(10), t.spots.length, 'spots,', I.eggs.filter((e) => e.tier === i).length, 'out at once | zones', zonesOf(t)));
@@ -335,7 +336,7 @@ if (I.myPlot() >= 0 || !document.body.classList.contains('playing')) { els.leave
 { const where = {}, pr = I.eggs.find((e) => e.tier === 4), keep = pr.spot;
   for (let k = 0; k < 300; k++) { pr.taken = true; I.goTo(k % 8); I.eggsRespawn(pr); stand(pr.spot); const z = I.zoneName(); where[z] = (where[z] || 0) + 1; }
   console.log('all hiding places:', I.eggSpots.length, '(hard places', I.hardSpots.length + ') | where the Prismatic egg turned up over 300 respawns:', JSON.stringify(where));
-  if (Object.keys(where).some((z) => !['Mountains', 'Snowy peak', 'Crystal cave', 'Dungeon'].includes(z)) || Object.keys(where).length < 3) throw new Error('prismatic eggs belong in the hard places');
+  if (Object.keys(where).some((z) => !['Mountains', 'Snowy peak', 'Crystal cave', 'Dungeon', 'Mud cavern'].includes(z)) || Object.keys(where).length < 3) throw new Error('prismatic eggs belong in the hard places');
   const cw = {}, cm = I.eggs.find((e) => e.tier === 0); for (let k = 0; k < 300; k++) { cm.taken = true; I.goTo(k % 8); I.eggsRespawn(cm); stand(cm.spot); const z = I.zoneName(); cw[z] = (cw[z] || 0) + 1; }
   console.log('where a Common egg turned up over 300 respawns:', JSON.stringify(cw)); if (Object.keys(cw).length < 5) throw new Error('other eggs should still turn up anywhere'); I.goTo(0); }
 const common = I.eggs.find((e) => e.tier === 0);
@@ -465,15 +466,16 @@ const sp0 = screenOf(pet.root.position.x, pet.root.position.y + 0.6, pet.root.po
 click(sp0); console.log('click the', pet.kind.padEnd(7), 'dragon     : riding', I.riding() && I.riding().kind, '| clicked at', sp0.x.toFixed(0), sp0.y.toFixed(0), '| message', said());
 const rd = I.riding(), rsp = rd && screenOf(rd.root.position.x, rd.root.position.y + 0.6, rd.root.position.z);
 if (!rd) throw new Error('clicking the dragon did not mount it');   // (another dragon standing in front gets it instead, which is fine)
-const pet2 = rd;
+let pet2 = rd;
 let x0 = I.p.x, z0 = I.p.z; I.keys.add('KeyW'); frameN(60); I.keys.clear(); raf(20000); raf(20016);
 console.log('ride forward 1 s             : moved', Math.hypot(I.p.x - x0, I.p.z - z0).toFixed(1), '(walking does 9.5) | dragon under me', Math.hypot(pet2.root.position.x - I.p.x, pet2.root.position.z - I.p.z) < 1e-6, '| sitting', (I.avatar.position.y - I.p.y).toFixed(2), 'above it | dragon size', I.riding().root.scale.x.toFixed(2));
 tapJump(); frameN(40);
-console.log('jump once                    : riding', !!I.riding(), '| flying', I.flying(), '| dragon flying home', !!pet2.homing);
+const offPlot = I.plotAt(I.p.x, I.p.z) !== I.myPlot();
+console.log('jump once (off my plot)      : riding', !!I.riding(), '| flying', I.flying(), '| dragon into the inventory', !I.dragonPlaced[pet2.index] && !I.plotPets.includes(pet2), '| message', said());
 if (I.riding()) throw new Error('one jump should get you off');
-I.p.x += 30; frameN(60 * 12);
-console.log('12 s later                   : dragon home', !pet2.homing && I.plotAt(pet2.root.position.x, pet2.root.position.z) === I.myPlot());
-I.goTo(7); I.p.x = at.x; I.p.z = at.z; frameN(2); I.mount(pet2);
+if (offPlot && (I.dragonPlaced[pet2.index] || I.plotPets.includes(pet2))) throw new Error('getting off away from your plot should put the dragon in the inventory');
+I.placeDragon(pet2.index); const pet3 = I.plotPets.find((d) => d.index === pet2.index); console.log('put it back on the plot from the inventory:', !!pet3);
+I.goTo(7); I.p.x = at.x; I.p.z = at.z; frameN(2); I.mount(pet3);
 tapJump(); frameN(8); tapJump();
 console.log('jump twice                   : flying', I.flying(), '| riding', !!I.riding());
 if (!I.flying()) throw new Error('two jumps should take off');
@@ -873,6 +875,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
       fr(90); const y1 = I.p.y; console.log('jump twice to fly, then let go: flying', I.flying(), '| climbed', (y1 - y0).toFixed(0), 'units in 1.5 s by itself');
       if (!I.flying() || y1 - y0 < 30) throw new Error('flying should take the dragon high into the air');
       window.fire('keydown', ev({ code: 'Space' })); fr(120); window.fire('keyup', ev({ code: 'Space' })); console.log('hold Jump 2 s more: height above where it took off', (I.p.y - y0).toFixed(0));
+      { fr(60); const yh = I.p.y; fr(120); console.log('let go of Jump on an admin dragon, then 2 s more: height change', (I.p.y - yh).toFixed(2)); if (Math.abs(I.p.y - yh) > 0.5) throw new Error('admin dragons should hover'); }
       const yTop = I.p.y; I.keys.add('KeyC'); fr(60); I.keys.delete('KeyC'); console.log('hold C for 1 s: dived down', (yTop - I.p.y).toFixed(0), 'units | still flying', I.flying());
       if (yTop - I.p.y < 25) throw new Error('holding C should dive down fast');
       I.p.y = y0; I.p.vy = 0; fr(3); }
@@ -1014,6 +1017,26 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   console.log('fire dragon + 9 Prismatic (speed', r9.speed + '): grabbed', r9.got, '| home after', r9.secs, 's |', r9.msg, '| dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], 'earning', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], '| egg gone till next time', !I.nukeEggThere());
   if (I.ownDragons.length !== before + 1 || !/^nuke(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.nukeEggThere()) throw new Error('9 upgraders should get the nuke egg home');
   const n50 = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(I.NUKE_TIER); n50[d] = (n50[d] || 0) + 1; } console.log('nuke egg hatches:', Object.keys(n50).map((k) => k + ' ' + (n50[k] / 200).toFixed(0) + '%').join(', '));
+}
+
+// ---- the swamp, the quicksand and the mud cavern ----
+{
+  const fr = (n = 1) => { for (let k = 0; k < n; k++) I.update(1 / 60, 0); };
+  if (I.riding()) I.dismount(true);
+  const S = W.SWAMP; let low = 0, n = 0; for (let k = 0; k < 400; k++) { const a = k * 2.4, r = Math.sqrt(k / 400) * S.r * 0.9, h = W.bil(W.H, S.x + Math.cos(a) * r, S.z + Math.sin(a) * r); n++; if (h < 1) low++; }
+  console.log('swamp at', S.x, S.z, '| low boggy ground', Math.round(low / n * 100) + '% | the desert next door at', I.MUD_EXIT.x, I.MUD_EXIT.z, 'is', W.desertF(I.MUD_EXIT.x, I.MUD_EXIT.z) > 0.5 ? 'desert' : 'not desert');
+  I.goTo(I.places.findIndex((q) => q.name === 'Swamp')); fr(2); console.log('the Swamp place: zone', I.zoneName());
+  if (I.zoneName() !== 'Swamp') throw new Error('should be in the swamp');
+  const q = I.QS; I.p.x = q.x + 1; I.p.z = q.z; I.p.y = W.bil(W.H, I.p.x, I.p.z); I.p.onGround = true; fr(1);
+  console.log('step onto the quicksand: sinking', I.sinkT() >= 0, '|', said());
+  if (I.sinkT() < 0) throw new Error('quicksand should catch you');
+  let t = 0; while (I.sinkT() >= 0 && t < 60 * 20) { t++; fr(); }
+  console.log('fell for', (t / 60).toFixed(1), 's | zone', I.zoneName(), '| floor', I.p.y.toFixed(0), '|', said());
+  if (I.zoneName() !== 'Mud cavern' || t < 60 * 11 || t > 60 * 12.5) throw new Error('you should fall about 10 s into the mud cavern');
+  const prism = I.eggs.find((e) => e.spot.mud); console.log('Prismatic hiding places down here:', I.eggSpots.filter((e) => e.mud).length, '| one here now', !!prism);
+  I.p.yaw = Math.PI / 2; I.keys.add('KeyW'); I.keys.add('ShiftLeft'); let k = 0; while (I.zoneName() === 'Mud cavern' && k++ < 60 * 20) { I.p.yaw = Math.abs(I.p.z - I.MUD.z) > 0.5 && I.p.x > I.MUD.x - I.MUD.hx ? Math.atan2(-(I.MUD.x - I.MUD.hx - 2 - I.p.x), -(I.MUD.z - I.p.z)) : Math.PI / 2; fr(); } I.keys.clear();
+  console.log('walk west along the tunnel: out after', (k / 60).toFixed(1), 's | zone', I.zoneName(), '| at', I.p.x.toFixed(0), I.p.z.toFixed(0), '|', said());
+  if (I.zoneName() !== 'Desert') throw new Error('the tunnel should come out in the desert');
 }
 
 // ---- and once more, as a device with saved progress ----
