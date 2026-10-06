@@ -1038,7 +1038,11 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   if (!sb.classList.contains('corner')) throw new Error('the plot button should sit at the side');
   const before = I.plotPets.filter((d) => I.hasMut(d.index, 'fire')).length;
   I.startFireStorm('Test'); fr(1); console.log('fire storm on', I.fireStormOn(), '|', said(), '| effects', JSON.stringify(els.effect.textContent));
-  let n = 0, hit = null; while (n++ < 60 * 40 && !hit) { fr(); hit = I.plotPets.find((d) => I.hasMut(d.index, 'fire') && !d.loose); }
+  { const xs = []; for (let k = 0; k < 200; k++) { I.spawnFireball(); const f = I.fireballs[I.fireballs.length - 1]; xs.push(Math.hypot(f.x - I.p.x, f.z - I.p.z)); I.fireballs.pop(); }
+    const far = xs.filter((d) => d > 60).length; console.log('200 random fireballs: landing more than 60 away from me', far, '| furthest', Math.max(...xs).toFixed(0));
+    if (far < 100) throw new Error('fireballs should land all over the island'); }
+  const aim = I.plotPets.find((d) => !d.ridden && !d.loose); aim.wait = 999; I.spawnFireball(aim.root.position.x, aim.root.position.z);   // one that happens to land on a dragon
+  let n = 0, hit = null; while (n++ < 60 * 10 && !hit) { fr(); hit = I.plotPets.find((d) => I.hasMut(d.index, 'fire') && !d.loose); }
   console.log('fireballs falling:', I.fireballs.length, '| after', (n / 60).toFixed(1), 's a dragon was hit:', hit && hit.kind, '|', said(), '| label', hit && JSON.stringify(I.ownDragons.length && hit && (I.plotPets.includes(hit) ? 'ok' : '')));
   if (!hit) throw new Error('fireballs should give a dragon the fire mutation');
   const pet = hit; I.mount(pet); const sp = I.rideSpeed(false); I.dismount(true);

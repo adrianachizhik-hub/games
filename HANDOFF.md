@@ -92,7 +92,7 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 
 **Choosing a server** (Adriana: her friends ended up on a different server): the front cover lists all 11 servers with how many are playing (and who, on hover), full ones greyed out (`refreshServers`, from the server's `/status`). The busiest server with room is picked to start with; tap another to choose it. If the chosen one fills up first, you go to one with room and are told.
 
-**Fire storm and the Fire mutation** (her idea): every 30 minutes on the clock, for 5 minutes, fireballs fall (`FS_PERIOD`, `fireStormStep`), many aimed at dragons on your plot. A dragon hit gets the Fire mutation for good (orange embers): 3× riding speed. Mutations are now a list per dragon (`hasMut`, `addMut`), so a dragon can have Lightning and Fire. The screen edges glow orange during a storm. Admins have "🔥 Start a fire storm" (for everyone online).
+**Fire storm and the Fire mutation** (her idea): every 30 minutes on the clock, for 5 minutes, fireballs fall at random all over the island (`FS_PERIOD`, `fireStormStep`, `spawnFireball`); a dragon is hit only if one happens to land on it. A dragon hit gets the Fire mutation for good (orange embers): 3× riding speed. Mutations are now a list per dragon (`hasMut`, `addMut`), so a dragon can have Lightning and Fire. The screen edges glow orange during a storm. Admins have "🔥 Start a fire storm" (for everyone online).
 
 **"Open my plot"** now sits at the left side of the screen instead of over the player (`#shopOpen.corner`).
 

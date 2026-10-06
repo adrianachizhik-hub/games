@@ -5457,7 +5457,7 @@ const World = (function () {
 
   /* ---------- The fire storm ---------- */
   /* Adriana's idea. Every FS_PERIOD seconds on the clock (the same for everyone) a fire storm starts and lasts FS_LEN
-     seconds: fireballs rain from the sky, many of them aimed at dragons on your plot. A dragon a fireball hits gets the
+     seconds: fireballs rain from the sky all over the island, at random. A dragon a fireball hits gets the
      Fire mutation for good: three times as fast to ride. Admins can start one whenever they like (for everyone, when
      there's a server). */
   const FS_PERIOD = 1800, FS_LEN = 300;                  // every 30 minutes, for 5 minutes
@@ -5470,11 +5470,9 @@ const World = (function () {
     if (by === undefined && isAdmin) netSend({ t: 'firestorm' });
     if (by) toast(by + ' started a FIRE STORM!', 3);
   }
-  function spawnFireball() {
-    const pets = myPlot >= 0 ? plotPets.filter((d) => !d.ridden && !d.homing && !d.loose) : [];
-    let target = null, x, z;
-    if (pets.length && Math.random() < 0.45) { target = pets[Math.floor(Math.random() * pets.length)]; x = target.root.position.x; z = target.root.position.z; }
-    else { const a = Math.random() * 6.283, r = 6 + Math.random() * 60; x = p.x + Math.cos(a) * r; z = p.z + Math.sin(a) * r; }
+  function spawnFireball(x, z) {                         // anywhere on the island, at random (Adriana: "randomly go everywhere")
+    const target = null;
+    if (x === undefined) for (let n = 0; n < 10; n++) { const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * 200; x = Math.cos(a) * r; z = Math.sin(a) * r; if (W.bil(H, x, z) > 0) break; }
     const g = new THREE.Group(), ball = new THREE.Mesh(fbGeo, fbMat), core = new THREE.Mesh(fbGeo, fbCore);
     core.scale.set(0.55, 0.55, 0.55); g.add(ball); g.add(core);
     for (let k = 1; k <= 4; k++) { const t = new THREE.Mesh(fbGeo, k % 2 ? fbMat : fbCore); t.scale.set(0.5 / k + 0.15, 0.5 / k + 0.15, 0.5 / k + 0.15); t.position.set(0, k * 1.1, 0); g.add(t); }   // a fiery tail
@@ -5488,7 +5486,7 @@ const World = (function () {
       fsWas = on; document.body.classList[on ? 'add' : 'remove']('firestorm');
       if (on) toast('🔥 FIRE STORM! Fireballs are falling! A dragon hit by one gets the FIRE mutation: 3× speed!', 5);
     }
-    if (on) { fsSpawn -= dt; if (fsSpawn <= 0 && fireballs.length < 24) { fsSpawn = 0.35; spawnFireball(); } }
+    if (on) { fsSpawn -= dt; if (fsSpawn <= 0 && fireballs.length < 30) { fsSpawn = 0.2; spawnFireball(); } }
     for (let i = fireballs.length - 1; i >= 0; i--) {
       const f = fireballs[i];
       if (f.boom) {                                      // the blast: grows and fades
@@ -5504,8 +5502,9 @@ const World = (function () {
       if (k < 1) continue;
       scene.remove(f.g);
       const m = new THREE.Mesh(fbGeo, new THREE.MeshBasicMaterial({ color: 0xffa020, transparent: true, opacity: 0.8 })); m.position.copy(f.g.position); scene.add(m); f.boom = { m, t: 0 };
-      if (f.target && plotPets.includes(f.target) && !f.target.ridden && ownDragons[f.target.index]) {
-        const i2 = f.target.index;
+      const hitPet = plotPets.find((d) => !d.ridden && !d.loose && !d.homing && Math.hypot(d.root.position.x - f.g.position.x, d.root.position.z - f.g.position.z) < 3);   // landed on one of your dragons?
+      if (hitPet && ownDragons[hitPet.index]) {
+        f.target = hitPet; const i2 = f.target.index;
         if (!hasMut(i2, 'fire')) { addMut(i2, 'fire'); saveProgress(); dressPet(f.target); renderInventory(); toast('🔥 A fireball hit your ' + DRAGON_KINDS[ownDragons[i2]].name + ' dragon! It got the FIRE mutation: 3× speed!', 5); }
       }
       if (Math.hypot(p.x - f.g.position.x, p.z - f.g.position.z) < 2.2 && Math.abs(p.y - f.g.position.y) < 3 && !p.dungeon) { p.vy = 8; p.onGround = false; toast('Ouch! A fireball!', 2); }
@@ -5712,7 +5711,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
