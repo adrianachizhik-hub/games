@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mutation Mayhem</title>
+<title>Dragon Keepers</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Luckiest+Guy&display=swap" rel="stylesheet">
@@ -686,14 +686,14 @@
     letter-spacing: 0.03em;
   }
   .logo .line { display: block; white-space: nowrap; }
-  .logo .line + .line { font-size: 1.24em; }
+  .logo .line:first-child { font-size: 1.24em; }   /* DRAGON big, KEEPERS under it */
   .logo b, .logo .eye {
     display: inline-block;
     transform: translateY(var(--y)) rotate(var(--r));
     animation: pop 0.55s cubic-bezier(0.2, 1.5, 0.4, 1) both;
     animation-delay: calc(var(--i) * 45ms);
   }
-  .logo b {                                 /* each letter has mutated its own way: its own colour, tilt and height */
+  .logo b {                                 /* each letter has its own colour, tilt and height */
     font-weight: inherit;
     color: var(--c);
     text-shadow:
@@ -701,7 +701,7 @@
       0.037em 0.037em var(--edge), -0.037em 0.037em var(--edge), 0.037em -0.037em var(--edge), -0.037em -0.037em var(--edge),
       0.03em 0.13em 0 var(--edge), -0.03em 0.13em 0 var(--edge), 0 0.15em 0 var(--edge);
   }
-  .logo .eye {                              /* the O has grown into an eye */
+  .logo .eye {                              /* the O is a dragon's eye */
     position: relative;
     width: 0.72em;
     height: 0.72em;
@@ -717,13 +717,13 @@
     position: absolute;
     left: 24%; top: 26%; width: 54%; height: 54%;
     border-radius: 50%;
-    background: radial-gradient(circle, var(--edge) 0 36%, #ff4fa8 38% 100%);
+    background: radial-gradient(ellipse 22% 50% at 50% 50%, var(--edge) 0 90%, transparent 100%), radial-gradient(circle, #ffe14a 0 40%, #ff8a3d 100%);   /* gold with a slit pupil */
   }
   .logo .eye::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: #9cff4a;
+    background: #ff8a3d;
     transform: translateY(-102%);
     animation: wink 6s 2s infinite;
   }
@@ -993,11 +993,11 @@
 
 <div id="intro">
   <div class="cover">
-    <h1 class="logo" aria-label="Mutation Mayhem">
-      <span class="line" aria-hidden="true"><b style="--c:#6bff5e;--r:-7deg;--y:0.02em;--i:0">M</b><b style="--c:#9cff4a;--r:4deg;--y:-0.05em;--i:1">U</b><b style="--c:#c8ff3d;--r:-3deg;--y:0.04em;--i:2">T</b><b style="--c:#6bff5e;--r:6deg;--y:-0.02em;--i:3">A</b><b style="--c:#9cff4a;--r:-5deg;--y:0.05em;--i:4">T</b><b style="--c:#c8ff3d;--r:3deg;--y:-0.04em;--i:5">I</b><span class="eye" style="--r:-4deg;--y:0.01em;--i:6"></span><b style="--c:#6bff5e;--r:7deg;--y:-0.03em;--i:7">N</b></span>
-      <span class="line" aria-hidden="true"><b style="--c:#ff4fa8;--r:5deg;--y:-0.03em;--i:8">M</b><b style="--c:#ff8a3d;--r:-6deg;--y:0.04em;--i:9">A</b><b style="--c:#ffd23f;--r:3deg;--y:-0.05em;--i:10">Y</b><b style="--c:#ff4fa8;--r:-4deg;--y:0.03em;--i:11">H</b><b style="--c:#b98bff;--r:7deg;--y:-0.02em;--i:12">E</b><b style="--c:#ff8a3d;--r:-5deg;--y:0.05em;--i:13">M</b></span>
+    <h1 class="logo" aria-label="Dragon Keepers">
+      <span class="line" aria-hidden="true"><b style="--c:#ff4b3a;--r:-7deg;--y:0.02em;--i:0">D</b><b style="--c:#ff8a3d;--r:4deg;--y:-0.05em;--i:1">R</b><b style="--c:#ffd23f;--r:-3deg;--y:0.04em;--i:2">A</b><b style="--c:#ff4b3a;--r:6deg;--y:-0.02em;--i:3">G</b><span class="eye" style="--r:-4deg;--y:0.01em;--i:4"></span><b style="--c:#ffd23f;--r:7deg;--y:-0.03em;--i:5">N</b></span>
+      <span class="line" aria-hidden="true"><b style="--c:#6bff5e;--r:5deg;--y:-0.03em;--i:6">K</b><b style="--c:#3fd6c4;--r:-6deg;--y:0.04em;--i:7">E</b><b style="--c:#5bc0f0;--r:3deg;--y:-0.05em;--i:8">E</b><b style="--c:#b98bff;--r:-4deg;--y:0.03em;--i:9">P</b><b style="--c:#ff4fa8;--r:7deg;--y:-0.02em;--i:10">E</b><b style="--c:#6bff5e;--r:-5deg;--y:0.05em;--i:11">R</b><b style="--c:#3fd6c4;--r:4deg;--y:-0.04em;--i:12">S</b></span>
     </h1>
-    <p class="tag">Collect pets and hunt for mutations on Isla Verde</p>
+    <p class="tag">Hatch, raise and ride dragons on Isla Verde</p>
     <button id="start" type="button">Play</button>
     <input id="name" type="text" maxlength="16" placeholder="Enter your name" aria-label="Your name" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="go">
     <input id="code" type="password" inputmode="numeric" maxlength="8" placeholder="Admin code" aria-label="Admin code" autocomplete="off" enterkeyhint="go" hidden>

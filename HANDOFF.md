@@ -1,10 +1,10 @@
-# Mutation Mayhem: handoff
+# Dragon Keepers (was Mutation Mayhem): handoff
 
 Written on 4 October 2026 by Claude (claude.ai chat) for Claude Code. Read this whole file before touching the code. Everything Adriana asked for, everything that was built, and everything that is still open is in here.
 
 ## 1. What this is
 
-**Mutation Mayhem** is a 3D pet-collecting game that runs in a web browser. Adriana is the designer. She describes what she wants in a sentence or two, and Claude writes all the code. She does not read or edit the code herself.
+**Dragon Keepers** (first called Mutation Mayhem) is a 3D dragon-collecting game that runs in a web browser. Adriana is the designer. She describes what she wants in a sentence or two, and Claude writes all the code. She does not read or edit the code herself.
 
 The game takes place on an island called **Isla Verde**. So far the island, the town, a dungeon, a front cover, sign-in, and an avatar shop exist. The pets, coins, and mutations that give the game its name are not built yet.
 
@@ -79,7 +79,6 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 - **Treats** (`TREATS`, timed, saved as end times in `mutation-mayhem-treats`): Coin Cookie ×2 coins for 5 minutes (5,000), Golden Apple ×3 coins for 3 minutes (40,000), Fire Pepper dragons fly 25% faster for 3 minutes (50,000). Coin treats do not stack, the best one counts (`treatCoins`); buying again adds time. Running treats show in the effects pills.
 - **Decorations** (`DECOR`, bought once, saved in `mutation-mayhem-decor`): flower beds 1,000, lamp posts 2,500, treasure chest 5,000, fountain 15,000, dragon statue 50,000. Built on whichever plot you claim (`buildDecor`), taken off on Leave (`clearDecor`).
 - **Outfits** (`OUTFITS`, owned counts in `mutation-mayhem-outfits`, what each dragon wears in `mutation-mayhem-dragon-outfits`, parallel to the dragon list): party hat 1,000, bow tie 2,500, sunglasses 5,000, cape 10,000, crown 50,000. After buying you pick a dragon; one outfit per dragon, and a swapped-off outfit goes back to you.
-- Adriana also asked for name ideas for the game, since it is about dragons. Not decided.
 
 **Lucky blocks (section "Lucky blocks"):** 8 yellow "?" blocks spinning around the island (outside town). Walk into one to pick it up (held over your head); Adriana asked that it be brought back to your plot and opened there, before a countdown runs out: `LUCKY_BASE` 30 seconds plus 1 per 7 units from your plot (her request: "time based on how far it is"). The clock stops once you are on your plot; too late and the block crumbles and turns up elsewhere 45 seconds later. No jumping to places while carrying it, and no picking up eggs or other blocks. On your plot the button reads "Open the lucky block": Common egg 50%, Rare 30%, Legendary 10%, Mythic 5%, Prismatic 1% (Adriana's odds), which hatches on the spot, or the other 4% gives 250 coins (Claude's choice; she did not answer). Needs a claimed plot. Leave puts a carried block back. An opened block turns up somewhere else, at least 40 away, 45 seconds later.
 
@@ -173,9 +172,9 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 - Sign text comes from one small canvas texture holding nine labels.
 
 ### Front cover
-- Title "MUTATION MAYHEM" in chunky letters (Luckiest Guy font from Google Fonts, with fallbacks). Each letter has its own colour and tilt, and the O is an eye that blinks.
+- Title "DRAGON KEEPERS" in chunky letters (Luckiest Guy font from Google Fonts, with fallbacks). Adriana renamed the game from "Mutation Mayhem" on 6 October 2026, picking from Claude's list. DRAGON is big in fire colours, KEEPERS under it in jewel colours; the O is a gold dragon's eye with a slit pupil that blinks. The saved-data keys still start with `mutation-mayhem-` on purpose, so nobody loses their progress; don't rename them.
 - Behind it the camera circles the island from the air.
-- Tagline: "Collect pets and hunt for mutations on Isla Verde".
+- Tagline: "Hatch, raise and ride dragons on Isla Verde" (Claude's wording).
 - A yellow **Play** button, then a box "Enter your name" (up to 16 characters, Enter also starts), then a controls reminder.
 - An empty name becomes "Player". The name is remembered on the device.
 
@@ -241,7 +240,7 @@ Light and sky, Terrain colours, Plants rocks and other scenery, Geometry helpers
 **Promised to her for later**
 - Once pets and coins exist, make sure progress is saved before Leave, or add a confirmation.
 - Add prices to the avatar shop when coins exist.
-- The artifact link is still titled "Isla Verde". She was offered a rename to "Mutation Mayhem" and has not answered.
+- The artifact link is still titled "Isla Verde". The game is now called "Dragon Keepers".
 
 **Chat (section "Chat"):** a box in the top right beside the minimap (Adriana moved it there from the top left), folded to a "Chat" button on small screens. Enter or Send posts, "/" jumps to it, Escape leaves it; game keys are ignored while typing; 120 letters at most; the last 40 lines kept. There is no server yet, so only you see your own messages, and the box says so. When a server exists, `sendChat` sends and `addChat` shows incoming messages. Before strangers can chat, think about safety for young players: a word filter, reporting, maybe preset phrases, and what the App Store asks of chat in apps for children.
 
