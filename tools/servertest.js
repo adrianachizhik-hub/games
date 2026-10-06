@@ -41,6 +41,8 @@ function player(name, code) {
     const ad = await player(adminName, adminCode);
     check(ad.welcome.admin === true, 'an admin with the right code is an admin on the server');
     ad.send({ t: 'announce', text: 'Hello all servers' }); await wait(80);
+    ad.send({ t: 'firestorm' }); await wait(80);
+    check(b.got.some((m) => m.t === 'firestorm'), 'an admin can start a fire storm for everyone');
     check(b.got.some((m) => m.t === 'announce' && m.text === 'Hello all servers'), 'an admin announcement reaches everyone');
     const fake = await player(adminName, '0000'); check(fake.welcome.admin === false, 'the admin name with a wrong code is not an admin');
     fake.ws.close(); ad.ws.close();
@@ -50,6 +52,13 @@ function player(name, code) {
   b.send({ t: 'claim', plot: 2 }); await wait(80);
   check(b.got.some((m) => m.t === 'claimed' && m.ok && m.plot === 2), 'then Kid2 can claim Plot 3');
   const late = await player('Late'); check(late.welcome.room === 1, 'a new player gets Kid1\'s old place on Server 1');
+  const status = await (await fetch('http://localhost:18080/status')).json();
+  check(status.rooms.length === 11 && status.rooms[0].players === 7 && status.rooms[0].names.includes('Late'), 'the status list shows all 11 servers, who is on them and how full they are');
+  const pick = await new Promise((resolve) => { const ws = new WebSocket(URL); ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', name: 'Picky', room: 5 })); ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'welcome') resolve({ ws, m }); }; });
+  check(pick.m.room === 5, 'a player who chooses Server 5 joins Server 5');
+  const pick2 = await new Promise((resolve) => { const ws = new WebSocket(URL); ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', name: 'Wants1', room: 1 })); ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'welcome') resolve({ ws, m }); }; });
+  check(pick2.m.room !== 1, 'choosing a full server puts you on one with room (Server ' + pick2.m.room + ')');
+  pick.ws.close(); pick2.ws.close();
   ps.forEach((q) => q.ws.close()); late.ws.close();
   await wait(100); server.close();
   console.log(fail ? fail + ' FAILED' : 'all server checks passed');

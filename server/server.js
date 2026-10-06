@@ -55,10 +55,14 @@ const clean = (t, n) => String(t || '').replace(/[\u0000-\u001f]/g, ' ').replace
 const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : 0);
 function broadcast(room, msg, except) { const t = JSON.stringify(msg); room.players.forEach((pl) => { if (pl !== except) sendRaw(pl.sock, t); }); }
 const card = (pl) => ({ id: pl.id, name: pl.name, admin: pl.admin, look: pl.look, plot: pl.plot, pets: pl.pets, s: pl.s });
-function pickRoom() { return rooms.find((r) => r.players.size < PLOTS) || null; }   // the first server with a free plot
+function pickRoom(want) {                             // the server the player chose, if it has a free plot; else the first one that does
+  const w = rooms[(want | 0) - 1];
+  if (w && w.players.size < PLOTS) return w;
+  return rooms.find((r) => r.players.size < PLOTS) || null;
+}
 
 function join(sock, hello) {
-  const room = pickRoom();
+  const room = pickRoom(hello.room);
   if (!room) { sendRaw(sock, JSON.stringify({ t: 'full' })); sock.end(); return null; }
   const pl = { id: nextId++, sock, room, name: clean(hello.name, 16) || 'Player', admin: isAdmin(hello.name, hello.code), look: hello.look && typeof hello.look === 'object' ? hello.look : {}, plot: -1, pets: [], s: null };
   if (JSON.stringify(pl.look).length > 600) pl.look = {};
@@ -99,6 +103,8 @@ function handle(pl, m) {
   } else if (m.t === 'announce') {
     const text = clean(m.text, 100);
     if (text && pl.admin) rooms.forEach((r) => broadcast(r, { t: 'announce', name: pl.name, text }, pl));   // admins speak to every server
+  } else if (m.t === 'firestorm') {                   // an admin starts a fire storm for everyone, on every server
+    if (pl.admin) rooms.forEach((r) => broadcast(r, { t: 'firestorm', by: pl.name }, pl));
   } else if (m.t === 'zap') {                          // a storm dragon's lightning hit another player: they get bounced back
     const target = room.players.get(m.id | 0);
     if (target && pl.admin) sendRaw(target.sock, JSON.stringify({ t: 'zapped', by: pl.name, dx: num(m.dx), dz: num(m.dz) }));
@@ -114,6 +120,11 @@ setInterval(() => {                                    // ten times a second, ev
 
 /* ---------- HTTP: a status page, and the upgrade to a WebSocket ---------- */
 const server = http.createServer((req, res) => {
+  if (req.url && req.url.startsWith('/status')) {      // for the game's "choose a server" list
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ plots: PLOTS, rooms: rooms.map((r) => ({ id: r.id, players: r.players.size, names: [...r.players.values()].map((pl) => pl.name) })) }));
+    return;
+  }
   res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
   res.end('Dragon Keepers server is running.\n' + rooms.map((r) => 'Server ' + r.id + ': ' + r.players.size + ' of ' + PLOTS + ' players').join('\n') + '\n');
 });

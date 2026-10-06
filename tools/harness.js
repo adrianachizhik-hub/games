@@ -68,6 +68,7 @@ const THREE = {
   BoxGeometry: class extends Geo { constructor(w, hh, d) { if ([w, hh, d].some((v) => typeof v !== 'number' || isNaN(v))) throw new Error('box args'); super(); const p = cyl(Math.SQRT1_2, Math.SQRT1_2, 1, 4); for (let i = 0; i < p.length; i += 3) { const x = p[i], z = p[i + 2], c = Math.SQRT1_2; p[i] = (x * c - z * c) * w; p[i + 1] *= hh; p[i + 2] = (x * c + z * c) * d; } this.attributes.position = new Attr(p, 3); } },
   ConeGeometry: class extends Geo { constructor(r, h, n) { if ([r, h, n].some((v) => typeof v !== 'number' || isNaN(v))) throw new Error('cone args'); super(); this.attributes.position = new Attr(cyl(0, r, h, n).slice(0, n * 2 * 9), 3); } },
   IcosahedronGeometry: class extends Geo { constructor(r, d) { super(d ? 80 : 20); } }, DodecahedronGeometry: class extends Geo { constructor() { super(36); } },
+  OctahedronGeometry: class extends Geo { constructor() { super(8); } },
   TorusGeometry: class extends Geo { constructor(r, t, a, b) { if ([r, t, a, b].some((v) => typeof v !== "number" || isNaN(v))) throw new Error("torus args"); super(a * b); } }, CircleGeometry: class extends Geo { constructor(r, n) { if ([r, n].some((v) => typeof v !== "number" || isNaN(v))) throw new Error("circle args"); super(n); } },
   PlaneGeometry: class extends Geo { constructor(w, h, a = 1, b = 1) { super(); this.attributes.position = new Attr(new Float32Array((a + 1) * (b + 1) * 3), 3); } },
   MeshBasicMaterial: mat, MeshLambertMaterial: mat, MeshStandardMaterial: mat, MeshPhongMaterial: mat, SpriteMaterial: mat, PointsMaterial: mat,
@@ -1019,6 +1020,38 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   console.log('fire dragon + 9 Prismatic (speed', r9.speed + '): grabbed', r9.got, '| home after', r9.secs, 's |', r9.msg, '| dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], 'earning', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], '| egg gone till next time', !I.nukeEggThere());
   if (I.ownDragons.length !== before + 1 || !/^nuke(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.nukeEggThere()) throw new Error('9 upgraders should get the nuke egg home');
   const n50 = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(I.NUKE_TIER); n50[d] = (n50[d] || 0) + 1; } console.log('nuke egg hatches:', Object.keys(n50).map((k) => k + ' ' + (n50[k] / 200).toFixed(0) + '%').join(', '));
+}
+
+// ---- the fire storm, the plot button, the admin shop ----
+{
+  const fr = (n = 1) => { for (let k = 0; k < n; k++) { I.update(1 / 60, 0); I.fireStormStep(1 / 60); } };
+  if (I.riding()) I.dismount(true);
+  if (I.myPlot() < 0) reclaim();
+  const hm = I.plotWorld(I.myPlot(), 0, -3); I.goTo(7); I.p.x = hm.x; I.p.z = hm.z; I.p.y = 6.3; for (let k = 0; k < 12; k++) raf(150000 + k * 16);
+  const sb = document.getElementById('shopOpen');
+  console.log('on my plot: button', JSON.stringify(document.getElementById('shopOpenLabel').textContent), '| at the side of the screen', sb.classList.contains('corner'));
+  if (!sb.classList.contains('corner')) throw new Error('the plot button should sit at the side');
+  const before = I.plotPets.filter((d) => I.hasMut(d.index, 'fire')).length;
+  I.startFireStorm('Test'); fr(1); console.log('fire storm on', I.fireStormOn(), '|', said(), '| effects', JSON.stringify(els.effect.textContent));
+  let n = 0, hit = null; while (n++ < 60 * 40 && !hit) { fr(); hit = I.plotPets.find((d) => I.hasMut(d.index, 'fire') && !d.loose); }
+  console.log('fireballs falling:', I.fireballs.length, '| after', (n / 60).toFixed(1), 's a dragon was hit:', hit && hit.kind, '|', said(), '| label', hit && JSON.stringify(I.ownDragons.length && hit && (I.plotPets.includes(hit) ? 'ok' : '')));
+  if (!hit) throw new Error('fireballs should give a dragon the fire mutation');
+  const pet = hit; I.mount(pet); const sp = I.rideSpeed(false); I.dismount(true);
+  const plain = (() => { const was = I.dragonMutation[pet.index]; I.dragonMutation[pet.index] = ''; I.mount(pet); const v = I.rideSpeed(false); I.dismount(true); I.dragonMutation[pet.index] = was; return v; })();
+  console.log('riding the fire dragon: speed', sp.toFixed(1), 'vs', plain.toFixed(1), 'without the mutation | saved', JSON.parse(store['mutation-mayhem-mutations'])[pet.index]);
+  if (Math.abs(sp - plain * 3) > 0.01) throw new Error('fire mutation should make it three times as fast');
+  console.log('admin shop: button shown only to admins', I.admin());
+  I.openAdminShop(); console.log('open the admin shop:', I.allOpen(), JSON.stringify(els.allTitle.textContent));
+  if (I.admin()) {
+    const rows = () => els.allList.children.filter((r) => r.className === 'uprow');
+    console.log('  items:', rows().map((r) => r.children[1].children[0].textContent).join(', '), '| first button', JSON.stringify(rows()[0].children[2].textContent));
+    const d0 = I.decorMeshes().length, c0 = I.coins(); rows().forEach((r) => r.children[2].fire('click', ev({})));
+    for (let k = 0; k < 10; k++) raf(160000 + k * 16);
+    console.log('  put all', I.ADMIN_DECOR.length, 'on my plot: decorations', d0, '->', I.decorMeshes().length, '| moving parts', I.adminAnims().length, '| free (no coins taken)', I.coins() >= c0, '| saved', store['mutation-mayhem-admin-decor']);
+    if (I.decorMeshes().length !== d0 + I.ADMIN_DECOR.length) throw new Error('admin decorations should go on the plot');
+    window.fire('keydown', ev({ code: 'Escape' }));
+  } else if (I.allOpen()) throw new Error('only admins can open the admin shop');
+  for (let k = 0; k < 60 * 70; k++) I.fireStormStep(1 / 60);
 }
 
 // ---- the swamp, the quicksand and the mud cavern ----

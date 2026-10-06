@@ -189,6 +189,7 @@
   }
   #talkBtn kbd { margin-left: 8px; padding: 1px 8px; border-radius: 7px; background: #0d2f37; color: #fff; font: inherit; font-size: 0.85rem; }
   body.pair #shopOpen { transform: translateX(calc(-100% - 6px)); }   /* both buttons: side by side across the middle */
+  #shopOpen.corner, body.touch #shopOpen.corner, body.hasinv #shopOpen.corner, body.touch.hasinv #shopOpen.corner { left: calc(16px + env(safe-area-inset-left, 0px)); top: 50%; bottom: auto; transform: translateY(-50%); }   /* "Open my plot": at the side, not over you */
   body.pair #talkBtn { transform: translateX(6px); }
   #talkBtn[hidden], #talk[hidden] { display: none; }
   #talk {
@@ -587,6 +588,11 @@
     #chatLog { height: 96px; }
   }
   body.shopping #radar { display: none; }
+  #allTabs[hidden], #allHave[hidden] { display: none !important; }
+  #adminShopBtn { display: none; position: fixed; left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); font: inherit; font-weight: 700; padding: 8px 16px; border: 3px solid #0d2f37; border-radius: 999px; background: linear-gradient(90deg, #ffd23f, #ff8fd6, #8fe8ff); color: #0d2f37; box-shadow: 0 4px 0 #0d2f37; cursor: pointer; z-index: 5; }
+  body.admin.playing:not(.shopping) #adminShopBtn { display: block; }   /* only admins see it */
+  body.touch #adminShopBtn { bottom: auto; top: calc(50% + 40px); }
+  body.firestorm::after { content: ''; position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 30px rgba(255, 90, 20, 0.45); z-index: 1; }   /* the sky glows during a fire storm */
   #adminPanel .none { display: none; margin: 0; font-size: 0.98rem; line-height: 1.45; opacity: 0.85; }
   #adminCommands:empty + .none { display: block; }
   .keys {
@@ -688,6 +694,15 @@
     background: linear-gradient(rgba(9, 38, 46, 0.55), rgba(9, 38, 46, 0.12) 40%, rgba(9, 38, 46, 0) 62%, rgba(9, 38, 46, 0.45));
   }
   #intro[hidden], #fail[hidden] { display: none; }
+  #servers { margin-top: 12px; width: min(620px, calc(100vw - 32px)); padding: 6px 10px 8px; border-radius: 16px; background: rgba(13, 47, 55, 0.72); color: #fff; text-align: center; }
+  #servers[hidden] { display: none; }
+  #servers .srvhead { margin: 0 0 6px; font-weight: 700; }
+  #srvList { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+  #srvList button { font: inherit; font-size: 0.78rem; font-weight: 600; padding: 3px 7px; border: 2px solid #0d2f37; border-radius: 10px; background: #fff; color: #0d2f37; cursor: pointer; }
+  #srvList button.on { background: #ffd23f; }
+  #srvList button:disabled { opacity: 0.45; cursor: default; }
+  #srvList button small { display: block; font-size: 0.68rem; font-weight: 500; }
+  #srvNote { margin: 6px 0 0; font-size: 0.8rem; opacity: 0.9; min-height: 1em; }
   .cover {
     display: flex;
     flex-direction: column;
@@ -930,6 +945,7 @@
 
 <div id="stick"><div id="knob"></div></div>
 <button id="jump" type="button">Jump</button>
+<button id="adminShopBtn" type="button">⭐ Admin shop</button>
 <button id="dive" type="button" hidden>Down</button>
 <button id="leave" type="button">Leave</button>
 
@@ -967,8 +983,8 @@
   <div class="foot"><button id="plotDone" type="button">Done</button></div>
 </div>
 <div id="allShop" role="dialog" aria-label="The Everything Shop" hidden>
-  <h2>The Everything Shop</h2>
-  <p class="have"><span class="coin" aria-hidden="true"></span>You have <b id="allCoins">0</b> coins</p>
+  <h2 id="allTitle">The Everything Shop</h2>
+  <p class="have" id="allHave"><span class="coin" aria-hidden="true"></span>You have <b id="allCoins">0</b> coins</p>
   <div class="allbody">
     <div id="allTabs" role="tablist" aria-label="What to buy"></div>
     <div id="allList" role="tabpanel"></div>
@@ -1030,6 +1046,7 @@
     <button id="start" type="button">Play</button>
     <input id="name" type="text" maxlength="16" placeholder="Enter your name" aria-label="Your name" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="go">
     <input id="code" type="password" inputmode="numeric" maxlength="8" placeholder="Admin code" aria-label="Admin code" autocomplete="off" enterkeyhint="go" hidden>
+    <div id="servers" hidden><p class="srvhead">Choose a server</p><div id="srvList" role="radiogroup" aria-label="Server"></div><p id="srvNote"></p></div>
     <p id="codeMsg" role="alert" hidden></p>
     <div class="grow"></div>
     <p class="how for-mouse">Use the arrow keys or W A S D: up walks forward, left and right turn. Space jumps, Shift runs.</p>
@@ -2837,7 +2854,8 @@ const World = (function () {
   }
   const sparkGeo = new THREE.BoxGeometry(0.05, 0.05, 0.42), sparkMat = new THREE.MeshBasicMaterial({ color: 0xbff6ff }), sparkMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const sparkMatY = new THREE.MeshBasicMaterial({ color: 0xfff27a });
-  function addSparks(d, mat) { d.sparks = []; for (let k = 0; k < 10; k++) { const m = new THREE.Mesh(sparkGeo, k % 3 ? mat : sparkMat2); m.visible = false; d.root.add(m); d.sparks.push(m); } }
+  const sparkMatF = new THREE.MeshBasicMaterial({ color: 0xff6a10 });
+  function addSparks(d, mat) { d.sparks = d.sparks || []; for (let k = 0; k < 10; k++) { const m = new THREE.Mesh(sparkGeo, k % 3 ? mat : sparkMat2); m.visible = false; d.root.add(m); d.sparks.push(m); } }
   const petSize = (d) => 0.75 * (DRAGON_KINDS[d.kind].big || 1);
   function sparkStep(d, dt) {                            // every few hundredths of a second the sparks jump somewhere new
     if (!d.sparks || reduced) return;
@@ -2900,7 +2918,7 @@ const World = (function () {
       dragonSpeed.push(typeof spd[i] === 'number' && spd[i] > 0 ? spd[i] : 0);
       dragonOutfit.push(Number.isInteger(outf[i]) && outf[i] >= 0 && outf[i] < 5 ? outf[i] : -1);
       dragonNames[ownDragons.length - 1] = typeof nms[i] === 'string' ? nms[i].slice(0, 16) : '';
-      dragonMutation[ownDragons.length - 1] = muts[i] === 'lightning' ? 'lightning' : '';
+      dragonMutation[ownDragons.length - 1] = typeof muts[i] === 'string' ? muts[i].split(' ').filter((w) => w === 'lightning' || w === 'fire').join(' ') : '';
     });
     const sl = +localStorage.getItem('mutation-mayhem-slots');
     if (sl >= 5 && sl <= MAX_SLOTS) plotSlots = Math.floor(sl);
@@ -2924,7 +2942,9 @@ const World = (function () {
      upgrader after upgrader. Its coins use the best upgrader it has ever had. */
   let coins = 0, coinsShown = -1, rateShown = -1, coinSaveT = 0, payT = 0;
   try { coins = Math.max(0, +localStorage.getItem('mutation-mayhem-coins') || 0); } catch (e) { /* none saved */ }
-  const dragonValue = (i) => (DRAGON_COINS[ownDragons[i]] || 0) * (dragonUpgrades[i] >= 0 ? UPGRADERS[dragonUpgrades[i]].boost : 1) * (dragonMutation[i] === 'lightning' ? 2 : 1);   // the Lightning mutation doubles it
+  const hasMut = (i, m) => (dragonMutation[i] || '').split(' ').includes(m);   // mutations: 'lightning' (×2 coins), 'fire' (×3 speed)
+  function addMut(i, m) { if (!hasMut(i, m)) dragonMutation[i] = ((dragonMutation[i] || '') + ' ' + m).trim(); }
+  const dragonValue = (i) => (DRAGON_COINS[ownDragons[i]] || 0) * (dragonUpgrades[i] >= 0 ? UPGRADERS[dragonUpgrades[i]].boost : 1) * (hasMut(i, 'lightning') ? 2 : 1);   // the Lightning mutation doubles it
   const coinRate = () => ownDragons.reduce((sum, k, i) => sum + (dragonPlaced[i] ? dragonValue(i) : 0), 0);   // coins each payout, from the dragons on your plot
   /* Which dragons are on the plot: as saved, or (the first time) the ones that earn the most. Then put them there. */
   ownDragons.forEach((k, i) => { dragonPlaced[i] = false; });
@@ -3192,7 +3212,7 @@ const World = (function () {
      let go to glide down. Jump once on the ground to hop off: the dragon then flies home to your plot.
      Dragons are too big for the cave, so riding stops at its mouth. */
   const RIDE_REACH = 10, RIDE_SIZE = 1.45;              // how close you must be to climb on, and how big it grows to carry you
-  const rideSpeed = (run) => { const t = tierOf(riding.kind), up = (1 + (dragonSpeed[riding.index] || 0) / 100) * (1 + treatSpeed()); if (DRAGON_KINDS[riding.kind].storm) return up * (flying ? 600 : 140) * (run ? 1.5 : 1); /* admin dragons: extremely fast */ return up * (flying ? (30 + t * 5) * (run ? 1.5 : 1) : (18 + t * 2) * (run ? 1.5 : 1)); };
+  const rideSpeed = (run) => { const t = tierOf(riding.kind), up = (1 + (dragonSpeed[riding.index] || 0) / 100) * (1 + treatSpeed()) * (hasMut(riding.index, 'fire') ? 3 : 1);   /* Fire mutation: three times as fast */ if (DRAGON_KINDS[riding.kind].storm) return up * (flying ? 600 : 140) * (run ? 1.5 : 1); /* admin dragons: extremely fast */ return up * (flying ? (30 + t * 5) * (run ? 1.5 : 1) : (18 + t * 2) * (run ? 1.5 : 1)); };
   function mount(d) {
     riding = d; d.ridden = true; d.homing = false; flying = false; tapT = 0;
     p.x = d.root.position.x; p.z = d.root.position.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true;
@@ -3278,8 +3298,8 @@ const World = (function () {
     shootBolt(from, to);
     if (best && best.pet) {                              // one of your dragons: it gets the Lightning mutation (twice the coins)
       const i = best.who.index;
-      if (dragonMutation[i] === 'lightning') { toast('ZAP! ' + best.name + ' already has the Lightning mutation.', 3); return; }
-      dragonMutation[i] = 'lightning'; saveProgress(); dressPet(best.who); renderInventory();
+      if (hasMut(i, 'lightning')) { toast('ZAP! ' + best.name + ' already has the Lightning mutation.', 3); return; }
+      addMut(i, 'lightning'); saveProgress(); dressPet(best.who); renderInventory();
       toast('⚡ ZAP! Your ' + DRAGON_KINDS[ownDragons[i]].name + ' dragon got the LIGHTNING mutation! It makes twice as many coins now.', 5);
       return;
     }
@@ -3637,7 +3657,7 @@ const World = (function () {
   const sellEl = $('sellShop'), sellList = $('sellList');
   let sellOpen = false;
   const sellPrice = (i) => Math.max(1, Math.round(dragonValue(i) * SELL_TIMES));
-  function dragonLabel(i) { const k = (dragonMutation[i] === 'lightning' ? '⚡ Lightning ' : '') + DRAGON_KINDS[ownDragons[i]].name; return dragonNames[i] ? dragonNames[i] + ' (' + k + ')' : k + ' dragon'; }   // "Sparky (Ruby)" once it has a name
+  function dragonLabel(i) { const k = (hasMut(i, 'lightning') ? '⚡ Lightning ' : '') + (hasMut(i, 'fire') ? '🔥 Fire ' : '') + DRAGON_KINDS[ownDragons[i]].name; return dragonNames[i] ? dragonNames[i] + ' (' + k + ')' : k + ' dragon'; }   // "Sparky (Ruby)" once it has a name
   function removeDragon(i) {                             // the dragon at ownDragons[i] is gone; everything after it moves up one
     const at = plotPets.findIndex((d) => d.index === i);
     if (at >= 0) scene.remove(plotPets.splice(at, 1)[0].root);
@@ -3704,6 +3724,19 @@ const World = (function () {
     { id: 'fountain', name: 'Fountain', note: 'A splashing stone fountain', price: 15000, colour: 0x5bc0f0 },
     { id: 'statue', name: 'Dragon statue', note: 'A golden dragon on a stone stand', price: 50000, colour: 0xe8be45 }
   ];
+  /* The admin shop (admins only, everything free): extremely cool plot decorations. Big ones stand just behind your plot. */
+  const ADMIN_DECOR = [
+    { id: 'portal', name: 'Rainbow portal', note: 'A swirling magic portal behind your plot', colour: 0xb27bff },
+    { id: 'crystal', name: 'Floating crystal island', note: 'A little island with glowing crystals, floating high over your plot', colour: 0x8fe8ff },
+    { id: 'volcano', name: 'Mini volcano', note: 'Glowing lava that bubbles and smokes', colour: 0xff5a1f },
+    { id: 'tesla', name: 'Lightning tower', note: 'A tower that crackles with lightning', colour: 0x5fd0ff },
+    { id: 'diamond', name: 'Giant spinning diamond', note: 'A huge glowing diamond that spins on a stand', colour: 0xbff6ff },
+    { id: 'throne', name: 'Golden dragon throne', note: 'A golden throne with dragon wings', colour: 0xffc21f },
+    { id: 'lasers', name: 'Laser light show', note: 'Coloured lasers sweeping from every corner', colour: 0xff4fa8 },
+    { id: 'fireworks', name: 'Fireworks launcher', note: 'Fireworks shoot up over your plot every few seconds', colour: 0xffe14a }
+  ];
+  const adminDecorOn = [];
+  try { (JSON.parse(localStorage.getItem('mutation-mayhem-admin-decor') || '[]') || []).forEach((id) => { if (ADMIN_DECOR.some((d) => d.id === id) && !adminDecorOn.includes(id)) adminDecorOn.push(id); }); } catch (e) { /* none */ }
   const OUTFITS = [
     { id: 'party', name: 'Party hat', price: 1000, colour: 0xef6fae },
     { id: 'bowtie', name: 'Bow tie', price: 2500, colour: 0x3f7fd6 },
@@ -3845,8 +3878,76 @@ const World = (function () {
     scene.add(g);
     return g;
   }
-  function buildDecor() { clearDecor(); if (myPlot >= 0) { decorMeshes = decorOwned.map(decorModel); if (archOn) decorMeshes.push(archModel(archOn)); } }
-  function clearDecor() { decorMeshes.forEach((g) => scene.remove(g)); decorMeshes = []; fairyBulbs = []; }
+  let adminAnims = [];                                   // things in admin decorations that move
+  function adminDecorModel(id) {
+    const g = new THREE.Group(), L = (c) => lam(c), G = (c) => new THREE.MeshBasicMaterial({ color: c });
+    const put = (lx, lz, y, build) => { const w = plotWorld(myPlot, lx, lz), s = new THREE.Group(); s.position.set(w.x, HUB.h + 0.1 + (y || 0), w.z); s.rotation.y = Math.PI / 2 - plots[myPlot].phi; build(s); g.add(s); return s; };
+    const RAIN = [0xe2483d, 0xff8a3d, 0xffd23f, 0x5fb83a, 0x3f7fd6, 0x8a5ad6];
+    if (id === 'portal') put(0, 8.6, 0, (s) => {
+      block(s, L(0x3a2f45), 5.6, 0.4, 1.4, 0, 0.2, 0);
+      const ring = new THREE.Group(); ring.position.set(0, 3.2, 0); s.add(ring);
+      for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; block(ring, G(RAIN[k % 6]), 0.55, 0.55, 0.5, Math.cos(a) * 2.5, Math.sin(a) * 2.5, 0, 0, 0, a); }
+      const swirl = new THREE.Group(); ring.add(swirl);
+      for (let k = 0; k < 18; k++) { const a = k / 18 * Math.PI * 2, r = 0.4 + (k % 6) * 0.35; block(swirl, G(RAIN[k % 6]), 0.5, 0.18, 0.06, Math.cos(a) * r, Math.sin(a) * r, 0, 0, 0, a + 1); }
+      adminAnims.push((t) => { swirl.rotation.z = -t * 2.5; ring.rotation.z = Math.sin(t) * 0.05; });
+    });
+    if (id === 'crystal') put(0, 1, 9, (s) => {
+      const isl = new THREE.Group(); s.add(isl);
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(2.6, 0), L(0x6b5a4a)); rock.scale.set(1, 0.6, 1); isl.add(rock);
+      block(isl, L(0x5fb83a), 4, 0.3, 4, 0, 1.4, 0);
+      [[0, 0, 2.6], [-1.1, 0.6, 1.7], [1, -0.7, 1.9], [0.9, 0.9, 1.3], [-0.8, -1, 1.4]].forEach(([x, z, h], k) => block(isl, G(k % 2 ? 0xb27bff : 0x8fe8ff), 0.5, h, 0.5, x, 1.5 + h / 2, z, 0.15 * (k - 2), 0, 0.2 * (k - 2)));
+      adminAnims.push((t) => { isl.position.y = Math.sin(t * 0.8) * 0.6; isl.rotation.y = t * 0.15; });
+    });
+    if (id === 'volcano') put(-7, 8.4, 0, (s) => {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(3.2, 4.2, 9), L(0x5a3a2a)); cone.position.y = 2.1; s.add(cone);
+      const lava = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.3, 9), G(0xff5a1f)); lava.position.y = 4.0; s.add(lava);
+      [[0.6, 0.3], [-0.5, 0.9], [0.2, -0.8]].forEach(([x, z]) => block(s, G(0xff8a3d), 0.35, 2.4, 0.2, x * 1.6, 2.6, z * 1.6, z * 0.5, 0, -x * 0.5));
+      const puffs = [0, 1, 2].map((k) => { const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.6, 0), L(0x8a8a8a)); s.add(m); return m; });
+      adminAnims.push((t) => { lava.material.color.setRGB(1, 0.3 + 0.2 * Math.sin(t * 4), 0.1); puffs.forEach((m, k) => { const q = (t * 0.5 + k / 3) % 1; m.position.set(Math.sin(k * 2) * q, 4.4 + q * 4, Math.cos(k * 2) * q); const sc = 0.5 + q * 1.4; m.scale.set(sc, sc, sc); }); });
+    });
+    if (id === 'tesla') put(7, 8.2, 0, (s) => {
+      block(s, L(0x3a3f45), 1.4, 0.4, 1.4, 0, 0.2, 0); block(s, L(0x8a9096), 0.35, 6, 0.35, 0, 3.2, 0);
+      [1.6, 2.6, 3.6, 4.6].forEach((y) => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.18, 12), L(0xc87a3a)); r.position.y = y; s.add(r); });
+      const top = new THREE.Mesh(new THREE.SphereGeometry(0.75, 12, 8), G(0x8fe8ff)); top.position.y = 6.6; s.add(top);
+      const bolts = []; for (let k = 0; k < 8; k++) { const m = new THREE.Mesh(sparkGeo, k % 2 ? sparkMat : sparkMat2); m.scale.set(2, 2, 3); s.add(m); bolts.push(m); }
+      adminAnims.push((t) => { if (Math.floor(t * 14) % 2) return; bolts.forEach((m) => { m.visible = Math.random() < 0.7; const a = Math.random() * 6.28, r = 0.8 + Math.random() * 1.2; m.position.set(Math.cos(a) * r, 6.6 + (Math.random() - 0.5) * 1.6, Math.sin(a) * r); m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3); }); });
+    });
+    if (id === 'diamond') put(3.8, 2.6, 0, (s) => {
+      block(s, L(0xd8dde2), 1, 1, 1, 0, 0.5, 0); block(s, L(0xffc21f), 1.1, 0.12, 1.1, 0, 1.02, 0);
+      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(1.1, 0), G(0xbff6ff)); gem.position.y = 2.6; gem.scale.set(1, 1.4, 1); s.add(gem);
+      adminAnims.push((t) => { gem.rotation.y = t * 1.5; gem.position.y = 2.6 + Math.sin(t * 2) * 0.2; });
+    });
+    if (id === 'throne') put(-3.8, 2.8, 0, (s) => {
+      const au = L(0xffc21f), red = L(0xc8102e);
+      block(s, au, 1.8, 0.8, 1.6, 0, 0.4, 0); block(s, red, 1.5, 0.2, 1.3, 0, 0.9, -0.05); block(s, au, 1.8, 2.6, 0.3, 0, 2.1, 0.7); block(s, red, 1.3, 1.9, 0.08, 0, 2.1, 0.54);
+      [-1, 1].forEach((sd) => { block(s, au, 0.3, 0.6, 1.6, sd * 0.9, 1.1, 0); for (let k = 0; k < 3; k++) block(s, au, 1.2 - k * 0.2, 0.12, 0.6, sd * (1.3 + k * 0.5), 3.1 - k * 0.45, 0.7, 0, 0, sd * (0.4 + k * 0.15)); });
+      block(s, L(0xe8115f), 0.3, 0.3, 0.1, 0, 3.0, 0.52, 0, 0, Math.PI / 4);
+    });
+    if (id === 'lasers') {
+      const beams = [];
+      [[-5.2, -5.2], [5.2, -5.2], [-5.2, 5.2], [5.2, 5.2]].forEach(([lx, lz], k) => put(lx, lz, 0, (s) => {
+        block(s, L(0x2a2f33), 0.4, 1.8, 0.4, 0, 0.9, 0);
+        const head = new THREE.Group(); head.position.y = 1.9; s.add(head);
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 14), G(RAIN[(k * 2) % 6])); beam.position.z = 7; head.add(beam);
+        beams.push({ head, k });
+      }));
+      adminAnims.push((t) => beams.forEach((b) => { b.head.rotation.y = t * 0.9 + b.k * 1.57; b.head.rotation.x = -0.35 + Math.sin(t * 1.7 + b.k) * 0.25; }));
+    }
+    if (id === 'fireworks') put(-7.4, -3, 0, (s) => {
+      block(s, L(0x3a2f45), 1.2, 0.8, 1.2, 0, 0.4, 0); [-0.3, 0.3].forEach((x) => block(s, L(0xc8102e), 0.3, 1, 0.3, x, 1.2, 0, 0.2, 0, x));
+      const sparks = []; for (let k = 0; k < 14; k++) { const m = new THREE.Mesh(sparkGeo, G(RAIN[k % 6])); m.scale.set(3, 3, 1); m.visible = false; s.add(m); sparks.push(m); }
+      const rocket = new THREE.Mesh(new THREE.SphereGeometry(0.25, 6, 4), G(0xffe14a)); rocket.visible = false; s.add(rocket);
+      adminAnims.push((t) => {
+        const q = (t % 3.5) / 3.5;                        // every 3.5 seconds: up it goes, then bang
+        rocket.visible = q < 0.4; rocket.position.set(0, 1.5 + q / 0.4 * 14, 0);
+        sparks.forEach((m, k) => { const b = (q - 0.4) / 0.6, a = k / 14 * Math.PI * 2; m.visible = q >= 0.4 && b < 0.8; m.position.set(Math.cos(a) * b * 6, 15.5 + Math.sin(a) * b * 6 - b * b * 3, Math.sin(a * 3) * b * 2); });
+      });
+    });
+    scene.add(g);
+    return g;
+  }
+  function buildDecor() { clearDecor(); if (myPlot >= 0) { decorMeshes = decorOwned.map(decorModel); if (archOn) decorMeshes.push(archModel(archOn)); if (isAdmin) adminDecorOn.forEach((id) => decorMeshes.push(adminDecorModel(id))); } }
+  function clearDecor() { decorMeshes.forEach((g) => scene.remove(g)); decorMeshes = []; fairyBulbs = []; adminAnims = []; }
   function twinkleLights(time) {                         // each bulb fades up and down at its own pace
     for (const b of fairyBulbs) { const k = reduced ? 1 : 0.35 + 0.65 * Math.max(0, Math.sin(time * b.speed + b.phase)); b.m.color.copy(b.base).multiplyScalar(k); }
   }
@@ -3876,7 +3977,8 @@ const World = (function () {
     if (d.collar) { d.root.remove(d.collar); d.collar = null; }
     const i = dragonOutfit[d.index];
     if (i >= 0 && OUTFITS[i]) { d.outfit = outfitModel(i); d.root.add(d.outfit); }
-    if (dragonMutation[d.index] === 'lightning' && !d.sparks) addSparks(d, sparkMatY);   // Lightning mutation: yellow sparks crackle round it
+    if (hasMut(d.index, 'lightning') && !d.mutL) { addSparks(d, sparkMatY); d.mutL = true; }   // Lightning mutation: yellow sparks crackle round it
+    if (hasMut(d.index, 'fire') && !d.mutF) { addSparks(d, sparkMatF); d.mutF = true; }        // Fire mutation: orange embers
     const nm = dragonNames[d.index];
     if (nm) {
       d.collar = new THREE.Group();
@@ -3888,6 +3990,7 @@ const World = (function () {
 
   /* The panel. */
   const allEl = $('allShop'), allList = $('allList');
+  let allAdmin = false;                                  // the Everything Shop's panel, showing the admin shop instead
   let allOpen = false, allTab = 0, allPickFor = -1, collarFor = -1;   // collarFor: -2 choosing a dragon for a name collar, or the dragon being named      // allPickFor: an outfit waiting for you to choose its dragon
   const tabBtns = ['Dragon treats', 'Plot decorations', 'Dragon outfits', 'Entrance arches'].map((t) => {
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = t; $('allTabs').appendChild(b); return b;
@@ -3903,6 +4006,20 @@ const World = (function () {
   function buy(price) { if (coins < price) { toast('You don\'t have enough money.', 3); return false; } coins -= price; saveCoins(); return true; }
   function refreshAll() {
     $('allCoins').textContent = fmt(coins);
+    $('allTitle').textContent = allAdmin ? '⭐ Admin shop' : 'The Everything Shop'; $('allHave').hidden = allAdmin; $('allTabs').hidden = allAdmin;
+    if (allAdmin) {
+      while (allList.firstChild) allList.removeChild(allList.firstChild);
+      const h = document.createElement('h3'); h.textContent = 'For admins only, and everything is free! Super cool things for your plot.'; allList.appendChild(h);
+      ADMIN_DECOR.forEach((d) => {
+        const on = adminDecorOn.includes(d.id);
+        allRow(d.name, d.note, d.colour, on ? 'Take it off' : 'Put it on my plot · free', () => {
+          if (on) adminDecorOn.splice(adminDecorOn.indexOf(d.id), 1); else adminDecorOn.push(d.id);
+          try { localStorage.setItem('mutation-mayhem-admin-decor', JSON.stringify(adminDecorOn)); } catch (e) { /* not saved */ }
+          buildDecor(); toast(on ? d.name + ' taken off.' : d.name + (myPlot >= 0 ? ' is on your plot!' : ' will be on your plot when you claim one.'), 3); refreshAll();
+        });
+      });
+      return;
+    }
     tabBtns.forEach((b, i) => { b.setAttribute('aria-selected', String(i === allTab)); b.classList[i === allTab ? 'add' : 'remove']('on'); });
     while (allList.firstChild) allList.removeChild(allList.firstChild);
     if (allTab === 0) TREATS.forEach((t) => {
@@ -3997,9 +4114,11 @@ const World = (function () {
     document.body.classList.add('shopping');
     refreshAll(); $('allDone').focus();
   }
+  function openAdminShop() { if (!isAdmin || allOpen) return; allAdmin = true; openAll(); if (!allOpen) allAdmin = false; }
+  $('adminShopBtn').addEventListener('click', (e) => { openAdminShop(); if (e.detail > 0) $('adminShopBtn').blur(); });
   function closeAll() {
     if (!allOpen) return;
-    allOpen = false; allEl.hidden = true;
+    allOpen = false; allEl.hidden = true; allAdmin = false;
     document.body.classList.remove('shopping');
     canvas.focus();
   }
@@ -4564,6 +4683,7 @@ const World = (function () {
     const parts = [];
     if (fireResLeft() > 0) parts.push('Fire resistance ' + clock(fireResLeft()));
     if (radResLeft() > 0) parts.push('Radiation resistance ' + clock(radResLeft()));
+    if (fireStormOn()) parts.push('🔥 Fire storm ' + clock(fsLeft()));
     TREATS.forEach((t) => { if (treatLeft(t.id) > 0) parts.push(t.name + ' ' + clock(treatLeft(t.id))); });
     const txt = parts.join(' · ');
     if (txt !== effectShown) { effectShown = txt; effectEl.textContent = txt; effectEl.hidden = !txt; }
@@ -4832,6 +4952,12 @@ const World = (function () {
   setSeeAll(false);
   seeAllBtn.addEventListener('click', (e) => { setSeeAll(!seeAllOn); if (e.detail > 0) seeAllBtn.blur(); });
   $('adminCommands').appendChild(seeAllBtn);
+
+  /* Admin command: start a fire storm now. */
+  const fsBtn = document.createElement('button');
+  fsBtn.type = 'button'; fsBtn.textContent = '🔥 Start a fire storm';
+  fsBtn.addEventListener('click', (e) => { startFireStorm(); toast('Fire storm started' + (netOnline ? ' for everyone!' : '!'), 3); if (e.detail > 0) fsBtn.blur(); });
+  $('adminCommands').appendChild(fsBtn);
 
   /* Admin command: restock the shops right now (the red stall's upgraders, all in stock). No server yet, so only
      for this admin's game; with a server it would restock for everyone. */
@@ -5251,7 +5377,7 @@ const World = (function () {
     const atPlot = onPlot && !atShop && !atUp;
     const atSign = free && !carryingBlock && !atPlot && dSign < 2.6 && dSign === near;
     const label = atKeypad ? 'Use the keypad' : atAll ? 'Open the Everything Shop' : atSell ? 'Open the sell shop' : atSecret ? 'Open the secret shop' : atUp ? 'Open the upgrade shop' : atPlot && carryingBlock ? 'Open the lucky block' : atPlot ? 'Open my plot' : atSign ? buyLabel() : 'Open the avatar shop';   // one button, for wherever you are
-    if ($('shopOpenLabel').textContent !== label) $('shopOpenLabel').textContent = label;
+    if ($('shopOpenLabel').textContent !== label) { $('shopOpenLabel').textContent = label; shopBtn.classList[label === 'Open my plot' ? 'add' : 'remove']('corner'); }
     const anyBtn = atShop || atUp || atPlot || atSign || atSecret || atSell || atAll || atKeypad;
     if (shopBtn.hidden === anyBtn) shopBtn.hidden = !anyBtn;
     showEffects();
@@ -5323,6 +5449,63 @@ const World = (function () {
     mapCtx.restore();
   }
 
+  /* ---------- The fire storm ---------- */
+  /* Adriana's idea. Every FS_PERIOD seconds on the clock (the same for everyone) a fire storm starts and lasts FS_LEN
+     seconds: fireballs rain from the sky, many of them aimed at dragons on your plot. A dragon a fireball hits gets the
+     Fire mutation for good: three times as fast to ride. Admins can start one whenever they like (for everyone, when
+     there's a server). */
+  const FS_PERIOD = 1800, FS_LEN = 60;
+  let fsUntil = 0, fsWas = false, fsSpawn = 0;
+  const fireballs = [], fbGeo = new THREE.SphereGeometry(0.9, 10, 8), fbMat = new THREE.MeshBasicMaterial({ color: 0xff6a10 }), fbCore = new THREE.MeshBasicMaterial({ color: 0xffe14a });
+  const fsLeft = () => Math.max(FS_LEN - (Date.now() / 1000) % FS_PERIOD, (fsUntil - Date.now()) / 1000, 0);
+  const fireStormOn = () => (Date.now() / 1000) % FS_PERIOD < FS_LEN || Date.now() < fsUntil;
+  function startFireStorm(by) {
+    fsUntil = Date.now() + FS_LEN * 1000;
+    if (by === undefined && isAdmin) netSend({ t: 'firestorm' });
+    if (by) toast(by + ' started a FIRE STORM!', 3);
+  }
+  function spawnFireball() {
+    const pets = myPlot >= 0 ? plotPets.filter((d) => !d.ridden && !d.homing && !d.loose) : [];
+    let target = null, x, z;
+    if (pets.length && Math.random() < 0.45) { target = pets[Math.floor(Math.random() * pets.length)]; x = target.root.position.x; z = target.root.position.z; }
+    else { const a = Math.random() * 6.283, r = 6 + Math.random() * 60; x = p.x + Math.cos(a) * r; z = p.z + Math.sin(a) * r; }
+    const g = new THREE.Group(), ball = new THREE.Mesh(fbGeo, fbMat), core = new THREE.Mesh(fbGeo, fbCore);
+    core.scale.set(0.55, 0.55, 0.55); g.add(ball); g.add(core);
+    for (let k = 1; k <= 4; k++) { const t = new THREE.Mesh(fbGeo, k % 2 ? fbMat : fbCore); t.scale.set(0.5 / k + 0.15, 0.5 / k + 0.15, 0.5 / k + 0.15); t.position.set(0, k * 1.1, 0); g.add(t); }   // a fiery tail
+    const ox = (Math.random() - 0.5) * 30, oz = (Math.random() - 0.5) * 30;
+    g.position.set(x + ox, 90, z + oz); scene.add(g);
+    fireballs.push({ g, target, x, z, ox, oz, t: 0, boom: null });
+  }
+  function fireStormStep(dt) {
+    const on = started && fireStormOn();
+    if (on !== fsWas) {
+      fsWas = on; document.body.classList[on ? 'add' : 'remove']('firestorm');
+      if (on) toast('🔥 FIRE STORM! Fireballs are falling! A dragon hit by one gets the FIRE mutation: 3× speed!', 5);
+    }
+    if (on) { fsSpawn -= dt; if (fsSpawn <= 0 && fireballs.length < 24) { fsSpawn = 0.35; spawnFireball(); } }
+    for (let i = fireballs.length - 1; i >= 0; i--) {
+      const f = fireballs[i];
+      if (f.boom) {                                      // the blast: grows and fades
+        f.boom.t += dt; const k = 1 + f.boom.t * 9; f.boom.m.scale.set(k, k, k); f.boom.m.material.opacity = Math.max(0, 0.8 - f.boom.t * 2);
+        if (f.boom.t > 0.4) { scene.remove(f.boom.m); fireballs.splice(i, 1); }
+        continue;
+      }
+      if (f.target && plotPets.includes(f.target)) { f.x = f.target.root.position.x; f.z = f.target.root.position.z; }   // it follows the dragon it's aimed at
+      f.t += dt;
+      const k = Math.min(1, f.t / 2), gy = (f.target ? f.target.root.position.y + 0.8 : W.bil(H, f.x, f.z));
+      f.g.position.set(f.x + f.ox * (1 - k), lerp(90, gy, k), f.z + f.oz * (1 - k));
+      f.g.rotation.z = Math.atan2(f.ox, 90) * 0.5;
+      if (k < 1) continue;
+      scene.remove(f.g);
+      const m = new THREE.Mesh(fbGeo, new THREE.MeshBasicMaterial({ color: 0xffa020, transparent: true, opacity: 0.8 })); m.position.copy(f.g.position); scene.add(m); f.boom = { m, t: 0 };
+      if (f.target && plotPets.includes(f.target) && !f.target.ridden && ownDragons[f.target.index]) {
+        const i2 = f.target.index;
+        if (!hasMut(i2, 'fire')) { addMut(i2, 'fire'); saveProgress(); dressPet(f.target); renderInventory(); toast('🔥 A fireball hit your ' + DRAGON_KINDS[ownDragons[i2]].name + ' dragon! It got the FIRE mutation: 3× speed!', 5); }
+      }
+      if (Math.hypot(p.x - f.g.position.x, p.z - f.g.position.z) < 2.2 && Math.abs(p.y - f.g.position.y) < 3 && !p.dungeon) { p.vy = 8; p.onGround = false; toast('Ouch! A fireball!', 2); }
+    }
+  }
+
   /* ---------- Multiplayer ---------- */
   /* Adriana's request: everyone who plays joins the same server, unless all 7 plots there are taken; then the next of
      10 more servers with room (the server program in server/server.js decides). Players see each other walking and
@@ -5349,11 +5532,37 @@ const World = (function () {
     try { sock = new WebSocket(NET_URL); } catch (e) { sock = null; return; }
     addChat('', 'Connecting to the game server...', true);
     const s0 = sock;
-    sock.onopen = () => { if (sock !== s0) return; s0.send(JSON.stringify({ t: 'hello', name: isAdmin ? typedName() : playerName, code: isAdmin ? code : '', look: myLook() })); };
+    sock.onopen = () => { if (sock !== s0) return; s0.send(JSON.stringify({ t: 'hello', name: isAdmin ? typedName() : playerName, code: isAdmin ? code : '', look: myLook(), room: chosenRoom })); };
     sock.onmessage = (ev) => { if (sock !== s0) return; let m; try { m = JSON.parse(ev.data); } catch (e) { return; } netMessage(m); };
     sock.onclose = () => { if (sock !== s0) return; const was = netOnline; netGone(); if (started) addChat('', was ? 'Lost the connection to the server. Playing offline now.' : 'Couldn\'t reach the game server. Playing offline.', true); };
     sock.onerror = () => {};
   }
+  /* Choosing a server on the front cover: every server, how many are playing on it (and who), and full ones greyed out.
+     The busiest server that still has room is picked to start with, so friends end up together. */
+  let chosenRoom = 0, srvPicked = false, srvTimer = 0;
+  const statusUrl = NET_URL ? NET_URL.replace(/^ws/, 'http').replace(/\/$/, '') + '/status' : null;
+  function refreshServers() {
+    if (!statusUrl || typeof fetch === 'undefined' || started) return;
+    $('servers').hidden = false;
+    fetch(statusUrl, { cache: 'no-store' }).then((r) => r.json()).then((st) => {
+      if (started) return;
+      const list = $('srvList'); while (list.firstChild) list.removeChild(list.firstChild);
+      if (!srvPicked) { const open = st.rooms.filter((r) => r.players < st.plots); chosenRoom = open.length ? open.reduce((a, b) => (b.players > a.players ? b : a)).id : 0; }
+      st.rooms.forEach((r) => {
+        const b = document.createElement('button'), full = r.players >= st.plots, sm = document.createElement('small');
+        b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(r.id === chosenRoom));
+        b.textContent = 'Server ' + r.id; sm.textContent = full ? 'Full' : r.players + '/' + st.plots + ' playing'; b.appendChild(sm);
+        if (r.names && r.names.length) b.title = r.names.join(', ');
+        if (r.id === chosenRoom) b.className = 'on';
+        b.disabled = full;
+        b.addEventListener('click', () => { chosenRoom = r.id; srvPicked = true; refreshServers(); });
+        list.appendChild(b);
+      });
+      const pick = st.rooms[chosenRoom - 1];
+      $('srvNote').textContent = pick && pick.names.length ? 'On Server ' + pick.id + ': ' + pick.names.join(', ') : 'Pick any server. Friends on the same server see each other.';
+    }).catch(() => { $('srvNote').textContent = 'The game server is waking up (it can take about a minute)...'; });
+  }
+  function serverPickerStep(dt) { if (started || !statusUrl) return; srvTimer -= dt; if (srvTimer <= 0) { srvTimer = 8; refreshServers(); } }
   function netGone() {
     netOnline = false; sock = null; netId = 0;
     others.forEach((o) => removeOther(o)); others.clear();
@@ -5366,7 +5575,7 @@ const World = (function () {
       m.players.forEach(addOther);
       m.plots.forEach((o, i) => { if (o && o.id !== netId) setOwner(i, o); });
       addChat('', 'You\'re on Server ' + m.room + (m.players.length ? ' with ' + m.players.length + ' other player' + (m.players.length === 1 ? '' : 's') : ', and nobody else is here yet') + '. Chat goes to everyone on this server.', true);
-      toast('You joined Server ' + m.room + '!', 3);
+      toast(m.room === chosenRoom || !chosenRoom ? 'You joined Server ' + m.room + '!' : 'Server ' + chosenRoom + ' filled up, so you joined Server ' + m.room + '.', 4);
       if (myPlot >= 0) { if (plotOwners[myPlot]) { releasePlot(); toast('Someone already has that plot. Walk onto a free one!', 4); } else netSend({ t: 'claim', plot: myPlot }); }
       petsSent = '';
     } else if (m.t === 'full') toast('All 11 servers are full right now. Playing offline.', 5);
@@ -5379,6 +5588,7 @@ const World = (function () {
     else if (m.t === 'look') { const o = others.get(m.id); if (o) { o.look = m.look; removeOther(o); buildOther(o); } }
     else if (m.t === 'chat') addChat(m.name + (m.admin ? ' (Admin)' : ''), m.text);
     else if (m.t === 'announce') showAnnouncement(m.name, m.text);
+    else if (m.t === 'firestorm') startFireStorm(m.name || m.by || 'An admin');
     else if (m.t === 'zapped') {                          // an admin's storm dragon hit you with lightning: bounced backwards
       toast('⚡ ZAP! ' + m.by + '\'s storm dragon bounced you backwards!', 3);
       for (let k = 0; k < 12; k++) if (!p.dungeon) tryMove(m.dx * 0.8, m.dz * 0.8);
@@ -5483,8 +5693,11 @@ const World = (function () {
     clouds.rotation.y += dt * 0.004;
     keeperPose(dt, time);
     netTick(dt, time);
+    serverPickerStep(dt);
     if (fairyBulbs.length) twinkleLights(time);
+    if (adminAnims.length) adminAnims.forEach((f) => f(reduced ? 0 : time));
     eggsAnimate(dt, time);
+    fireStormStep(dt);
     if (bolts.length || knocked.length) zapStep(dt);
     if (frame % 3 === 0) drawMap();
     if (frame % 10 === 0) showZone();
@@ -5493,7 +5706,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
