@@ -332,6 +332,10 @@ I.goTo(0);
 console.log('egg hiding places:'); E.forEach((t, i) => console.log(' ', t.name.padEnd(10), t.spots.length, 'spots,', I.eggs.filter((e) => e.tier === i).length, 'out at once | zones', zonesOf(t)));
 els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear();
 if (I.myPlot() >= 0 || !document.body.classList.contains('playing')) { els.leave.fire('click', ev({ detail: 1 })); document.getElementById('confirm').hidden = true; els.name.value = MODE === 'admin' ? AN : I.name(); els.name.fire('input', ev({})); els.code.value = AC; els.start.fire('click', ev({ pointerType: 'mouse' })); }   // start with no plot
+{ const where = {}, pr = I.eggs.find((e) => e.tier === 4), keep = pr.spot;
+  for (let k = 0; k < 300; k++) { pr.taken = true; I.goTo(k % 8); I.eggsRespawn(pr); stand(pr.spot); const z = I.zoneName(); where[z] = (where[z] || 0) + 1; }
+  console.log('all hiding places:', I.eggSpots.length, '| where the Prismatic egg turned up over 300 respawns:', JSON.stringify(where));
+  if (Object.keys(where).length < 5) throw new Error('the prismatic egg should turn up all over the island'); I.goTo(0); }
 const common = I.eggs.find((e) => e.tier === 0);
 stand(common.spot); tick(0.2);
 console.log('touch an egg with no plot : carrying', !!I.carrying(), '| message', said());

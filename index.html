@@ -2535,28 +2535,33 @@ const World = (function () {
     .map(([lx, lz]) => ({ x: DG.x + lx, y: DG.floor, z: DG.z + lz, dungeon: true }));
 
   EGG_TIERS[5].spots = [];                              // the fire egg only ever appears in the village bonfire
+  /* Every hiding place, from beaches to the mine, goes into one list, and any egg can turn up at any of them, at random
+     (Adriana: "the prismatic doesn't just spawn in the secret mine"). Rare eggs stay rare because fewer are out at once. */
+  const eggSpots = [].concat(...EGG_TIERS.map((t) => t.spots));
+  const freeSpot = (avoid) => {                          // a random hiding place with no egg on it, away from you if possible
+    const used = eggs.map((e) => e.spot), open = eggSpots.filter((s) => !used.includes(s) && s !== avoid);
+    let far = open.filter((s) => Math.hypot(s.x - p.x, s.z - p.z) > 40);
+    if (!far.length) far = open.filter((s) => Math.hypot(s.x - p.x, s.z - p.z) > 5);
+    if (!far.length) far = open;
+    return far[Math.floor(Math.random() * far.length)] || avoid;
+  };
   const eggs = [];
   EGG_TIERS.forEach((t, i) => {
-    for (let k = 0; k < Math.min(t.count, t.spots.length); k++) {
+    for (let k = 0; k < t.count; k++) {
       const g = new THREE.Group(), body = new THREE.Mesh(eggGeo[i], eggMat(i));
       g.add(body); g.scale.set(1.4, 1.4, 1.4);            // a bit bigger than life, so they can be spotted
       const stars = t.shiny ? [twinkle(g, -0.5, 1.1, 0, 0.7), twinkle(g, 0.45, 0.75, 0.1, 0.55), twinkle(g, 0.2, 1.35, -0.3, 0.45)] : [];
       scene.add(g);
       const egg = { tier: i, g, body, stars, spot: null, taken: false, phase: k * 1.7 + i };
-      placeEgg(egg, t.spots[k]);
       eggs.push(egg);
+      placeEgg(egg, freeSpot(null));
     }
   });
   function placeEgg(egg, spot) { egg.spot = spot; egg.taken = false; egg.g.visible = true; egg.g.position.set(spot.x, spot.y, spot.z); }
-  function respawnEgg(egg) {                             // the same kind of egg turns up again somewhere else, away from you
+  function respawnEgg(egg) {                             // the same kind of egg turns up again at a random hiding place, away from you
     if (egg.lucky) return;                                // eggs from lucky blocks were never out in the world
     if (egg.spawned) { scene.remove(egg.g); eggs.splice(eggs.indexOf(egg), 1); return; }   // an admin's spawned egg is used up
-    const t = EGG_TIERS[egg.tier], used = eggs.filter((e) => e !== egg && e.tier === egg.tier).map((e) => e.spot);
-    const open = t.spots.filter((s) => !used.includes(s) && s !== egg.spot);
-    let free = open.filter((s) => Math.hypot(s.x - p.x, s.z - p.z) > 40);
-    if (!free.length) free = open.filter((s) => Math.hypot(s.x - p.x, s.z - p.z) > 5);
-    if (!free.length) free = open;
-    placeEgg(egg, free[Math.floor(Math.random() * free.length)] || egg.spot);
+    placeEgg(egg, freeSpot(egg.spot));
   }
 
   /* A dragon, built the same way as the concept pictures. The body is one mesh; the wings are two more, so they can flap. */
@@ -4242,7 +4247,7 @@ const World = (function () {
     AV, avatar, gear, hair, keeper, upKeeper, keepers, talking: () => talking, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
-    upgradersOwned, renderInventory, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
+    upgradersOwned, renderInventory, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();
