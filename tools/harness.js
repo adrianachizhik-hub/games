@@ -648,7 +648,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   window.fire('keydown', ev({ code: 'Escape', target: ci }));
 }
 
-// ---- talking to Mia and Leo ----
+// ---- talking to Mia, Leo, Kai and the twins Lexi and Max ----
 {
   let T = 60000; const frames = (n) => { for (let k = 0; k < n; k++) raf(T += 16); };
   const talk = () => I.talking() && I.talking().name, line = () => els.talkText.textContent;
@@ -673,6 +673,22 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   window.fire('keydown', ev({ code: 'Escape' })); frames(12);
   els.talkBtn.fire('click', ev({})); I.p.x += 9; frames(5); console.log('talk, then walk away: talking', !!talk());
   I.p.x = I.upFront.x; frames(12); els.talkBtn.fire('click', ev({})); els.talkNo.fire('click', ev({})); console.log('"No thanks": talking', !!talk());
+  I.p.x = I.sellFront.x; I.p.z = I.sellFront.z; frames(12); els.talkBtn.fire('click', ev({})); frames(150);
+  console.log('green stall: talk to', talk(), 'says', JSON.stringify(line()), '| buttons', els.talkYes.textContent, '/', els.talkNo.textContent);
+  if (talk() !== 'Kai' || !/^Yo, I'm Kai!/.test(line())) throw new Error("Kai's line is wrong");
+  els.talkYes.fire('click', ev({})); frames(3); console.log('"Sell a dragon": sell shop open', I.sellOpen()); if (!I.sellOpen()) throw new Error('Kai should open the sell shop');
+  window.fire('keydown', ev({ code: 'Escape' })); frames(12);
+  I.p.x = I.allFront.x; I.p.z = I.allFront.z; frames(12);
+  console.log('yellow stall: talk button', JSON.stringify(document.getElementById('talkLabel').textContent), '| shop button too', !document.getElementById('shopOpen').hidden);
+  els.talkBtn.fire('click', ev({})); const said = [];
+  for (let k = 0; k < 600 && said.length < 5; k++) { frames(1); const who = els.talkWho.textContent, l = line(); if (l === I.talkLines()[I.talkLineAt()][1] && said[said.length - 1] !== who + ': ' + l) said.push(who + ': ' + l); }
+  console.log('the twins argue:\n   ' + said.join('\n   ') + '\n  buttons', els.talkYes.textContent, '/', els.talkNo.textContent);
+  if (said.length !== 5 || !said[1].startsWith('Max:') || els.talkYes.textContent !== 'Lexi' || els.talkNo.textContent !== 'Max') throw new Error('the twins should argue, then ask you to pick');
+  els.talkNo.fire('click', ev({})); frames(300);
+  console.log('pick Max: last line', els.talkWho.textContent + ':', JSON.stringify(line()), '| buttons', els.talkYes.textContent, '/', els.talkNo.textContent, '| still talking', !!talk());
+  if (els.talkYes.textContent !== 'Show me the shop' || !talk()) throw new Error('after picking, the shop button should show');
+  els.talkYes.fire('click', ev({})); frames(3); console.log('"Show me the shop": Everything Shop open', I.allOpen()); if (!I.allOpen()) throw new Error('the twins should open the Everything Shop');
+  window.fire('keydown', ev({ code: 'Escape' })); frames(12);
   I.goTo(6); frames(5); const x1 = I.p.x, z1 = I.p.z; window.fire('keydown', ev({ code: 'KeyE' })); frames(30); window.fire('keyup', ev({ code: 'KeyE' }));
   console.log('away from the shops, E still steps sideways:', Math.hypot(I.p.x - x1, I.p.z - z1).toFixed(1), 'units');
 }
@@ -768,6 +784,21 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   window.fire('keydown', ev({ code: 'Escape' })); console.log('Escape closes it:', !I.allOpen());
   els.leave.fire('click', ev({ detail: 1 })); console.log('leave: decorations taken off the plot', I.decorMeshes().length === 0);
   playAgain(); reclaim(); console.log('back on a plot: decorations', I.decorMeshes().length, '| saved', store['mutation-mayhem-decor'], '| outfit saved', JSON.parse(store['mutation-mayhem-dragon-outfits'])[idx]);
+  { // entrance arches: the fourth tab; buy, swap, take down, saved
+    I.p.x = I.allFront.x; I.p.z = I.allFront.z; hud(); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); hud(2);
+    tabs[3].fire('click', ev({})); I.setCoins(300000); const n0 = I.decorMeshes().length;
+    console.log('arches tab:', rows().length, 'arches:', rows().map(name).join(', '));
+    if (rows().length !== 12) throw new Error('there should be 12 arches');
+    buyBtn(rows()[0]).fire('click', ev({})); console.log('buy the Flower arch: on the plot', I.archOn(), '| decorations', n0, '->', I.decorMeshes().length, '| button', JSON.stringify(buyBtn(rows()[0]).textContent));
+    if (I.archOn() !== 'flower' || I.decorMeshes().length !== n0 + 1) throw new Error('the arch should go up');
+    buyBtn(rows()[1]).fire('click', ev({})); console.log('buy the Vine arch: on the plot', I.archOn(), '| decorations', I.decorMeshes().length, '| flower button', JSON.stringify(buyBtn(rows()[0]).textContent));
+    const c1 = I.coins(); buyBtn(rows()[0]).fire('click', ev({})); console.log('swap back to the Flower arch: free', I.coins() === c1, '| on', I.archOn());
+    if (I.archOn() !== 'flower' || I.decorMeshes().length !== n0 + 1) throw new Error('only one arch at a time');
+    I.ARCHES.forEach((a) => I.archModel(a.id)); console.log('every arch builds without errors');
+    buyBtn(rows()[0]).fire('click', ev({})); console.log('take it down: on', JSON.stringify(I.archOn()), '| decorations', I.decorMeshes().length);
+    buyBtn(rows()[11]).fire('click', ev({})); console.log('Dragon arch for 100,000: on', I.archOn(), '| saved', store['mutation-mayhem-arches'], store['mutation-mayhem-arch']);
+    window.fire('keydown', ev({ code: 'Escape' })); hud(2);
+  }
   for (const k in I.treatUntil) delete I.treatUntil[k]; I.setCoins(0);
 }
 

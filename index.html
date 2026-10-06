@@ -207,6 +207,7 @@
   #talk .talkwho { display: inline-block; margin: 0 0 6px; padding: 1px 12px; border-radius: 999px; color: #fff; font-weight: 700; }
   #talkText { margin: 0; min-height: 2.8em; font-size: 1.12rem; font-weight: 500; line-height: 1.4; }
   #talk .talkrow { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; flex-wrap: wrap; }
+  #talk .talkrow[hidden] { display: none; }
   #talk button { font: inherit; font-weight: 600; padding: 6px 14px; border: 3px solid #0d2f37; border-radius: 12px; cursor: pointer; color: #0d2f37; }
   #talkYes { background: #ffd23f; }
   #talkNo { background: #fff; }
@@ -407,7 +408,7 @@
   #allBack { font: inherit; font-weight: 600; padding: 5px 14px; border: 3px solid #0d2f37; border-radius: 999px; background: #fff; color: #0d2f37; cursor: pointer; }
   #allList .uprow button:disabled { background: #e3e0d6; color: #6b7275; cursor: default; }
   #allTabs button:focus-visible, #allBack:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
-  @media (max-width: 640px) { #allShop .allbody { flex-direction: column; } #allTabs { flex-direction: row; width: auto; position: static; } #allTabs button { flex: 1; text-align: center; font-size: 0.8rem; padding: 6px 4px; } }   /* phones: tabs across the top */
+  @media (max-width: 640px) { #allShop .allbody { flex-direction: column; } #allTabs { flex-direction: row; flex-wrap: wrap; width: auto; position: static; } #allTabs button { flex: 1 1 40%; text-align: center; font-size: 0.8rem; padding: 6px 4px; } }   /* phones: tabs across the top */
   #sellList .uprow button.sure { background: #ef6b4f; color: #fff; }
   #sellList .uprow button:disabled { background: #e3e0d6; color: #6b7275; }
   .uprow button, #upDragons button, #upCancel, #secretBuy {
@@ -2242,6 +2243,34 @@ const World = (function () {
     block(k.head, gold, 0.05, 0.09, 0.05, 0.28, 0.14, 0.02);                      // earring
   })();
 
+  /* ---------- The Everything Shop's keepers: twins ---------- */
+  /* Lexi and Max (Adriana's names), twins behind the yellow counter: same face, same auburn hair colour, same yellow
+     T-shirt, orange shorts and white sneakers, and both have freckles. Lexi has long hair with a pink clip; Max has
+     swoopy hair (both Adriana's choice). */
+  function makeTwin(long) {
+    const k = figure({ skin: lam('#e0ac69'), shirt: lam('#ffd23f'), pants: lam('#ff8a3d'), face: paint.face });
+    const hairC = lam('#a0471f'), white = lam('#f2f2f2'), freckle = lam('#a85f2c');
+    [k.legL, k.legR].forEach((leg) => block(leg, white, 0.35, 0.16, 0.42, 0, -0.74, -0.04));   // sneakers
+    block(k.head, hairC, 0.57, 0.16, 0.57, 0, 0.5, 0.01);                       // top of the hair
+    if (long) {                                          // Lexi: long, down past her shoulders, with a fringe and a pink clip
+      block(k.head, hairC, 0.6, 0.95, 0.13, 0, 0.03, 0.26);
+      block(k.head, hairC, 0.1, 0.72, 0.36, -0.3, 0.14, 0.08);
+      block(k.head, hairC, 0.1, 0.72, 0.36, 0.3, 0.14, 0.08);
+      block(k.head, hairC, 0.5, 0.1, 0.07, 0, 0.45, -0.275);
+      block(k.head, lam('#ff6fae'), 0.14, 0.06, 0.05, 0.17, 0.44, -0.3, 0, 0, 0.3);
+    } else {                                             // Max: a big swoop across the forehead
+      block(k.head, hairC, 0.57, 0.34, 0.12, 0, 0.3, 0.24);
+      block(k.head, hairC, 0.1, 0.3, 0.32, -0.29, 0.36, -0.04);
+      block(k.head, hairC, 0.1, 0.3, 0.32, 0.29, 0.36, -0.04);
+      block(k.head, hairC, 0.6, 0.16, 0.1, 0.03, 0.47, -0.28, 0, 0, -0.2);
+      block(k.head, hairC, 0.2, 0.14, 0.4, -0.12, 0.62, -0.1, 0.3, 0, 0.2);     // sticking up a little at the front
+    }
+    [[-0.19, 0.2], [-0.13, 0.18], [-0.16, 0.15], [0.19, 0.2], [0.13, 0.18], [0.16, 0.15]].forEach(([x, y]) => block(k.head, freckle, 0.04, 0.04, 0.02, x, y, -0.265));   // freckles on both cheeks
+    block(k.root, lam('#ff8a3d'), 0.16, 0.16, 0.03, 0, 1.25, -0.21, 0, 0, 0.785);   // an orange diamond on the shirt
+    return k;
+  }
+  const lexi = makeTwin(true), max = makeTwin(false);
+
   /* ---------- The avatar shop's keeper ---------- */
   /* A stylish girl behind the counter of the blue stall: pink jacket, purple skirt, white boots,
      a beret, sunglasses, gold jewellery and a long high ponytail with pink tips. */
@@ -3326,16 +3355,34 @@ const World = (function () {
     { id: 'cape', name: 'Cape', price: 10000, colour: 0xd9483b },
     { id: 'crown', name: 'Crown', price: 50000, colour: 0xffc21f }
   ];
-  const treatUntil = {}, decorOwned = [], outfitsOwned = OUTFITS.map(() => 0);
+  const ARCHES = [                                       // over the way into your plot; you can own many but show one at a time
+    { id: 'flower', name: 'Flower arch', note: 'Covered in bright flowers', price: 2000, colour: 0xef6fae },
+    { id: 'vine', name: 'Vine arch', note: 'Leafy vines hanging down', price: 2000, colour: 0x3f8a3a },
+    { id: 'stone', name: 'Stone arch', note: 'Like an old castle gate', price: 4000, colour: 0x9aa0a6 },
+    { id: 'beach', name: 'Beach arch', note: 'Coral, shells and a starfish', price: 6000, colour: 0xff8f70 },
+    { id: 'candy', name: 'Candy arch', note: 'Candy-cane stripes and a lollipop', price: 8000, colour: 0xff6fae },
+    { id: 'mushroom', name: 'Mushroom arch', note: 'Two giant spotty mushrooms', price: 10000, colour: 0xe2483d },
+    { id: 'ice', name: 'Ice arch', note: 'Frosty, with icicles', price: 12000, colour: 0xbfe9ff },
+    { id: 'rainbow', name: 'Rainbow arch', note: 'A rainbow on two clouds', price: 15000, colour: 0x8a5ad6 },
+    { id: 'lava', name: 'Lava arch', note: 'Black rock with glowing lava', price: 25000, colour: 0xff5a1f },
+    { id: 'crystal', name: 'Crystal arch', note: 'Glowing purple crystals', price: 30000, colour: 0xb27bff },
+    { id: 'gold', name: 'Golden arch', note: 'Solid gold with gems', price: 60000, colour: 0xffc21f },
+    { id: 'dragon', name: 'Dragon arch', note: 'Two ruby dragons guard the way in', price: 100000, colour: 0xc8102e }
+  ];
+  const treatUntil = {}, decorOwned = [], outfitsOwned = OUTFITS.map(() => 0), archesOwned = [];
+  let archOn = '';
   try {
     Object.assign(treatUntil, JSON.parse(localStorage.getItem('mutation-mayhem-treats') || '{}') || {});
     (JSON.parse(localStorage.getItem('mutation-mayhem-decor') || '[]') || []).forEach((id) => { if (DECOR.some((d) => d.id === id) && !decorOwned.includes(id)) decorOwned.push(id); });
+    (JSON.parse(localStorage.getItem('mutation-mayhem-arches') || '[]') || []).forEach((id) => { if (ARCHES.some((a) => a.id === id) && !archesOwned.includes(id)) archesOwned.push(id); });
+    archOn = localStorage.getItem('mutation-mayhem-arch') || ''; if (!archesOwned.includes(archOn)) archOn = '';
     (JSON.parse(localStorage.getItem('mutation-mayhem-outfits') || '[]') || []).slice(0, OUTFITS.length).forEach((n, i) => { outfitsOwned[i] = Number.isInteger(n) && n > 0 ? n : 0; });
   } catch (e) { /* nothing saved */ }
   function saveShopStuff() {
     try {
       localStorage.setItem('mutation-mayhem-treats', JSON.stringify(treatUntil)); localStorage.setItem('mutation-mayhem-decor', JSON.stringify(decorOwned));
       localStorage.setItem('mutation-mayhem-outfits', JSON.stringify(outfitsOwned));
+      localStorage.setItem('mutation-mayhem-arches', JSON.stringify(archesOwned)); localStorage.setItem('mutation-mayhem-arch', archOn);
     } catch (e) { /* not saved */ }
   }
   const treatLeft = (id) => Math.max(0, (treatUntil[id] || 0) - Date.now()) / 1000;
@@ -3355,7 +3402,76 @@ const World = (function () {
     scene.add(g);
     return g;
   }
-  function buildDecor() { clearDecor(); if (myPlot >= 0) decorMeshes = decorOwned.map(decorModel); }
+  /* An arch over the way in (the gap in the near edge, lz = -5.5, 3.2 wide). Posts at lx ±1.9, a curved top from blocks. */
+  function archModel(id) {
+    const g = new THREE.Group(), L = (c) => lam(c), glow = (c) => new THREE.MeshBasicMaterial({ color: c });
+    const w = plotWorld(myPlot, 0, -PLOT / 2), s = new THREE.Group();
+    s.position.set(w.x, HUB.h + 0.1, w.z); s.rotation.y = Math.PI / 2 - plots[myPlot].phi; g.add(s);
+    const R = 1.9, TOP = 2.5, RY = 0.9;                  // half width, post height, how tall the curve is
+    const arcAt = (t, r = R, ry = RY) => { const a = Math.PI * t; return [Math.cos(a) * r, TOP + Math.sin(a) * ry, Math.atan2(Math.cos(a) * ry, -Math.sin(a) * r)]; };
+    const arc = (m, size, n = 11, r = R, ry = RY, thick = size) => { for (let k = 0; k <= n; k++) { const [x, y, rz] = arcAt(k / n, r, ry); block(s, typeof m === 'function' ? m(k) : m, size, size, thick, x, y, 0, 0, 0, rz); } };
+    const posts = (m, size = 0.34, h = TOP) => [-R, R].forEach((x) => block(s, m, size, h, size, x, h / 2, 0));
+    const dots = (cols, n, spread = 0.28, hangs = false) => { for (let k = 0; k < n; k++) {   // little blocks along the posts and the curve
+      const t = (k * 0.618) % 1, onPost = k % 3 === 0, side = k % 2 ? 1 : -1, j = ((k * 37) % 10) / 10 - 0.5;
+      const [x, y] = onPost ? [side * R, 0.4 + t * (TOP - 0.5)] : arcAt(t);
+      block(s, cols[k % cols.length], 0.16, 0.16, 0.16, x + j * spread, y + (hangs ? -0.2 : j * 0.2), (k % 2 ? 1 : -1) * 0.2); } };
+    if (id === 'flower') { posts(L(0x8a5a2b), 0.3); arc(L(0x4f9a4a), 0.34); dots([0xef6fae, 0xffd23f, 0x8a5ad6, 0xffffff, 0xe2483d].map(L), 40); }
+    if (id === 'vine') {
+      posts(L(0x5a3d22), 0.3); arc(L(0x2f7a3a), 0.36); dots([0x3f8a3a, 0x5fb83a, 0x2f6a2a].map(L), 36);
+      for (let k = 1; k < 10; k++) { const [x, y] = arcAt(k / 10), len = 0.4 + ((k * 7) % 5) * 0.18; block(s, L(0x3f8a3a), 0.07, len, 0.07, x, y - len / 2 - 0.1, (k % 2 ? 0.1 : -0.1)); block(s, L(0x5fb83a), 0.16, 0.12, 0.05, x + 0.06, y - len, 0); }
+    }
+    if (id === 'stone') { posts(L(0x8a9096), 0.55); arc((k) => L(k % 2 ? 0x9aa0a6 : 0x80868c), 0.52); block(s, L(0xc4c8cc), 0.5, 0.62, 0.58, 0, TOP + RY, 0); [-R, R].forEach((x) => block(s, L(0x6e7479), 0.7, 0.22, 0.7, x, 0.11, 0)); }
+    if (id === 'beach') {
+      posts(L(0xe8cf9a), 0.42); arc((k) => L(k % 2 ? 0xff8f70 : 0xffb59a), 0.38); dots([0xffffff, 0xffd8c2, 0xf6a5c0].map(L), 24);
+      const star = new THREE.Group(); star.position.set(0, TOP + RY + 0.3, 0); s.add(star); [0, 1, 2, 3, 4].forEach((k) => block(star, L(0xff8a3d), 0.13, 0.4, 0.1, Math.sin(k * 1.257) * 0.17, Math.cos(k * 1.257) * 0.17, 0, 0, 0, -k * 1.257));
+    }
+    if (id === 'candy') {
+      [-R, R].forEach((x) => { for (let k = 0; k < 8; k++) block(s, L(k % 2 ? 0xffffff : 0xff4f7a), 0.32, TOP / 8, 0.32, x, (k + 0.5) * TOP / 8, 0); });
+      arc((k) => L(k % 2 ? 0xffffff : 0xff4f7a), 0.34, 13);
+      block(s, L(0xf2f2f2), 0.07, 0.5, 0.07, 0, TOP + RY + 0.3, 0); const lol = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.1, 16), L(0x8a5ad6)); lol.rotation.x = Math.PI / 2; lol.position.set(0, TOP + RY + 0.75, 0); s.add(lol);
+      block(s, L(0xffd23f), 0.42, 0.08, 0.11, 0, TOP + RY + 0.75, 0, 0, 0, 0.8);
+    }
+    if (id === 'mushroom') {
+      [-R, R].forEach((x) => { block(s, L(0xf5efe0), 0.4, TOP + 0.2, 0.4, x, (TOP + 0.2) / 2, 0); block(s, L(0xe2483d), 1.2, 0.5, 1.2, x, TOP + 0.4, 0); block(s, L(0xe2483d), 0.8, 0.25, 0.8, x, TOP + 0.75, 0);
+        [[-0.35, -0.61], [0.3, -0.61], [0, 0.61], [-0.61, 0.1], [0.61, -0.2]].forEach(([a, b]) => block(s, L(0xffffff), 0.18, 0.18, 0.04, x + (Math.abs(a) > 0.6 ? a : a), TOP + 0.45, b, 0, Math.abs(a) > 0.6 ? Math.PI / 2 : 0, 0)); });
+      arc((k) => L(k % 2 ? 0xe2483d : 0xffffff), 0.22, 9, R - 0.5, RY * 0.7);
+    }
+    if (id === 'ice') {
+      const ice = new THREE.MeshLambertMaterial({ color: 0xbfe9ff, transparent: true, opacity: 0.8 });
+      posts(ice, 0.42); arc(ice, 0.44); for (let k = 1; k < 10; k++) { const [x, y] = arcAt(k / 10), len = 0.25 + (k % 3) * 0.15; block(s, glow(0xe8f8ff), 0.09, len, 0.09, x, y - 0.22 - len / 2, 0); }
+      dots([glow(0xffffff)], 14);
+    }
+    if (id === 'rainbow') {
+      [0xe2483d, 0xff8a3d, 0xffd23f, 0x5fb83a, 0x3f7fd6, 0x8a5ad6].forEach((c, k) => { const r = R + 0.35 - k * 0.14; arc(L(c), 0.15, 18, r, RY + TOP - 0.3 - k * 0.14, 0.3); });
+      s.children.forEach((m) => { m.position.y -= TOP - 0.3; });   // a rainbow starts at the ground
+      [-R, R].forEach((x) => [[0, 0.2, 0.9], [0.35, 0.35, 0.6], [-0.3, 0.3, 0.6]].forEach(([dx, y, sz]) => block(s, L(0xffffff), sz, sz * 0.7, sz, x + dx, y, 0)));
+    }
+    if (id === 'lava') {
+      posts(L(0x2a2523), 0.5); arc(L(0x332c29), 0.48);
+      for (let k = 0; k < 14; k++) { const onPost = k % 2, t = (k * 0.618) % 1, [x, y] = onPost ? [(k % 4 === 1 ? -1 : 1) * R, 0.3 + t * (TOP - 0.5)] : arcAt(t); block(s, glow(k % 3 ? 0xff5a1f : 0xffc21f), 0.1, 0.3, 0.52, x, y, 0, 0, 0, t * 2); }
+      block(s, glow(0xff8a3d), 0.3, 0.4, 0.3, 0, TOP + RY + 0.4, 0); block(s, glow(0xffd23f), 0.16, 0.3, 0.16, 0, TOP + RY + 0.55, 0);
+    }
+    if (id === 'crystal') {
+      const cr = (c) => glow(c);
+      posts(L(0x4a3a66), 0.36); arc(L(0x5a4a7a), 0.34);
+      for (let k = 0; k < 16; k++) { const t = k / 15, [x, y] = k < 4 ? [(k % 2 ? 1 : -1) * R, 0.3 + (k >> 1) * 0.9] : arcAt(t); const h = 0.4 + (k % 3) * 0.18; block(s, cr(k % 2 ? 0xb27bff : 0xe0b8ff), 0.16, h, 0.16, x, y + h / 2, k % 2 ? 0.12 : -0.12, 0, 0, (k % 3 - 1) * 0.4); }
+      block(s, cr(0xf2e2ff), 0.3, 0.8, 0.3, 0, TOP + RY + 0.45, 0, 0, 0.78, 0);
+    }
+    if (id === 'gold') {
+      const au = L(0xffc21f);
+      posts(au, 0.4); arc(au, 0.38); [-R, R].forEach((x) => { block(s, au, 0.6, 0.2, 0.6, x, 0.1, 0); block(s, au, 0.56, 0.16, 0.56, x, TOP - 0.05, 0); });
+      [[0xe2483d, 0.15], [0x3f7fd6, 0.32], [0x5fb83a, 0.5], [0x3f7fd6, 0.68], [0xe2483d, 0.85]].forEach(([c, t]) => { const [x, y] = arcAt(t); block(s, glow(c), 0.18, 0.18, 0.44, x, y, 0, 0, 0, 0.78); });
+      block(s, glow(0xbff6ff), 0.3, 0.3, 0.46, 0, TOP + RY + 0.05, 0, 0, 0, 0.78);
+    }
+    if (id === 'dragon') {
+      posts(L(0x5a5560), 0.6); arc((k) => L(k % 2 ? 0x6a6470 : 0x55505c), 0.5);
+      for (let k = 1; k < 12; k++) { const [x, y] = arcAt(k / 12); block(s, L(0xc8102e), 0.12, 0.28, 0.12, x, y + 0.32, 0, 0, 0, 0.78); }   // red spikes along the top
+      [-1, 1].forEach((side) => { const d = makeDragon('ruby'); scene.remove(d.root); d.root.position.set(side * R, TOP, 0); d.root.rotation.y = Math.PI; d.root.scale.set(0.55, 0.55, 0.55); s.add(d.root); });
+    }
+    scene.add(g);
+    return g;
+  }
+  function buildDecor() { clearDecor(); if (myPlot >= 0) { decorMeshes = decorOwned.map(decorModel); if (archOn) decorMeshes.push(archModel(archOn)); } }
   function clearDecor() { decorMeshes.forEach((g) => scene.remove(g)); decorMeshes = []; }
 
   /* Outfits on a dragon, measured from the dragon's root (its head is at about 0, 1.4, -0.6). */
@@ -3377,7 +3493,7 @@ const World = (function () {
   /* The panel. */
   const allEl = $('allShop'), allList = $('allList');
   let allOpen = false, allTab = 0, allPickFor = -1;      // allPickFor: an outfit waiting for you to choose its dragon
-  const tabBtns = ['Dragon treats', 'Plot decorations', 'Dragon outfits'].map((t) => {
+  const tabBtns = ['Dragon treats', 'Plot decorations', 'Dragon outfits', 'Entrance arches'].map((t) => {
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = t; $('allTabs').appendChild(b); return b;
   });
   tabBtns.forEach((b, i) => b.addEventListener('click', () => { allTab = i; allPickFor = -1; refreshAll(); }));
@@ -3409,6 +3525,17 @@ const World = (function () {
         toast(d.name + (myPlot >= 0 ? ' added to your plot!' : ' bought! It will appear on your plot.'), 4); refreshAll();
       }, own);
     });
+    if (allTab === 3) {
+      const h = document.createElement('h3'); h.textContent = 'One arch over the way into your plot. You can swap any time.'; allList.appendChild(h);
+      ARCHES.forEach((a) => {
+        const own = archesOwned.includes(a.id), on = archOn === a.id;
+        allRow(a.name, a.note, a.colour, on ? 'Take it down' : own ? 'Put it up' : fmt(a.price) + ' coins', () => {
+          if (!own) { if (!buy(a.price)) return; archesOwned.push(a.id); }
+          archOn = on ? '' : a.id; saveShopStuff(); buildDecor();
+          toast(on ? a.name + ' taken down.' : a.name + (myPlot >= 0 ? ' is up on your plot!' : ' bought! It will go up on your plot.'), 4); refreshAll();
+        });
+      });
+    }
     if (allTab === 2 && allPickFor < 0) {
       OUTFITS.forEach((o, i) => allRow(o.name, outfitsOwned[i] ? 'You have ' + outfitsOwned[i] + ' to put on' : 'One dragon can wear it', o.colour, outfitsOwned[i] ? 'Put on a dragon' : fmt(o.price) + ' coins', () => {
         if (!outfitsOwned[i]) { if (!buy(o.price)) return; outfitsOwned[i]++; saveShopStuff(); toast('You bought a ' + o.name + '!', 3); }
@@ -3790,15 +3917,31 @@ const World = (function () {
   const sellKeeperYaw = Math.atan2(-greenOut.x, -greenOut.z);   // the sell shop's keeper behind the green counter
   sellKeeper.root.position.set(GREEN.x + greenOut.x * 0.5, HUB.h + 0.2, GREEN.z + greenOut.z * 0.5);
   sellKeeper.root.rotation.y = sellKeeperYaw;
-  /* Mia (the avatar shop) and Leo (the upgrade shop). Their names float over their heads. Stand at their stall and
-     hold E, or tap "Talk to ...", and they say their line; the answer buttons can open their shop. */
+  const twinYaw = Math.atan2(-yellowOut.x, -yellowOut.z);   // Lexi and Max side by side behind the yellow counter
+  [[lexi, -1.1], [max, 1.1]].forEach(([t, side]) => {
+    t.root.position.set(YELLOW.x + yellowOut.x * 0.5 - yellowOut.z * side, HUB.h + 0.2, YELLOW.z + yellowOut.z * 0.5 + yellowOut.x * side);
+    t.root.rotation.y = twinYaw;
+  });
+  /* Mia (the avatar shop), Leo (the upgrade shop), Kai (the sell shop) and the twins Lexi and Max (the Everything Shop).
+     Their names float over their heads. Stand at their stall and hold E, or tap "Talk to ...", and they say their lines
+     (several speakers take turns when `lines` is given); the answer buttons can open their shop. The twins argue over who
+     serves you, and you pick one (`pick`) before the shop buttons show. */
   const keepers = [
     { k: keeper, yaw: keeperYaw, at: BLUE, front: shopFront, wave: 0, sway: 0, name: 'Mia', colour: '#d6337f',
       line: 'Ugh, what do you want? Hurry up and stop wasting my time.', yes: 'Show me the avatars', no: 'Bye', open: () => openShop() },
     { k: upKeeper, yaw: upKeeperYaw, at: RED, front: upFront, wave: 0, sway: 2.1, name: 'Leo', colour: '#2f7a3a',
       line: 'Hi! How are you doing? Do you need an upgrader?', yes: 'Yes please!', no: 'No thanks', open: () => openUpShop() },
-    { k: sellKeeper, yaw: sellKeeperYaw, at: GREEN, front: sellFront, wave: 0, sway: 4.2 }   // no name or lines yet
+    { k: sellKeeper, yaw: sellKeeperYaw, at: GREEN, front: sellFront, wave: 0, sway: 4.2, name: 'Kai', colour: '#3f8f22',
+      line: "Yo, I'm Kai! Got a dragon you don't need? I'll give you good coins for it.", yes: 'Sell a dragon', no: 'Not today', open: () => openSell() },
+    { k: lexi, yaw: twinYaw, at: YELLOW, front: allFront, wave: 0, sway: 1.3, name: 'Lexi', colour: '#d6337f', label: 'Talk to Lexi and Max',
+      lines: [['Lexi', 'Hi! Welcome to the Everything Shop! I\'ll help you!'], ['Max', 'No way, I saw them first! I\'ll help you!'],
+        ['Lexi', 'You helped the last customer, Max!'], ['Max', 'That was a pigeon, Lexi. It doesn\'t count.'], ['Lexi', 'Ugh! Fine. You choose. Who do you want?']],
+      pick: [{ label: 'Lexi', lines: [['Lexi', 'Yes! I win! What would you like?'], ['Max', 'Hmph. Fine.']] },
+        { label: 'Max', lines: [['Max', 'Ha! Told you they like me better! What would you like?'], ['Lexi', 'Whatever, Max.']] }],
+      yes: 'Show me the shop', no: 'Bye', open: () => openAll() },
+    { k: max, yaw: twinYaw, at: YELLOW, front: allFront, wave: 0, sway: 1.35, name: 'Max', colour: '#2a6fb8', quiet: true }   // Lexi's entry does the talking for both
   ];
+  const keeperColour = (name) => (keepers.find((q) => q.name === name) || {}).colour || '#0d2f37';
   keepers.forEach((q) => {                               // a name tag over each head
     if (!q.name) return;
     const cv = document.createElement('canvas'), g = cv.getContext('2d');
@@ -3812,16 +3955,34 @@ const World = (function () {
   });
   const talkBtn = $('talkBtn'), talkEl = $('talk'), talkText = $('talkText');
   let talkNear = null, talking = null, talkHold = 0, holdFrom = -1, talkShownFill = -1, talkChars = 0;
+  let talkLines = [], talkAt = 0, talkWait = 0, talkPicking = false, talkPicked = false;   // the lines being said, which one, and where in the twins' choice we are
   function talkTarget() {                                // the shopkeeper you are standing in front of, if any
     if (!started || shopping || menuOpen() || riding || carrying || carryingBlock || p.dungeon || p.inCave) return null;
-    for (const q of keepers) if (q.name && Math.hypot(p.x - q.front.x, p.z - q.front.z) < 4.5) return q;
+    for (const q of keepers) if (q.name && !q.quiet && Math.hypot(p.x - q.front.x, p.z - q.front.z) < 4.5) return q;
     return null;
   }
+  const talkRow = () => talkEl.querySelector ? talkEl.querySelector('.talkrow') : null;
+  function sayLines(lines) {                             // start a run of lines; the answer buttons wait until the last one is said
+    talkLines = lines; talkAt = 0; talkChars = 0; talkWait = 0;
+    const row = talkRow(); if (row) row.hidden = lines.length > 1;
+    showSpeaker();
+  }
+  function showSpeaker() {
+    const who = talkLines[talkAt][0];
+    $('talkWho').textContent = who; $('talkWho').style.background = keeperColour(who); talkText.textContent = '';
+  }
+  function setAnswers() {                                // the twins first make you choose; everyone else offers their shop
+    talkPicking = !!(talking.pick && !talkPicked);
+    $('talkYes').textContent = talkPicking ? talking.pick[0].label : talking.yes;
+    $('talkNo').textContent = talkPicking ? talking.pick[1].label : talking.no;
+  }
   function openTalk(q) {
-    talking = q; talkHold = 0; talkChars = 0;
-    $('talkWho').textContent = q.name; $('talkWho').style.background = q.colour;
-    talkText.textContent = ''; $('talkYes').textContent = q.yes; $('talkNo').textContent = q.no;
+    talking = q; talkHold = 0; talkPicked = false;
+    sayLines(q.lines || [[q.name, q.line]]); setAnswers();
     talkEl.hidden = false; talkBtn.hidden = true; shopBtn.hidden = true; document.body.classList.remove('pair');
+  }
+  function pickTwin(i) {                                 // the one you chose is happy, the other one sulks
+    talkPicked = true; sayLines(talking.pick[i].lines); setAnswers();
   }
   function closeTalk() {
     if (!talking) return;
@@ -3829,12 +3990,15 @@ const World = (function () {
     canvas.focus();
   }
   talkBtn.addEventListener('click', (e) => { const q = talkTarget(); if (q) openTalk(q); if (e.detail > 0) talkBtn.blur(); });
-  $('talkNo').addEventListener('click', closeTalk);
-  $('talkYes').addEventListener('click', () => { const q = talking; closeTalk(); if (q) q.open(); });
+  $('talkNo').addEventListener('click', () => { if (talking && talkPicking) pickTwin(1); else closeTalk(); });
+  $('talkYes').addEventListener('click', () => { if (talking && talkPicking) { pickTwin(0); return; } const q = talking; closeTalk(); if (q) q.open(); });
   function talkStep(dt, time) {                          // every frame: hold E to talk, and the words appear a few at a time
     talkNear = talking ? null : talkTarget();
     if (talking) {
-      if (talkChars < talking.line.length) { talkChars = Math.min(talking.line.length, talkChars + dt * (reduced ? 1000 : 45)); talkText.textContent = talking.line.slice(0, Math.ceil(talkChars)); }
+      const line = talkLines[talkAt][1];
+      if (talkChars < line.length) { talkChars = Math.min(line.length, talkChars + dt * (reduced ? 1000 : 45)); talkText.textContent = line.slice(0, Math.ceil(talkChars)); }
+      else if (talkAt < talkLines.length - 1 && (talkWait += dt) > 1.1) { talkAt++; talkChars = 0; talkWait = 0; showSpeaker(); }   // a moment to read, then the next speaker
+      else if (talkAt === talkLines.length - 1) { const row = talkRow(); if (row && row.hidden) row.hidden = false; }
       if (!started || Math.hypot(p.x - talking.front.x, p.z - talking.front.z) > 7) closeTalk();   // walked away
       return;
     }
@@ -3845,7 +4009,7 @@ const World = (function () {
     } else { talkHold = 0; holdFrom = -1; }
     const fill = Math.round(talkHold / 0.5 * 100);
     if (fill !== talkShownFill && talkBtn.style.setProperty) { talkShownFill = fill; talkBtn.style.setProperty('--fill', fill + '%'); }   // the button fills up while you hold E
-    const label = talkNear ? 'Talk to ' + talkNear.name : '';
+    const label = talkNear ? talkNear.label || 'Talk to ' + talkNear.name : '';
     if (talkNear && $('talkLabel').textContent !== label) $('talkLabel').textContent = label;
     if (talkBtn.hidden === !!talkNear) talkBtn.hidden = !talkNear;
     const pair = !!talkNear && !shopBtn.hidden;
@@ -4436,10 +4600,10 @@ const World = (function () {
     renderer.render(scene, camera);
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
-    AV, avatar, gear, hair, keeper, upKeeper, keepers, talking: () => talking, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
+    AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
-    upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
+    upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();
