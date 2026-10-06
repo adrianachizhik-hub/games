@@ -79,7 +79,7 @@ function ctx2d(canvas) {
 }
 function el(id) {
   const cls = new Set();
-  return { id, hidden: false, value: '', attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, style: {}, width: 264, height: 264, clientWidth: 1280, clientHeight: 720, offsetWidth: 10, textContent: '', children: [],
+  return { id, hidden: false, value: '', attrs: {}, dataset: {}, setAttribute(k, v) { this.attrs[k] = v; }, style: {}, width: 264, height: 264, clientWidth: 1280, clientHeight: 720, offsetWidth: 10, textContent: '', children: [],
     classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) },
     listeners: {}, addEventListener(n, f) { (this.listeners[n] = this.listeners[n] || []).push(f); }, fire(n, e) { (this.listeners[n] || []).forEach((f) => f(e)); },
     getBoundingClientRect() { return id === 'stick' && document.body.classList.contains('touch') ? { left: 22, top: 720 - 28 - 124, width: 124, height: 124 } : { left: 0, top: 0, width: 0, height: 0 }; },
@@ -572,6 +572,10 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   const stored = () => [...prow()].filter((r) => btn(r).textContent === 'Place');
   btn(stored()[0]).fire('click', ev({})); console.log('Place a stored one: placed', I.dragonPlaced.filter(Boolean).length);
   btn(stored()[0]).fire('click', ev({})); console.log('Place a 6th: placed', I.dragonPlaced.filter(Boolean).length, '| message', said());
+  if (I.admin()) {                                       // admins have unlimited space: the 6th fits, and there is no space to buy
+    console.log('admin: unlimited space, placed', I.dragonPlaced.filter(Boolean).length); if (I.dragonPlaced.filter(Boolean).length !== 6) throw new Error('admins should have unlimited space');
+    els.plotDone.fire('click', ev({}));
+  } else {
   if (I.dragonPlaced.filter(Boolean).length !== 5) throw new Error('a full plot took a 6th dragon');
   els.plotDone.fire('click', ev({})); console.log('Done closes it:', !I.plotMenuOpen());
   const sg = I.signSpot(); I.p.x = sg.x; I.p.z = sg.z; I.p.y = 6.3; for (let k = 0; k < 12; k++) raf(44500 + k * 16);
@@ -584,6 +588,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   I.p.x = home3.x; I.p.z = home3.z; for (let k = 0; k < 12; k++) raf(45000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); raf(45300);
   btn(stored()[0]).fire('click', ev({})); console.log('back in the menu, place a 6th: placed', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| saved', store['mutation-mayhem-slots'], 'spaces,', JSON.parse(store['mutation-mayhem-placed']).length, 'placed');
   els.plotDone.fire('click', ev({}));
+  }
 }
 
 // ---- the inventory bar ----
@@ -617,7 +622,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   const dragBtn = () => [...els.invItems.children].find((b) => / dragon$/.test(b.children[1].textContent));
   const full = I.dragonPlaced.filter(Boolean).length >= I.plotSlots(); dragBtn().fire('click', ev({ detail: 1 }));
   console.log('click a dragon in the inventory, plot', full ? 'full' : 'has room', ': placed', I.dragonPlaced.filter(Boolean).length, 'of', I.plotSlots(), '| message', said());
-  I.giveCoins(1e6); const sg2 = I.signSpot(); I.p.x = sg2.x; I.p.z = sg2.z; for (let k = 0; k < 12; k++) raf(47000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' }));
+  if (!I.admin()) { I.giveCoins(1e6); const sg2 = I.signSpot(); I.p.x = sg2.x; I.p.z = sg2.z; for (let k = 0; k < 12; k++) raf(47000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); }   // admins have no space to buy
   I.p.x = hm.x; I.p.z = hm.z; I.update(1 / 60, 0); const p0 = I.dragonPlaced.filter(Boolean).length, n0 = els.invItems.children.length; dragBtn().fire('click', ev({ detail: 1 }));
   console.log('bought a space, click again: placed', p0, '->', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| saved upgraders', store['mutation-mayhem-upgraders']);
   if (I.dragonPlaced.filter(Boolean).length !== p0 + 1) throw new Error('clicking a dragon in the inventory should place it');
@@ -684,6 +689,47 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     if (I.coins() === Infinity || store['mutation-mayhem-coins'] === 'Infinity') throw new Error('unlimited coins must not stick');
     playAgain(); reclaim();
   }
+}
+
+// ---- the green stall: selling dragons; and the admin powers ----
+{
+  let T = 95000; const hud = (n = 12) => { for (let k = 0; k < n; k++) raf(T += 16); };
+  const lab = () => document.getElementById('shopOpenLabel').textContent;
+  if (I.riding()) I.dismount(true);
+  I.goTo(7); I.p.x = I.sellFront.x; I.p.z = I.sellFront.z; I.p.y = 6.3; hud();
+  console.log('at the green stall: button', JSON.stringify(lab()), '| sign', JSON.stringify(I.signLabels[10]), '| keeper there', Math.hypot(I.sellKeeper.root.position.x - I.shops[2].x, I.sellKeeper.root.position.z - I.shops[2].z) < 1);
+  if (lab() !== 'Open the sell shop') throw new Error('no sell shop button at the green stall');
+  window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); hud(2);
+  const rows = () => els.sellList.children.filter((r) => r.children && r.children[1]), n0 = I.ownDragons.length, c0 = I.coins();
+  const top = rows()[0], btn = top.children[1];
+  console.log('sell shop open', I.sellOpen(), '|', rows().length, 'dragons listed | top', JSON.stringify(top.children[0].children[0].textContent), JSON.stringify(btn.textContent));
+  btn.fire('click', ev({})); console.log('press Sell once: still', I.ownDragons.length, 'dragons | button now', JSON.stringify(btn.textContent));
+  if (I.ownDragons.length !== n0) throw new Error('the first press should only ask');
+  const pets0 = I.plotPets.map((d) => d.index + ':' + d.kind); btn.fire('click', ev({}));
+  console.log('press again: dragons', n0, '->', I.ownDragons.length, '| coins +' + (I.coins() - c0 === Infinity || isNaN(I.coins() - c0) ? '(unlimited)' : Math.round(I.coins() - c0)), '| message', said());
+  if (I.ownDragons.length !== n0 - 1) throw new Error('selling should remove the dragon');
+  const okPets = I.plotPets.every((d) => I.ownDragons[d.index] === d.kind); console.log('pets on the plot still match their dragons:', okPets, '| saved', JSON.parse(store['mutation-mayhem-dragons']).length);
+  if (!okPets) throw new Error('plot pets point at the wrong dragons after selling');
+  window.fire('keydown', ev({ code: 'Escape' })); hud(2);
+  // admin powers (only work for admins)
+  const nE = I.eggs.length; I.spawnEgg(5); I.spawnEgg(0);
+  console.log('spawn a Fire and a Common egg (admin ' + I.admin() + '): eggs', nE, '->', I.eggs.length);
+  if (I.admin()) {
+    const sp = I.eggs[I.eggs.length - 2]; I.p.x = sp.spot.x; I.p.z = sp.spot.z; I.p.y = sp.spot.y; I.update(1 / 60, 0);
+    console.log('  walk into the spawned Fire egg: carrying', I.carrying() && I.EGG_TIERS[I.carrying().egg.tier].name, '| chase', !!I.chase());
+    const hm = I.plotWorld(I.myPlot(), 0, 0); I.p.x = hm.x; I.p.z = hm.z; I.p.y = 6.3; tick(2.5);
+    console.log('  take it home: hatched', I.ownDragons.slice(-1)[0], '| spawned egg gone', !I.eggs.includes(sp));
+    const n1 = I.ownDragons.length, placed1 = I.dragonPlaced.filter(Boolean).length; ['jade', 'fireboy', 'diamond', 'gold', 'ruby', 'silver', 'green'].forEach((k) => I.adminAddDragon(k));
+    console.log('  add 7 dragons: dragons', n1, '->', I.ownDragons.length, '| on the plot', placed1, '->', I.dragonPlaced.filter(Boolean).length, '(space ' + I.slotLimit() + ')');
+    if (I.ownDragons.length !== n1 + 7 || I.dragonPlaced.filter(Boolean).length !== placed1 + 7) throw new Error('admins should have unlimited space');
+    I.banName('Taj'); I.banName('Ellie#32'); console.log('  ban Taj and Ellie#32: banned', JSON.stringify(I.banned), '| message', said());
+    els.leave.fire('click', ev({ detail: 1 })); console.log('  leave: placed now', I.dragonPlaced.filter(Boolean).length, 'of', I.plotSlots());
+    if (I.dragonPlaced.filter(Boolean).length > I.plotSlots()) throw new Error('unlimited space should end when the admin leaves');
+    els.name.value = 'Taj'; els.name.fire('input', ev({})); els.start.fire('click', ev({ pointerType: 'mouse' }));
+    console.log('  someone types Taj: playing', document.body.classList.contains('playing'), '| message', JSON.stringify(els.codeMsg.textContent));
+    if (document.body.classList.contains('playing')) throw new Error('a banned name got in');
+    playAgain(); reclaim(); I.banned.length = 0;
+  } else if (I.eggs.length !== nE) throw new Error('only admins can spawn eggs');
 }
 
 // ---- admin announcement ----

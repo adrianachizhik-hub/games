@@ -211,7 +211,7 @@
   #talkYes { background: #ffd23f; }
   #talkNo { background: #fff; }
   #talk button:focus-visible, #talkBtn:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
-  #shopOpen[hidden], #avatarShop[hidden], #upShop[hidden], #upList[hidden], #upPick[hidden], #plotMenu[hidden], #secretShop[hidden], .effect[hidden] { display: none; }
+  #shopOpen[hidden], #avatarShop[hidden], #upShop[hidden], #upList[hidden], #upPick[hidden], #plotMenu[hidden], #secretShop[hidden], #sellShop[hidden], .effect[hidden] { display: none; }
   /* Dragon eggs: the countdown while you carry one, and short messages above it */
   #carry, #toast {
     position: fixed;
@@ -321,7 +321,7 @@
   body.touch #shopOpen, body.touch #talkBtn, body.touch #talk { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
   @media (pointer: coarse) { #shopOpen kbd, #talkBtn kbd { display: none; } }
   @media (max-width: 520px) { body.pair #shopOpen { transform: translateX(-50%); } body.pair #talkBtn { transform: translateX(-50%) translateY(-62px); } }   /* narrow: stack them */
-  #avatarShop, #upShop, #plotMenu, #secretShop {
+  #avatarShop, #upShop, #plotMenu, #secretShop, #sellShop {
     position: fixed;
     right: calc(14px + env(safe-area-inset-right, 0px));
     top: calc(14px + env(safe-area-inset-top, 0px));
@@ -336,11 +336,11 @@
     box-shadow: 0 6px 0 #0d2f37;
   }
   @media (max-width: 640px) {               /* on a phone the shop is a sheet along the bottom, so the avatar shows above it */
-    #avatarShop, #upShop, #plotMenu, #secretShop { left: 10px; right: 10px; top: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 54vh; }
+    #avatarShop, #upShop, #plotMenu, #secretShop, #sellShop { left: 10px; right: 10px; top: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 54vh; }
   }
-  #avatarShop h2, #upShop h2, #plotMenu, #secretShop h2 { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
-  #avatarShop .sub, #upShop .sub, #plotMenu, #secretShop .sub { margin: 4px 0 2px; font-size: 0.92rem; opacity: 0.8; }
-  #avatarShop h3, #upShop h3, #plotMenu, #secretShop h3 { margin: 11px 0 6px; font-size: 1rem; font-weight: 600; }
+  #avatarShop h2, #upShop h2, #plotMenu h2, #secretShop h2, #sellShop h2 { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+  #avatarShop .sub, #upShop .sub, #plotMenu .sub, #secretShop .sub, #sellShop .sub { margin: 4px 0 2px; font-size: 0.92rem; opacity: 0.8; }
+  #avatarShop h3, #upShop h3, #plotMenu h3, #secretShop h3, #sellShop h3 { margin: 11px 0 6px; font-size: 1rem; font-weight: 600; }
   .swatches, .picks { display: flex; flex-wrap: wrap; gap: 9px; }
   .swatches button { width: 35px; height: 35px; padding: 0; border: 3px solid #0d2f37; border-radius: 50%; cursor: pointer; }
   .swatches button.on { box-shadow: 0 0 0 3px var(--panel-solid), 0 0 0 7px #0d2f37; }
@@ -357,7 +357,7 @@
     cursor: pointer;
   }
   .picks button.on { background: #ffd23f; font-weight: 600; }
-  #avatarShop .foot, #upShop .foot, #plotMenu, #secretShop .foot {                       /* stays in view at the bottom while the choices scroll */
+  #avatarShop .foot, #upShop .foot, #plotMenu .foot, #secretShop .foot, #sellShop .foot {                       /* stays in view at the bottom while the choices scroll */
     position: sticky;
     bottom: 0;
     display: flex;
@@ -367,7 +367,7 @@
     padding: 10px 18px 16px;
     background: var(--panel-solid);
   }
-  #shopDone, #upDone, #plotDone, #secretDone {
+  #shopDone, #upDone, #plotDone, #secretDone, #sellDone {
     flex: 1;
     font: inherit;
     font-size: 1.1rem;
@@ -380,7 +380,7 @@
     box-shadow: 0 4px 0 #0d2f37;
     cursor: pointer;
   }
-  #upShop .have, #plotMenu .have, #secretShop .have { display: flex; align-items: center; gap: 7px; margin: 10px 0 2px; font-weight: 500; }
+  #upShop .have, #plotMenu .have, #secretShop .have, #sellShop .have { display: flex; align-items: center; gap: 7px; margin: 10px 0 2px; font-weight: 500; }
   .uprow { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 8px 8px 12px; border: 3px solid #0d2f37; border-radius: 14px; background: #fff; color: #0d2f37; }
   .uprow .what { flex: 1; min-width: 0; }
   .uprow b { display: block; font-size: 1rem; }
@@ -395,6 +395,8 @@
   .effect { width: max-content; margin: 0 0 8px; padding: 2px 12px; border-radius: 999px; background: #ff6a20; color: #fff; font-size: 0.9rem; font-weight: 700; }
   #plotMenu .restock { margin: 2px 0 8px; font-size: 1rem; font-weight: 600; }
   #upShop .restock { margin: 2px 0 0; font-size: 0.9rem; font-weight: 600; }
+  #sellList .uprow button.sure { background: #ef6b4f; color: #fff; }
+  #sellList .uprow button:disabled { background: #e3e0d6; color: #6b7275; }
   .uprow button, #upDragons button, #upCancel, #secretBuy {
     font: inherit;
     font-weight: 600;
@@ -466,11 +468,16 @@
     padding: 9px 14px;
     border-radius: 12px;
     border: 3px solid #0d2f37;
-    background: var(--panel-ink);
+    background: #fff;
     color: #0d2f37;
     cursor: pointer;
   }
   #adminCommands button[aria-pressed="true"] { background: #ffd23f; }
+  #adminCommands .adminhead { margin: 6px 0 -2px; font-size: 0.9rem; font-weight: 700; }
+  #adminCommands .adminrow { display: flex; flex-wrap: wrap; gap: 5px; }
+  #adminCommands button.small { font-size: 0.8rem; padding: 4px 9px; border-width: 2px; border-radius: 9px; }
+  #adminCommands select, #adminCommands .adminrow input { flex: 1; min-width: 0; font: inherit; font-size: 0.85rem; padding: 4px 6px; border: 2px solid #0d2f37; border-radius: 9px; background: #fff; color: #0d2f37; -webkit-user-select: text; user-select: text; }
+  #adminCommands .banlist div { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 0.85rem; margin-top: 3px; }
   /* The egg radar's readout, in the gap between the minimap and the admin arrow */
   #radar {
     position: fixed;
@@ -920,6 +927,13 @@
   <h3>Your dragons</h3>
   <div id="plotList"></div>
   <div class="foot"><button id="plotDone" type="button">Done</button></div>
+</div>
+<div id="sellShop" role="dialog" aria-label="Sell shop" hidden>
+  <h2>Sell shop</h2>
+  <p class="sub">Sell a dragon for coins. Rarer and upgraded dragons sell for more. Press Sell, then press again to be sure.</p>
+  <p class="have"><span class="coin" aria-hidden="true"></span>You have <b id="sellCoins">0</b> coins</p>
+  <div id="sellList"></div>
+  <div class="foot"><button id="sellDone" type="button">Done</button></div>
 </div>
 <div id="secretShop" role="dialog" aria-label="Secret shop" hidden>
   <h2>Secret shop</h2>
@@ -1703,7 +1717,7 @@ const World = (function () {
       box(F, 7.2, 0.25, 6, 0, 3.45, 0.3, ROOFS[i], 0.1);                 // roof, tipped toward the front
       box(F, 2.2, 1, 0.16, 0, 3.92, 2.2, 0x7a5533);                      // sign board on the roof
       const sp = spot(cx, cz, phi, 0, 2.31);
-      signs.push({ x: sp.x, y: y0 + 3.92, z: sp.z, nx: Math.cos(phi), nz: Math.sin(phi), w: 1.9, h: 0.95, cell: i === 1 ? 8 : i === 0 ? 9 : 7 });   // the blue stall is the avatar shop, the red one sells upgraders
+      signs.push({ x: sp.x, y: y0 + 3.92, z: sp.z, nx: Math.cos(phi), nz: Math.sin(phi), w: 1.9, h: 0.95, cell: i === 1 ? 8 : i === 0 ? 9 : i === 2 ? 10 : 7 });   // the blue stall is the avatar shop, the red one sells upgraders
       [-2, 0, 2].forEach((lx) => { const c = spot(cx, cz, phi, lx, 0); addCollider(c.x, c.z, 2.3); });
       shops.push({ x: cx, z: cz, phi });
     }
@@ -1732,7 +1746,7 @@ const World = (function () {
     scene.add(new THREE.Mesh(merge(parts), plantMat));
 
     /* The words on the signs: one picture holding all nine labels (see paintSign). */
-    for (let c = 0; c < 10; c++) paintSign(c, c < 7 ? 'Plot ' + (c + 1) : c === 7 ? 'Shop' : c === 8 ? 'Avatars' : 'Upgrades');
+    for (let c = 0; c < 11; c++) paintSign(c, c < 7 ? 'Plot ' + (c + 1) : c === 7 ? 'Shop' : c === 8 ? 'Avatars' : c === 9 ? 'Upgrades' : 'Sell');
     const ps = [], uv = [];
     signs.forEach((sg) => {
       const rx = sg.nz, rz = -sg.nx, hw = sg.w / 2, hh = sg.h / 2;           // rx, rz: to the reader's right
@@ -2186,6 +2200,22 @@ const World = (function () {
   }
   dress(false);
 
+  /* ---------- The sell shop's keeper ---------- */
+  /* A boy with dark brown skin and spiky black hair with lime-green tips, in a lime hoodie, black joggers with a lime
+     stripe, white sneakers and a gold earring. (Adriana: "black with spikey hair, you choose the colors".) */
+  const sellKeeper = figure({ skin: lam('#4a2c1a'), shirt: lam('#7ed957'), pants: lam('#1d1f22'), face: paint.face });
+  (function styleSellKeeper() {
+    const k = sellKeeper, hairC = lam('#141414'), tip = lam('#b6ff3d'), white = lam('#f2f2f2'), gold = lam('#ffc21f');
+    block(k.head, hairC, 0.56, 0.12, 0.56, 0, 0.55, 0.01);
+    block(k.head, hairC, 0.56, 0.28, 0.1, 0, 0.36, 0.24);
+    [[-0.18, -0.15, 0.3], [0, -0.17, 0], [0.18, -0.15, -0.3], [-0.12, 0.12, 0.25], [0.12, 0.12, -0.25], [0, 0.14, 0]].forEach(([x, z, r]) => {   // spikes, lime at the tips
+      block(k.head, hairC, 0.13, 0.22, 0.13, x, 0.71, z, 0, 0, r); block(k.head, tip, 0.09, 0.08, 0.09, x - Math.sin(r) * 0.12, 0.84, z, 0, 0, r);
+    });
+    block(k.root, lam('#5fb83a'), 0.3, 0.16, 0.06, 0, 1.0, -0.21);                 // hoodie pocket
+    [k.legL, k.legR].forEach((leg, i) => { block(leg, tip, 0.04, 0.7, 0.36, i ? 0.17 : -0.17, -0.42, 0); block(leg, white, 0.35, 0.16, 0.42, 0, -0.74, -0.04); });   // stripe, sneakers
+    block(k.head, gold, 0.05, 0.09, 0.05, 0.28, 0.14, 0.02);                      // earring
+  })();
+
   /* ---------- The avatar shop's keeper ---------- */
   /* A stylish girl behind the counter of the blue stall: pink jacket, purple skirt, white boots,
      a beret, sunglasses, gold jewellery and a long high ponytail with pink tips. */
@@ -2383,6 +2413,9 @@ const World = (function () {
     if (saved) nameEl.value = saved.slice(0, 16);
     if (saved && localStorage.getItem('mutation-mayhem-name-locked') === '1') lockedName = saved.slice(0, 16);
   } catch (e) { /* no storage: just start blank */ }
+  let banned = [];                                       // names an admin banned (lower case), kept on this device
+  try { banned = (JSON.parse(localStorage.getItem('mutation-mayhem-banned') || '[]') || []).filter((n) => typeof n === 'string'); } catch (e) { /* none */ }
+  function saveBans() { try { localStorage.setItem('mutation-mayhem-banned', JSON.stringify(banned)); } catch (e) { /* not saved */ } }
   const confirmEl = $('confirm');
   let confirmTouch = false;
   /* Admins. One special name asks for a code, and the right code starts the game as an admin.
@@ -2517,6 +2550,7 @@ const World = (function () {
   function placeEgg(egg, spot) { egg.spot = spot; egg.taken = false; egg.g.visible = true; egg.g.position.set(spot.x, spot.y, spot.z); }
   function respawnEgg(egg) {                             // the same kind of egg turns up again somewhere else, away from you
     if (egg.lucky) return;                                // eggs from lucky blocks were never out in the world
+    if (egg.spawned) { scene.remove(egg.g); eggs.splice(eggs.indexOf(egg), 1); return; }   // an admin's spawned egg is used up
     const t = EGG_TIERS[egg.tier], used = eggs.filter((e) => e !== egg && e.tier === egg.tier).map((e) => e.spot);
     const open = t.spots.filter((s) => !used.includes(s) && s !== egg.spot);
     let free = open.filter((s) => Math.hypot(s.x - p.x, s.z - p.z) > 40);
@@ -2658,6 +2692,7 @@ const World = (function () {
   else ownDragons.map((k, i) => i).sort((a, b) => dragonValue(b) - dragonValue(a)).slice(0, plotSlots).forEach((i) => { dragonPlaced[i] = true; });
   while (dragonPlaced.filter(Boolean).length > plotSlots) dragonPlaced[dragonPlaced.lastIndexOf(true)] = false;
   const placedCount = () => dragonPlaced.filter(Boolean).length;
+  const slotLimit = () => (isAdmin ? Infinity : plotSlots);   // admins: unlimited space on their plot
   const coinCountEl = $('coinCount'), coinRateEl = $('coinRate');
   const fmtRate = (r) => (Math.round(r * 10) / 10).toLocaleString('en-US');
   const coinsEl = $('coins');
@@ -2694,7 +2729,7 @@ const World = (function () {
   }
   function releasePlot() {                               // leaving: anything hatching finishes, then the plot is empty again
     if (myPlot < 0) return;
-    if (hatching) { scene.remove(hatching.mesh); const kind = pickDragon(hatching.tier); ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonPlaced.push(placedCount() < plotSlots); saveProgress(); hatching = null; }
+    if (hatching) { scene.remove(hatching.mesh); const kind = pickDragon(hatching.tier); ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonPlaced.push(placedCount() < slotLimit()); saveProgress(); hatching = null; }
     plotPets.forEach((d) => scene.remove(d.root)); plotPets.length = 0;
     paintSign(myPlot, 'Plot ' + (myPlot + 1));
     myPlot = -1;
@@ -2812,7 +2847,7 @@ const World = (function () {
       if (hatching.t > 1.6) {
         scene.remove(hatching.mesh);
         const kind = pickDragon(hatching.tier);
-        const room = placedCount() < plotSlots, i = ownDragons.length;
+        const room = placedCount() < slotLimit(), i = ownDragons.length;
         ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonPlaced.push(room); saveProgress();
         if (room) addPet(kind, true, i); else renderInventory();
         toast('You hatched a ' + DRAGON_KINDS[kind].name + ' dragon! (' + EGG_TIERS[hatching.tier].name + ') It makes ' + DRAGON_COINS[kind] + ' coin' + (DRAGON_COINS[kind] === 1 ? '' : 's') + ' every ' + PAYOUT_SECONDS + ' seconds.'
@@ -3075,14 +3110,14 @@ const World = (function () {
      A plot starts with room for 5, and each extra space costs twice the one before (500, 1,000, 2,000 ...). */
   const plotEl = $('plotMenu'), plotList = $('plotList');
   let plotMenuOpen = false;
-  const menuOpen = () => upShopOpen || plotMenuOpen || secretOpen;
+  const menuOpen = () => upShopOpen || plotMenuOpen || secretOpen || sellOpen;
   const spacePrice = () => 500 * Math.pow(2, plotSlots - 5);
   const buyLabel = () => (plotSlots >= MAX_SLOTS ? 'Your plot is as big as it gets' : 'Buy 1 more space · ' + fmt(spacePrice()) + ' coins');
   const signSpot = () => plotWorld(myPlot, 3.1, -PLOT / 2 - 1.9);   // in front of your plot's sign, on the town side
   function refreshPlotMenu() {
     $('plotTitle').textContent = playerName + '\'s Plot';
     $('plotCoins').textContent = fmt(coins);
-    $('plotSpace').textContent = placedCount() + ' of ' + plotSlots + ' spaces used';
+    $('plotSpace').textContent = placedCount() + ' of ' + (isAdmin ? 'unlimited' : plotSlots) + ' spaces used';
     while (plotList.firstChild) plotList.removeChild(plotList.firstChild);
     if (!ownDragons.length) { const p0 = document.createElement('p'); p0.className = 'sub'; p0.textContent = 'No dragons yet. Find eggs and bring them home to hatch.'; plotList.appendChild(p0); }
     ownDragons.map((k, i) => i).sort((a, b) => (dragonPlaced[b] - dragonPlaced[a]) || (dragonValue(b) - dragonValue(a))).forEach((i) => {
@@ -3098,7 +3133,7 @@ const World = (function () {
   function placeDragon(i) {
     if (dragonPlaced[i]) return;
     if (myPlot < 0) { toast('Walk onto a plot first, then you can put dragons on it.', 4); return; }
-    if (placedCount() >= plotSlots) { toast('Your plot is full. Put a dragon in your inventory or buy more space first.', 4); return; }
+    if (placedCount() >= slotLimit()) { toast('Your plot is full. Put a dragon in your inventory or buy more space first.', 4); return; }
     dragonPlaced[i] = true; addPet(ownDragons[i], true, i); saveProgress(); renderInventory(); if (plotMenuOpen) refreshPlotMenu();
   }
   function storeDragon(i) {
@@ -3171,6 +3206,62 @@ const World = (function () {
     openUpShop(i);
   }
   renderInventory();
+
+  /* ---------- The green stall: selling dragons ---------- */
+  /* Sell a dragon for coins: SELL_TIMES its coins per payday, upgrades included. The Sell button asks once more
+     ("Sure?") before it goes. You can't sell the dragon you are riding. */
+  const SELL_TIMES = 20;
+  const GREEN = shops[2], greenOut = { x: Math.cos(GREEN.phi), z: Math.sin(GREEN.phi) };
+  const sellFront = { x: GREEN.x + greenOut.x * 4.2, z: GREEN.z + greenOut.z * 4.2 };
+  const sellEl = $('sellShop'), sellList = $('sellList');
+  let sellOpen = false;
+  const sellPrice = (i) => Math.max(1, Math.round(dragonValue(i) * SELL_TIMES));
+  function removeDragon(i) {                             // the dragon at ownDragons[i] is gone; everything after it moves up one
+    const at = plotPets.findIndex((d) => d.index === i);
+    if (at >= 0) scene.remove(plotPets.splice(at, 1)[0].root);
+    [ownDragons, dragonUpgrades, dragonPlaced, dragonSpeed].forEach((a) => a.splice(i, 1));
+    plotPets.forEach((d) => { if (d.index > i) d.index--; });
+    saveProgress(); renderInventory();
+  }
+  function refreshSell() {
+    $('sellCoins').textContent = fmt(coins);
+    while (sellList.firstChild) sellList.removeChild(sellList.firstChild);
+    if (!ownDragons.length) { const p0 = document.createElement('p'); p0.className = 'sub'; p0.textContent = 'You have no dragons to sell.'; sellList.appendChild(p0); }
+    ownDragons.map((k, i) => i).sort((a, b) => sellPrice(b) - sellPrice(a)).forEach((i) => {
+      const k = ownDragons[i], row = document.createElement('div'), what = document.createElement('div'), name = document.createElement('b'), note = document.createElement('small'), btn = document.createElement('button');
+      row.className = 'uprow'; what.className = 'what';
+      name.textContent = DRAGON_KINDS[k].name + ' dragon';
+      note.textContent = (dragonPlaced[i] ? 'On your plot' : 'In your inventory') + (dragonUpgrades[i] >= 0 ? ' · ' + UPGRADERS[dragonUpgrades[i]].name + ' upgrader' : '') + (dragonSpeed[i] ? ' · +' + dragonSpeed[i] + '% speed' : '');
+      btn.type = 'button';
+      const ridden = riding && riding.index === i;
+      btn.textContent = ridden ? 'Riding it' : 'Sell · ' + fmt(sellPrice(i));
+      btn.disabled = !!ridden;
+      btn.addEventListener('click', () => {
+        if (btn.dataset.sure !== '1') { btn.dataset.sure = '1'; btn.textContent = 'Sure? Sell for ' + fmt(sellPrice(i)); btn.classList.add('sure'); return; }
+        const got = sellPrice(i), nm = DRAGON_KINDS[k].name;
+        coins += got; saveCoins(); removeDragon(i);
+        toast('You sold your ' + nm + ' dragon for ' + fmt(got) + ' coins.', 4);
+        refreshSell();
+      });
+      what.appendChild(name); what.appendChild(note); row.appendChild(what); row.appendChild(btn); sellList.appendChild(row);
+    });
+  }
+  function openSell() {
+    if (menuOpen() || shopping || !started) return;
+    sellOpen = true; walking = false;
+    keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
+    stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
+    shopBtn.hidden = true; sellEl.hidden = false;
+    document.body.classList.add('shopping');
+    refreshSell(); $('sellDone').focus();
+  }
+  function closeSell() {
+    if (!sellOpen) return;
+    sellOpen = false; sellEl.hidden = true;
+    document.body.classList.remove('shopping');
+    canvas.focus();
+  }
+  $('sellDone').addEventListener('click', closeSell);
 
   /* ---------- Lucky blocks ---------- */
   /* Yellow "?" blocks hidden around the island. Walk into one to pick it up, carry it to your plot before its
@@ -3286,7 +3377,7 @@ const World = (function () {
      FIRE_SECONDS to get it to your plot, while the villagers, who are very fast, chase you with axes. If one reaches you,
      or time runs out, you are sent back to your plot without the egg (it goes back into the fire). Home in time, and it
      hatches a fire dragon, boy or girl. One fire egg per fire. */
-  const FIRE_PERIOD = 600, FIRE_LIT = 120, FIRE_SECONDS = 15, VILLAGER_SPEED = 120, CATCH_RANGE = 2.5, HEAT_RANGE = 3.4;
+  const FIRE_PERIOD = 600, FIRE_LIT = 120, FIRE_SECONDS = 15, VILLAGER_SPEED = 150, CATCH_RANGE = 2.5, HEAT_RANGE = 3.4;
   const vY = W.bil(H, VILLAGE.x, VILLAGE.z);
   let fireOverride = null, fireTakenRound = -1;            // fireOverride: tests only (seconds into the cycle)
   try { fireTakenRound = +localStorage.getItem('mutation-mayhem-fire-taken') || -1; } catch (e) { /* none */ }
@@ -3343,7 +3434,7 @@ const World = (function () {
     const egg = { tier: 5, fire: true, lucky: true, taken: false, g: { visible: false }, spot: { x: VILLAGE.x, y: vY, z: VILLAGE.z } };
     pickUp(egg);
     carrying.left = carrying.total = FIRE_SECONDS;
-    chase = { wait: 1 };
+    chase = { wait: 0.25 };                             // they react almost at once
     toast('You grabbed the fire egg! ' + FIRE_SECONDS + ' seconds to get it home. The villagers are coming. RUN!', 5);
   }
   function fireHatched() { fireTakenRound = fireRound(); villagersHome(); try { localStorage.setItem('mutation-mayhem-fire-taken', String(fireTakenRound)); } catch (e) { /* not saved */ } }
@@ -3508,15 +3599,20 @@ const World = (function () {
   const upKeeperYaw = Math.atan2(-redOut.x, -redOut.z);  // the boy behind the red stall's counter
   upKeeper.root.position.set(RED.x + redOut.x * 0.5, HUB.h + 0.2, RED.z + redOut.z * 0.5);
   upKeeper.root.rotation.y = upKeeperYaw;
+  const sellKeeperYaw = Math.atan2(-greenOut.x, -greenOut.z);   // the sell shop's keeper behind the green counter
+  sellKeeper.root.position.set(GREEN.x + greenOut.x * 0.5, HUB.h + 0.2, GREEN.z + greenOut.z * 0.5);
+  sellKeeper.root.rotation.y = sellKeeperYaw;
   /* Mia (the avatar shop) and Leo (the upgrade shop). Their names float over their heads. Stand at their stall and
      hold E, or tap "Talk to ...", and they say their line; the answer buttons can open their shop. */
   const keepers = [
     { k: keeper, yaw: keeperYaw, at: BLUE, front: shopFront, wave: 0, sway: 0, name: 'Mia', colour: '#d6337f',
       line: 'Ugh, what do you want? Hurry up and stop wasting my time.', yes: 'Show me the avatars', no: 'Bye', open: () => openShop() },
     { k: upKeeper, yaw: upKeeperYaw, at: RED, front: upFront, wave: 0, sway: 2.1, name: 'Leo', colour: '#2f7a3a',
-      line: 'Hi! How are you doing? Do you need an upgrader?', yes: 'Yes please!', no: 'No thanks', open: () => openUpShop() }
+      line: 'Hi! How are you doing? Do you need an upgrader?', yes: 'Yes please!', no: 'No thanks', open: () => openUpShop() },
+    { k: sellKeeper, yaw: sellKeeperYaw, at: GREEN, front: sellFront, wave: 0, sway: 4.2 }   // no name or lines yet
   ];
   keepers.forEach((q) => {                               // a name tag over each head
+    if (!q.name) return;
     const cv = document.createElement('canvas'), g = cv.getContext('2d');
     cv.width = 256; cv.height = 72;
     g.fillStyle = 'rgba(13, 47, 55, 0.85)'; g.fillRect(28, 8, 200, 56);
@@ -3530,7 +3626,7 @@ const World = (function () {
   let talkNear = null, talking = null, talkHold = 0, holdFrom = -1, talkShownFill = -1, talkChars = 0;
   function talkTarget() {                                // the shopkeeper you are standing in front of, if any
     if (!started || shopping || menuOpen() || riding || carrying || carryingBlock || p.dungeon || p.inCave) return null;
-    for (const q of keepers) if (Math.hypot(p.x - q.front.x, p.z - q.front.z) < 4.5) return q;
+    for (const q of keepers) if (q.name && Math.hypot(p.x - q.front.x, p.z - q.front.z) < 4.5) return q;
     return null;
   }
   function openTalk(q) {
@@ -3628,7 +3724,7 @@ const World = (function () {
     avatar.visible = true;
     poseAvatar(dt, Math.atan2(-shopOut.x, -shopOut.z) + shopTurn);
   }
-  const openStall = () => { const l = $('shopOpenLabel').textContent; if (l === 'Open the secret shop') openSecret(); else if (l === 'Open the upgrade shop') openUpShop(); else if (l === 'Open the lucky block') { openLucky(); shopBtn.hidden = true; } else if (l === 'Open my plot') openPlotMenu(); else if (l.indexOf('Buy 1 more space') === 0) buySpace(); else openShop(); };
+  const openStall = () => { const l = $('shopOpenLabel').textContent; if (l === 'Open the sell shop') openSell(); else if (l === 'Open the secret shop') openSecret(); else if (l === 'Open the upgrade shop') openUpShop(); else if (l === 'Open the lucky block') { openLucky(); shopBtn.hidden = true; } else if (l === 'Open my plot') openPlotMenu(); else if (l.indexOf('Buy 1 more space') === 0) buySpace(); else openShop(); };
   shopBtn.addEventListener('click', openStall);
   $('shopDone').addEventListener('click', closeShop);
   $('shopTurn').addEventListener('click', () => { shopTurnTo = shopTurnTo ? 0 : Math.PI; });
@@ -3689,6 +3785,67 @@ const World = (function () {
     annInput.blur(); canvas.focus();
   }
   function announceStep(dt) { if (annTimer > 0) { annTimer -= dt; if (annTimer <= 0) annEl.hidden = true; } }
+  /* Admin commands: spawn any egg in front of you, add any dragon to your base, and ban a name. Admins also have
+     unlimited space on their plot (slotLimit). Bans are kept on this device only until there is a server; a banned
+     name can't press Play here. */
+  function adminSection(title) { const h = document.createElement('p'); h.className = 'adminhead'; h.textContent = title; $('adminCommands').appendChild(h); const box = document.createElement('div'); box.className = 'adminrow'; $('adminCommands').appendChild(box); return box; }
+  const spawnRow = adminSection('Spawn an egg');
+  EGG_TIERS.forEach((t, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'small'; b.textContent = t.name;
+    b.addEventListener('click', (e) => { spawnEgg(i); if (e.detail > 0) b.blur(); });
+    spawnRow.appendChild(b);
+  });
+  function spawnEgg(tier) {                              // an egg on the ground a few steps in front of you
+    if (!isAdmin || !started) return;
+    const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), x = p.x + fx * 3, z = p.z + fz * 3;
+    const spot = { x, y: p.dungeon ? DG.floor : p.inCave ? W.bil(H, x, z) : standing(x, z), z, dungeon: p.dungeon, cave: p.inCave };
+    const t = EGG_TIERS[tier], g = new THREE.Group(), body = new THREE.Mesh(eggGeo[tier], eggMat(tier));
+    g.add(body); g.scale.set(1.4, 1.4, 1.4);
+    const stars = t.shiny ? [twinkle(g, -0.5, 1.1, 0, 0.7), twinkle(g, 0.45, 0.75, 0.1, 0.55), twinkle(g, 0.2, 1.35, -0.3, 0.45)] : [];
+    scene.add(g);
+    const egg = { tier, g, body, stars, spot: null, taken: false, phase: Math.random() * 6, spawned: true };
+    placeEgg(egg, spot); eggs.push(egg);
+    toast('A ' + t.name + ' egg appeared in front of you!', 3);
+  }
+  const addRow = adminSection('Add a dragon to your base'), addPick = document.createElement('select'), addBtn = document.createElement('button');
+  Object.keys(DRAGON_KINDS).forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = DRAGON_KINDS[k].name; addPick.appendChild(o); });
+  addPick.setAttribute('aria-label', 'Dragon to add'); addBtn.type = 'button'; addBtn.className = 'small'; addBtn.textContent = 'Add';
+  addRow.appendChild(addPick); addRow.appendChild(addBtn);
+  addBtn.addEventListener('click', (e) => { adminAddDragon(addPick.value); if (e.detail > 0) addBtn.blur(); });
+  function adminAddDragon(kind) {
+    if (!isAdmin || !started || !DRAGON_KINDS[kind]) return;
+    const i = ownDragons.length, place = myPlot >= 0;
+    ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonPlaced.push(place); saveProgress();
+    if (place) addPet(kind, true, i); else renderInventory();
+    toast('Added a ' + DRAGON_KINDS[kind].name + ' dragon ' + (place ? 'to your plot.' : 'to your inventory (walk onto a plot to place it).'), 3);
+  }
+  const banRow = adminSection('Ban a player'), banInput = document.createElement('input'), banBtn = document.createElement('button'), banList = document.createElement('div');
+  banInput.type = 'text'; banInput.maxLength = 16; banInput.placeholder = 'Their name'; banInput.setAttribute('aria-label', 'Name to ban'); banInput.autocomplete = 'off';
+  banBtn.type = 'button'; banBtn.className = 'small'; banBtn.textContent = 'Ban';
+  banList.className = 'banlist';
+  banRow.appendChild(banInput); banRow.appendChild(banBtn); $('adminCommands').appendChild(banList);
+  banInput.addEventListener('focus', () => keys.clear());
+  banBtn.addEventListener('click', () => banName(banInput.value));
+  function banName(raw) {
+    const nm = (raw || '').replace(/\s+/g, ' ').trim().slice(0, 16);
+    banInput.value = '';
+    if (!nm || !isAdmin) return;
+    if (ADMINS.some((a) => a[0] === scramble(nm.toLowerCase()))) { toast('Admins can\'t be banned.', 3); return; }
+    if (!banned.includes(nm.toLowerCase())) banned.push(nm.toLowerCase());
+    saveBans(); showBans();
+    toast(nm + ' is banned. (For now only on this device; everywhere once there is a server.)', 5);
+  }
+  function showBans() {
+    while (banList.firstChild) banList.removeChild(banList.firstChild);
+    banned.forEach((nm) => {
+      const row = document.createElement('div'), t = document.createElement('span'), un = document.createElement('button');
+      t.textContent = nm; un.type = 'button'; un.className = 'small'; un.textContent = 'Unban';
+      un.addEventListener('click', () => { banned.splice(banned.indexOf(nm), 1); saveBans(); showBans(); });
+      row.appendChild(t); row.appendChild(un); banList.appendChild(row);
+    });
+  }
+  showBans();
+
   function nearestEgg() {
     let best = null, bd = Infinity;
     for (const egg of eggs) { if (egg.taken) continue; const d = Math.hypot(egg.spot.x - p.x, egg.spot.z - p.z); if (d < bd) { bd = d; best = egg; } }
@@ -3698,6 +3855,8 @@ const World = (function () {
     if (started || (!confirmEl.hidden && !sure)) return;   // still waiting for an answer to "are you sure?"
     const typed = typedName();
     if (!isAdminName()) {
+      const nm = (lockedName || typed).toLowerCase();
+      if (nm && banned.includes(nm)) { codeMsg.textContent = 'The name ' + (lockedName || typed) + ' has been banned by an admin.'; codeMsg.hidden = false; return; }
       if (lockedName && typed.toLowerCase() !== lockedName.toLowerCase()) {
         nameEl.value = lockedName;
         codeMsg.textContent = 'Your name is ' + lockedName + '. Names can\'t be changed.'; codeMsg.hidden = false;
@@ -3750,7 +3909,9 @@ const World = (function () {
     if (!started) return;
     closeShop(); closeUpShop(); closePlotMenu(); closeTalk(); shopBtn.hidden = true; avatar.visible = false;
     if (realCoins !== null) { coins = realCoins; realCoins = null; }   // an admin's unlimited coins end when they leave
-    dropEgg(); dropBlock(); villagersHome(); dismount(true); releasePlot(); saveCoins(); closeSecret(); toastEl.hidden = true;
+    while (placedCount() > plotSlots) { let w = -1; dragonPlaced.forEach((on, i) => { if (on && (w < 0 || dragonValue(i) < dragonValue(w))) w = i; }); dragonPlaced[w] = false; }   // and their unlimited plot space
+    saveProgress();
+    dropEgg(); dropBlock(); villagersHome(); dismount(true); releasePlot(); saveCoins(); closeSecret(); closeSell(); toastEl.hidden = true;
     started = false; isAdmin = false; setRadar(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
@@ -3774,6 +3935,11 @@ const World = (function () {
       else if (e.code === 'Escape') { annInput.blur(); canvas.focus(); }
       return;
     }
+    if (started && e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') && e.target !== chatInput) {   // any other box in the game, like the ban box
+      if ((e.code === 'Enter' || e.key === 'Enter') && e.target === banInput) { e.preventDefault(); banName(banInput.value); }
+      else if (e.code === 'Escape') { e.target.blur(); canvas.focus(); }
+      return;
+    }
     if (e.target === chatInput) {                        // typing a chat message: the game keys stay out of it
       if (e.code === 'Enter' || e.key === 'Enter') { e.preventDefault(); sendChat(); }
       else if (e.code === 'Escape') { chatInput.blur(); canvas.focus(); }
@@ -3786,7 +3952,7 @@ const World = (function () {
       return;
     }
     if (shopping) { if (e.code === 'Escape') closeShop(); return; }           // the shop's own buttons take the keys
-    if (menuOpen()) { if (e.code === 'Escape') { closeUpShop(); closePlotMenu(); closeSecret(); } return; }
+    if (menuOpen()) { if (e.code === 'Escape') { closeUpShop(); closePlotMenu(); closeSecret(); closeSell(); } return; }
     if (talking && e.code === 'Escape') { closeTalk(); return; }
     if (e.key === '/' || e.code === 'Slash') { e.preventDefault(); setChatOpen(true); keys.clear(); chatInput.focus(); return; }   // jump to the chat box   // the menu's own buttons take the keys
     if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openStall(); return; }
@@ -3960,15 +4126,17 @@ const World = (function () {
     const free = started && !shopping && !menuOpen() && !talking && !carrying && !riding && !p.dungeon && !p.inCave;
     const onPlot = free && myPlot >= 0 && plotAt(p.x, p.z) === myPlot;
     const dShop = Math.hypot(p.x - shopFront.x, p.z - shopFront.z), dUp = Math.hypot(p.x - upFront.x, p.z - upFront.z);
-    const dSign = myPlot >= 0 && plotSlots < MAX_SLOTS ? Math.hypot(p.x - signSpot().x, p.z - signSpot().z) : Infinity;
+    const dSign = myPlot >= 0 && plotSlots < MAX_SLOTS && !isAdmin ? Math.hypot(p.x - signSpot().x, p.z - signSpot().z) : Infinity;
     const atSecret = free && !carryingBlock && Math.hypot(p.x - secretFront.x, p.z - secretFront.z) < 3.6;
-    const near = Math.min(dShop, dUp, dSign);              // a stall and a plot sign can be close together: the nearest one wins
+    const dSell = Math.hypot(p.x - sellFront.x, p.z - sellFront.z);
+    const near = Math.min(dShop, dUp, dSign, dSell);
+    const atSell = free && !carryingBlock && dSell < 3.6 && dSell === near;              // a stall and a plot sign can be close together: the nearest one wins
     const atShop = free && !carryingBlock && dShop < 3.6 && dShop === near, atUp = free && !carryingBlock && dUp < 3.6 && dUp === near;
     const atPlot = onPlot && !atShop && !atUp;
     const atSign = free && !carryingBlock && !atPlot && dSign < 2.6 && dSign === near;
-    const label = atSecret ? 'Open the secret shop' : atUp ? 'Open the upgrade shop' : atPlot && carryingBlock ? 'Open the lucky block' : atPlot ? 'Open my plot' : atSign ? buyLabel() : 'Open the avatar shop';   // one button, for wherever you are
+    const label = atSell ? 'Open the sell shop' : atSecret ? 'Open the secret shop' : atUp ? 'Open the upgrade shop' : atPlot && carryingBlock ? 'Open the lucky block' : atPlot ? 'Open my plot' : atSign ? buyLabel() : 'Open the avatar shop';   // one button, for wherever you are
     if ($('shopOpenLabel').textContent !== label) $('shopOpenLabel').textContent = label;
-    if (shopBtn.hidden === (atShop || atUp || atPlot || atSign || atSecret)) shopBtn.hidden = !(atShop || atUp || atPlot || atSign || atSecret);
+    if (shopBtn.hidden === (atShop || atUp || atPlot || atSign || atSecret || atSell)) shopBtn.hidden = !(atShop || atUp || atPlot || atSign || atSecret || atSell);
     showEffects();
     if (carryingBlock) carryEl.hidden = atPlot;           // at home the "Open the lucky block" button takes the note's place
     const z = zoneName();
@@ -4074,7 +4242,7 @@ const World = (function () {
     AV, avatar, gear, hair, keeper, upKeeper, keepers, talking: () => talking, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
     eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
-    upgradersOwned, renderInventory, showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
+    upgradersOwned, renderInventory, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
   requestAnimationFrame(tick);
 })();
