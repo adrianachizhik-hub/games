@@ -3758,6 +3758,7 @@ const World = (function () {
     { id: 'gold', name: 'Golden arch', note: 'Solid gold with gems', price: 60000, colour: 0xffc21f },
     { id: 'dragon', name: 'Dragon arch', note: 'Two ruby dragons guard the way in', price: 100000, colour: 0xc8102e }
   ];
+  const decorOff = [];                                   // decorations you own but took off your plot
   const treatUntil = {}, decorOwned = [], outfitsOwned = OUTFITS.map(() => 0), archesOwned = [];
   let archOn = '', collarsOwned = 0;
   const COLLAR_PRICE = 2000;                             // a name collar: names one dragon
@@ -3766,6 +3767,7 @@ const World = (function () {
     (JSON.parse(localStorage.getItem('mutation-mayhem-decor') || '[]') || []).forEach((id) => { if (DECOR.some((d) => d.id === id) && !decorOwned.includes(id)) decorOwned.push(id); });
     (JSON.parse(localStorage.getItem('mutation-mayhem-arches') || '[]') || []).forEach((id) => { if (ARCHES.some((a) => a.id === id) && !archesOwned.includes(id)) archesOwned.push(id); });
     collarsOwned = Math.max(0, Math.floor(+localStorage.getItem('mutation-mayhem-collars') || 0));
+    (JSON.parse(localStorage.getItem('mutation-mayhem-decor-off') || '[]') || []).forEach((id) => { if (DECOR.some((d) => d.id === id) && !decorOff.includes(id)) decorOff.push(id); });
     archOn = localStorage.getItem('mutation-mayhem-arch') || ''; if (!archesOwned.includes(archOn)) archOn = '';
     (JSON.parse(localStorage.getItem('mutation-mayhem-outfits') || '[]') || []).slice(0, OUTFITS.length).forEach((n, i) => { outfitsOwned[i] = Number.isInteger(n) && n > 0 ? n : 0; });
   } catch (e) { /* nothing saved */ }
@@ -3773,7 +3775,7 @@ const World = (function () {
     try {
       localStorage.setItem('mutation-mayhem-treats', JSON.stringify(treatUntil)); localStorage.setItem('mutation-mayhem-decor', JSON.stringify(decorOwned));
       localStorage.setItem('mutation-mayhem-outfits', JSON.stringify(outfitsOwned));
-      localStorage.setItem('mutation-mayhem-arches', JSON.stringify(archesOwned)); localStorage.setItem('mutation-mayhem-arch', archOn); localStorage.setItem('mutation-mayhem-collars', String(collarsOwned));
+      localStorage.setItem('mutation-mayhem-arches', JSON.stringify(archesOwned)); localStorage.setItem('mutation-mayhem-arch', archOn); localStorage.setItem('mutation-mayhem-decor-off', JSON.stringify(decorOff)); localStorage.setItem('mutation-mayhem-collars', String(collarsOwned));
     } catch (e) { /* not saved */ }
   }
   const treatLeft = (id) => Math.max(0, (treatUntil[id] || 0) - Date.now()) / 1000;
@@ -3946,7 +3948,7 @@ const World = (function () {
     scene.add(g);
     return g;
   }
-  function buildDecor() { clearDecor(); if (myPlot >= 0) { decorMeshes = decorOwned.map(decorModel); if (archOn) decorMeshes.push(archModel(archOn)); if (isAdmin) adminDecorOn.forEach((id) => decorMeshes.push(adminDecorModel(id))); } }
+  function buildDecor() { clearDecor(); if (myPlot >= 0) { decorMeshes = decorOwned.filter((id) => !decorOff.includes(id)).map(decorModel); if (archOn) decorMeshes.push(archModel(archOn)); if (isAdmin) adminDecorOn.forEach((id) => decorMeshes.push(adminDecorModel(id))); } }
   function clearDecor() { decorMeshes.forEach((g) => scene.remove(g)); decorMeshes = []; fairyBulbs = []; adminAnims = []; }
   function twinkleLights(time) {                         // each bulb fades up and down at its own pace
     for (const b of fairyBulbs) { const k = reduced ? 1 : 0.35 + 0.65 * Math.max(0, Math.sin(time * b.speed + b.phase)); b.m.color.copy(b.base).multiplyScalar(k); }
@@ -4031,12 +4033,16 @@ const World = (function () {
       });
     });
     if (allTab === 1) DECOR.forEach((d) => {
-      const own = decorOwned.includes(d.id);
-      allRow(d.name, d.note, d.colour, own ? 'On your plot' : fmt(d.price) + ' coins', () => {
-        if (own || !buy(d.price)) return;
+      const own = decorOwned.includes(d.id), off = decorOff.includes(d.id);   // once bought, take it off and put it back for free
+      allRow(d.name, d.note, d.colour, !own ? fmt(d.price) + ' coins' : off ? 'Put it back' : 'Take it off', () => {
+        if (own) {
+          if (off) decorOff.splice(decorOff.indexOf(d.id), 1); else decorOff.push(d.id);
+          saveShopStuff(); buildDecor(); toast(d.name + (off ? ' is back on your plot!' : ' taken off your plot. You still own it.'), 3); refreshAll(); return;
+        }
+        if (!buy(d.price)) return;
         decorOwned.push(d.id); saveShopStuff(); buildDecor();
         toast(d.name + (myPlot >= 0 ? ' added to your plot!' : ' bought! It will appear on your plot.'), 4); refreshAll();
-      }, own);
+      });
     });
     if (allTab === 3) {
       const h = document.createElement('h3'); h.textContent = 'One arch over the way into your plot. You can swap any time.'; allList.appendChild(h);
@@ -5454,7 +5460,7 @@ const World = (function () {
      seconds: fireballs rain from the sky, many of them aimed at dragons on your plot. A dragon a fireball hits gets the
      Fire mutation for good: three times as fast to ride. Admins can start one whenever they like (for everyone, when
      there's a server). */
-  const FS_PERIOD = 1800, FS_LEN = 60;
+  const FS_PERIOD = 1800, FS_LEN = 300;                  // every 30 minutes, for 5 minutes
   let fsUntil = 0, fsWas = false, fsSpawn = 0;
   const fireballs = [], fbGeo = new THREE.SphereGeometry(0.9, 10, 8), fbMat = new THREE.MeshBasicMaterial({ color: 0xff6a10 }), fbCore = new THREE.MeshBasicMaterial({ color: 0xffe14a });
   const fsLeft = () => Math.max(FS_LEN - (Date.now() / 1000) % FS_PERIOD, (fsUntil - Date.now()) / 1000, 0);
@@ -5706,7 +5712,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

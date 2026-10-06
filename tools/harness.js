@@ -791,6 +791,11 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   tabs[1].fire('click', ev({})); const d0 = I.decorMeshes().length; buyBtn(rows()[4]).fire('click', ev({})); buyBtn(rows()[1]).fire('click', ev({}));
   console.log('decorations tab:', rows().map(name).join(', '), '| bought fountain and fairy lights: on the plot', d0, '->', I.decorMeshes().length, '| fountain button now', JSON.stringify(buyBtn(rows()[4]).textContent));
   if (I.decorMeshes().length !== d0 + 2) throw new Error('decorations should appear on the plot');
+  { const n1 = I.decorMeshes().length; buyBtn(rows()[4]).fire('click', ev({})); const c1 = I.coins();
+    console.log('take the fountain off: decorations', n1, '->', I.decorMeshes().length, '| button', JSON.stringify(buyBtn(rows()[4]).textContent), '|', said());
+    if (I.decorMeshes().length !== n1 - 1) throw new Error('taking a decoration off should remove it');
+    buyBtn(rows()[4]).fire('click', ev({})); console.log('put it back: decorations', I.decorMeshes().length, '| free', I.coins() >= c1, '| button', JSON.stringify(buyBtn(rows()[4]).textContent));
+    if (I.decorMeshes().length !== n1) throw new Error('putting it back should bring it back'); }
   tabs[2].fire('click', ev({})); buyBtn(rows()[5]).fire('click', ev({}));   // row 0 is the name collar
   const pickRows = rows(), firstPet = I.plotPets[0], idx = firstPet.index;
   console.log('outfits tab: bought a Crown -> asks', JSON.stringify(els.allList.children[0].textContent), '|', pickRows.length, 'dragons to choose from');
@@ -1051,7 +1056,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     if (I.decorMeshes().length !== d0 + I.ADMIN_DECOR.length) throw new Error('admin decorations should go on the plot');
     window.fire('keydown', ev({ code: 'Escape' }));
   } else if (I.allOpen()) throw new Error('only admins can open the admin shop');
-  for (let k = 0; k < 60 * 70; k++) I.fireStormStep(1 / 60);
+  for (let k = 0; k < 60 * 310; k++) I.fireStormStep(1 / 60);
 }
 
 // ---- the swamp, the quicksand and the mud cavern ----
