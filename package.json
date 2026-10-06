@@ -1,0 +1,10 @@
+{
+  "name": "dragon-keepers",
+  "private": true,
+  "description": "Dragon Keepers: a 3D dragon game in one web page, plus its small multiplayer server.",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node tools/harness.js && node tools/servertest.js"
+  },
+  "engines": { "node": ">=22" }
+}

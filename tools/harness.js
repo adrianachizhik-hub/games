@@ -638,10 +638,12 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   I.p.x = hm.x; I.p.z = hm.z; I.update(1 / 60, 0);
   const dragBtn = () => [...els.invItems.children].find((b) => / dragon$/.test(b.children[1].textContent));
   const full = I.dragonPlaced.filter(Boolean).length >= I.plotSlots(); dragBtn().fire('click', ev({ detail: 1 }));
-  console.log('click a dragon in the inventory, plot', full ? 'full' : 'has room', ': placed', I.dragonPlaced.filter(Boolean).length, 'of', I.plotSlots(), '| message', said());
+  console.log('click a dragon in the inventory: riding it', I.riding() && I.riding().kind, '| placed', I.dragonPlaced.filter(Boolean).length, 'of', I.plotSlots(), '| message', said());
+  if (!I.riding()) throw new Error('clicking a dragon in the inventory should put you on it');
+  I.dismount(false); console.log('get off on my plot (plot', full ? 'full' : 'has room', '): placed', I.dragonPlaced.filter(Boolean).length, '| message', said());
   if (!I.admin()) { I.giveCoins(1e6); const sg2 = I.signSpot(); I.p.x = sg2.x; I.p.z = sg2.z; for (let k = 0; k < 12; k++) raf(47000 + k * 16); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); }   // admins have no space to buy
-  I.p.x = hm.x; I.p.z = hm.z; I.update(1 / 60, 0); const p0 = I.dragonPlaced.filter(Boolean).length, n0 = els.invItems.children.length; dragBtn().fire('click', ev({ detail: 1 }));
-  console.log('bought a space, click again: placed', p0, '->', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| saved upgraders', store['mutation-mayhem-upgraders']);
+  I.p.x = hm.x; I.p.z = hm.z; I.update(1 / 60, 0); const p0 = I.dragonPlaced.filter(Boolean).length, n0 = els.invItems.children.length; dragBtn().fire('click', ev({ detail: 1 })); I.p.x = hm.x; I.p.z = hm.z; I.dismount(false);
+  console.log('bought a space, ride one out of the inventory and get off on my plot: placed', p0, '->', I.dragonPlaced.filter(Boolean).length, '| roaming', I.plotPets.length, '| saved upgraders', store['mutation-mayhem-upgraders']);
   if (I.dragonPlaced.filter(Boolean).length !== p0 + 1) throw new Error('clicking a dragon in the inventory should place it');
   I.setStockRound(null); I.setCoins(0);
 }
@@ -759,7 +761,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     const n1 = I.ownDragons.length, placed1 = I.dragonPlaced.filter(Boolean).length; ['jade', 'fireboy', 'diamond', 'gold', 'ruby', 'silver', 'green'].forEach((k) => I.adminAddDragon(k));
     console.log('  add 7 dragons: dragons', n1, '->', I.ownDragons.length, '| on the plot', placed1, '->', I.dragonPlaced.filter(Boolean).length, '(space ' + I.slotLimit() + ')');
     if (I.ownDragons.length !== n1 + 7 || I.dragonPlaced.filter(Boolean).length !== placed1 + 7) throw new Error('admins should have unlimited space');
-    I.banName('Taj'); I.banName('Ellie#32'); console.log('  ban Taj and Ellie#32: banned', JSON.stringify(I.banned), '| message', said());
+    I.banName('Taj'); I.banName(process.env.ADMIN_NAME || ''); console.log('  ban Taj and the signed-in admin (admins can\'t be banned): banned', JSON.stringify(I.banned), '| message', said());
     els.leave.fire('click', ev({ detail: 1 })); console.log('  leave: placed now', I.dragonPlaced.filter(Boolean).length, 'of', I.plotSlots());
     if (I.dragonPlaced.filter(Boolean).length > I.plotSlots()) throw new Error('unlimited space should end when the admin leaves');
     els.name.value = 'Taj'; els.name.fire('input', ev({})); els.start.fire('click', ev({ pointerType: 'mouse' }));

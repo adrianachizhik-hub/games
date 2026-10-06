@@ -2269,6 +2269,7 @@ const World = (function () {
     const hat = AV.head === 'cap' || AV.head === 'crown' || AV.head === 'tophat';
     for (const k in hair) { hair[k].all.visible = k === AV.hair; hair[k].up.visible = !hat; }
     if (save) { try { localStorage.setItem('mutation-mayhem-avatar', JSON.stringify(AV)); } catch (e) { /* not saved, still wearing it */ } }
+    if (save) netSend({ t: 'look', look: myLook() });   // other players see your new look
   }
   dress(false);
 
@@ -2976,7 +2977,7 @@ const World = (function () {
   /* Your plot is chosen fresh each visit: the first plot you step on becomes yours, and your dragons appear on it.
      Leaving gives it back. (Only the dragons, upgrades and spaces are saved, not which plot.) */
   function claimPlot(i) {
-    myPlot = i; nameMyPlot();
+    myPlot = i; nameMyPlot(); netSend({ t: 'claim', plot: i }); petsSent = '';
     ownDragons.forEach((k, d) => { if (dragonPlaced[d]) addPet(k, true, d); });
     buildDecor();
     toast(ownDragons.length ? 'Welcome back! This is ' + playerName + '\'s Plot, and your dragons are here.' : 'This is now ' + playerName + '\'s Plot! Find eggs around the island and bring them here to hatch.', 6);
@@ -2986,8 +2987,9 @@ const World = (function () {
     if (hatching) { scene.remove(hatching.mesh); const kind = pickDragon(hatching.tier); ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(placedCount() < slotLimit()); saveProgress(); hatching = null; }
     plotPets.forEach((d) => scene.remove(d.root)); plotPets.length = 0;
     clearDecor();
-    paintSign(myPlot, 'Plot ' + (myPlot + 1));
-    myPlot = -1;
+    const was = myPlot; myPlot = -1;
+    paintSign(was, plotOwners[was] ? plotOwners[was].name + '\'s Plot' : 'Plot ' + (was + 1));
+    netSend({ t: 'release' });
   }
   function nameMyPlot() { if (myPlot >= 0) paintSign(myPlot, playerName + '\'s Plot'); }   // the sign says whose plot it is
   function saveProgress() {
@@ -3085,7 +3087,8 @@ const World = (function () {
     if (!started) return;
     if (myPlot < 0 && !p.dungeon) {
       const i = plotAt(p.x, p.z);
-      if (i >= 0) claimPlot(i);
+      if (i >= 0 && plotOwners[i] && plotOwners[i].id !== netId) { if (nagT <= 0) { toast('This is ' + plotOwners[i].name + '\'s Plot. Find a free one!', 3); nagT = 4; } }
+      else if (i >= 0) claimPlot(i);
     }
     nagT -= dt;
     villagePlay(dt);
@@ -3196,6 +3199,7 @@ const World = (function () {
     if (d.heading !== undefined) p.yaw = d.heading;
     toast('You\'re riding your ' + DRAGON_KINDS[d.kind].name + ' dragon! Jump twice to fly. Jump once to get off.', 5);
   }
+  function dropLoose(d) { const at = plotPets.indexOf(d); if (at >= 0) plotPets.splice(at, 1); scene.remove(d.root); renderInventory(); }
   function dismount(home) {                              // home: put it straight back on the plot, with no flight
     const d = riding;
     if (!d) return;
@@ -3207,8 +3211,14 @@ const World = (function () {
       const l = onPlot && !home ? plotLocal(myPlot, d.root.position.x, d.root.position.z) : { lx: 0, lz: 0 };
       d.lx = l.lx; d.lz = l.lz; d.tx = l.lx; d.tz = l.lz; d.wait = 1;
     } else {                                             // off your plot: it goes into your inventory (Adriana's rule)
-      storeDragon(d.index);
+      if (d.loose) { d.loose = false; dropLoose(d); } else storeDragon(d.index);
       toast('Your ' + DRAGON_KINDS[d.kind].name + ' dragon went into your inventory.', 3);
+      return;
+    }
+    if (d.loose) {                                       // a dragon ridden out of the inventory, now on your plot: it stays if there's room
+      d.loose = false;
+      if (myPlot >= 0 && placedCount() < slotLimit()) { dragonPlaced[d.index] = true; saveProgress(); renderInventory(); if (plotMenuOpen) refreshPlotMenu(); }
+      else { dropLoose(d); toast('Your plot is full, so your dragon went back into your inventory.', 3); }
     }
   }
   /* What did the click or tap land on? A ray from the camera through that point, tested against each dragon. */
@@ -3246,6 +3256,7 @@ const World = (function () {
     keepers.forEach((q) => list.push({ name: q.name, root: q.k.root, who: q }));
     list.push({ name: 'The nuclear monster', root: monster.f.root, who: monster, villager: true, big: 2.6 });
     plotPets.forEach((d) => { if (!d.ridden && !d.homing && !DRAGON_KINDS[d.kind].storm) list.push({ name: dragonLabel(d.index), root: d.root, who: d, pet: true }); });
+    others.forEach((o) => { if (o.f) list.push({ name: o.name, root: o.f.root, who: o, player: true }); });   // other players
     return list;
   }
   function mouthAt() {                                   // the tip of the ridden dragon's snout, in the world
@@ -3270,6 +3281,12 @@ const World = (function () {
       if (dragonMutation[i] === 'lightning') { toast('ZAP! ' + best.name + ' already has the Lightning mutation.', 3); return; }
       dragonMutation[i] = 'lightning'; saveProgress(); dressPet(best.who); renderInventory();
       toast('⚡ ZAP! Your ' + DRAGON_KINDS[ownDragons[i]].name + ' dragon got the LIGHTNING mutation! It makes twice as many coins now.', 5);
+      return;
+    }
+    if (best && best.player) {                           // another player: the server tells their game to bounce them back
+      const ax = best.root.position.x - p.x, az = best.root.position.z - p.z, al = Math.hypot(ax, az) || 1;
+      netSend({ t: 'zap', id: best.who.id, dx: ax / al, dz: az / al });
+      toast('ZAP! ' + best.name + ' got bounced backwards!', 2.5);
       return;
     }
     if (best) {
@@ -3524,6 +3541,16 @@ const World = (function () {
       what.appendChild(name); what.appendChild(note); row.appendChild(what); row.appendChild(btn); plotList.appendChild(row);
     });
   }
+  function rideFromInventory(i) {                        // pick a dragon in the inventory: it appears under you and you're riding it (Adriana's request)
+    if (!started || dragonPlaced[i] || !ownDragons[i]) return;
+    if (p.dungeon || p.inCave || sinkT >= 0) { toast('Dragons are too big to ride down here.', 3); return; }
+    if (carryingBlock) { toast('Take your lucky block home first.', 3); return; }
+    if (riding) dismount(false);
+    const d = makeDragon(ownDragons[i]);
+    Object.assign(d, { index: i, lx: 0, lz: 0, tx: 0, tz: 0, wait: 1, speed: 1, pop: 1, phase: 0, loose: true });   // loose: out of the inventory, not on the plot
+    d.root.position.set(p.x, p.y, p.z); plotPets.push(d); dressPet(d);
+    mount(d); renderInventory();
+  }
   function placeDragon(i) {
     if (dragonPlaced[i]) return;
     if (myPlot < 0) { toast('Walk onto a plot first, then you can put dragons on it.', 4); return; }
@@ -3581,11 +3608,11 @@ const World = (function () {
   function renderInventory() {
     while (invItems.firstChild) invItems.removeChild(invItems.firstChild);
     const groups = new Map();                            // same colour and same upgrader: one stack
-    ownDragons.forEach((k, i) => { if (dragonPlaced[i]) return; const key = k + '|' + dragonUpgrades[i]; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i); });
+    ownDragons.forEach((k, i) => { if (dragonPlaced[i] || (riding && riding.index === i)) return; const key = k + '|' + dragonUpgrades[i]; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i); });
     groups.forEach((list) => {
       const i = list[0], c = DRAGON_KINDS[ownDragons[i]];
       invButton(c.name + ' dragon', dragonUpgrades[i] >= 0 ? UPGRADERS[dragonUpgrades[i]].name + ' upgrader' : '', list.length,
-        { background: hex(c.body), borderColor: hex(c.wing) }, () => placeDragon(i));
+        { background: hex(c.body), borderColor: hex(c.wing) }, () => rideFromInventory(i));
     });
     upgradersOwned.forEach((n, i) => {
       if (n > 0) invButton(UPGRADERS[i].name + ' upgrader', '×' + UPGRADERS[i].boost + ' coins', n, { background: hex(UP_COLOURS[i]), borderRadius: '50%' }, () => useUpgrader(i));
@@ -4560,6 +4587,7 @@ const World = (function () {
     chatInput.value = '';
     if (!text || !started) return;
     addChat(playerName + (isAdmin ? ' (Admin)' : ''), text);
+    netSend({ t: 'chat', text });
   }
   function setChatOpen(open) {
     chatEl.classList[open ? 'remove' : 'add']('closed');
@@ -4574,7 +4602,7 @@ const World = (function () {
   function greetChat() {
     if (chatGreeted) return;
     chatGreeted = true;
-    addChat('', 'Only you can see this chat for now. Talking with other players comes when the game gets a server.', true);
+    if (!NET_URL || typeof WebSocket === 'undefined') addChat('', 'Playing offline: only you can see this chat.', true);
   }
 
   /* ---------- The avatar shop (the blue stall) ---------- */
@@ -4840,7 +4868,7 @@ const World = (function () {
     annInput.value = '';
     if (!text || !isAdmin || !started) return;
     showAnnouncement(playerName, text);
-    toast('Announced! For now only you can see it; everyone will once the game has a server.', 4);
+    if (netOnline) { netSend({ t: 'announce', text }); toast('Announced to every server!', 3); } else toast('Announced! You\'re playing offline, so only you can see it.', 4);
     annInput.blur(); canvas.focus();
   }
   function announceStep(dt) { if (annTimer > 0) { annTimer -= dt; if (annTimer <= 0) annEl.hidden = true; } }
@@ -4953,6 +4981,7 @@ const World = (function () {
     if (isAdmin && realCoins === null) { realCoins = coins; coins = Infinity; }   // and unlimited coins (never saved)
     document.body.classList[isAdmin ? 'add' : 'remove']('admin');
     greetChat();
+    netConnect(codeEl.value);
     if (isAdmin) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Admin'; who.appendChild(badge); }
     try {
       if (!(isAdmin && lockedName)) localStorage.setItem('mutation-mayhem-name', playerName === 'Player' ? '' : playerName);   // an admin never replaces a locked name
@@ -4971,6 +5000,7 @@ const World = (function () {
   /* Leave: back to the front cover. The next Play starts fresh on the beach, and an admin has to sign in again. */
   function leave() {
     if (!started) return;
+    netSend({ t: 'release' }); netClose();
     closeShop(); closeUpShop(); closePlotMenu(); closeTalk(); shopBtn.hidden = true; avatar.visible = false;
     if (riding && DRAGON_KINDS[riding.kind].storm) dismount(true);
     removeStorms(); closeKeypad(); bunkerOpen = false;
@@ -5293,6 +5323,130 @@ const World = (function () {
     mapCtx.restore();
   }
 
+  /* ---------- Multiplayer ---------- */
+  /* Adriana's request: everyone who plays joins the same server, unless all 7 plots there are taken; then the next of
+     10 more servers with room (the server program in server/server.js decides). Players see each other walking and
+     riding, with name tags; each plot belongs to one player at a time, and shows its owner's dragons; chat and admin
+     announcements reach everyone. Coins, dragons and eggs still live on each player's own device. With no server (or
+     if it can't be reached) the game plays offline as before. The server's address: ?server=... in the page address,
+     or the Render service next to the game's own Render site, or a local test server. */
+  const NET_URL = (() => {
+    try {
+      const q = new URLSearchParams(location.search).get('server');
+      if (q) return q;
+      const h = location.hostname || '';
+      if (/onrender\.com$/.test(h)) return 'wss://dragon-keepers-server.onrender.com';
+      if (h === 'localhost' || h === '127.0.0.1') return 'ws://' + h + ':8080';
+    } catch (e) { /* no address */ }
+    return null;
+  })();
+  let sock = null, netId = 0, netRoom = 0, netOnline = false, netT = 0, petsT = 0, petsSent = '';
+  const others = new Map(), plotOwners = new Array(7).fill(null);
+  function netSend(m) { if (sock && netOnline) { try { sock.send(JSON.stringify(m)); } catch (e) { /* lost */ } } }
+  const myLook = () => ({ skin: AV.skin, shirt: AV.shirt, pants: AV.pants, hairColor: AV.hairColor, hair: AV.hair });
+  function netConnect(code) {
+    if (!NET_URL || typeof WebSocket === 'undefined') return;
+    try { sock = new WebSocket(NET_URL); } catch (e) { sock = null; return; }
+    addChat('', 'Connecting to the game server...', true);
+    const s0 = sock;
+    sock.onopen = () => { if (sock !== s0) return; s0.send(JSON.stringify({ t: 'hello', name: isAdmin ? typedName() : playerName, code: isAdmin ? code : '', look: myLook() })); };
+    sock.onmessage = (ev) => { if (sock !== s0) return; let m; try { m = JSON.parse(ev.data); } catch (e) { return; } netMessage(m); };
+    sock.onclose = () => { if (sock !== s0) return; const was = netOnline; netGone(); if (started) addChat('', was ? 'Lost the connection to the server. Playing offline now.' : 'Couldn\'t reach the game server. Playing offline.', true); };
+    sock.onerror = () => {};
+  }
+  function netGone() {
+    netOnline = false; sock = null; netId = 0;
+    others.forEach((o) => removeOther(o)); others.clear();
+    plotOwners.forEach((o, i) => { if (o) { plotOwners[i] = null; if (i !== myPlot) paintSign(i, 'Plot ' + (i + 1)); } });
+  }
+  function netClose() { if (sock) { const s0 = sock; netGone(); try { s0.close(); } catch (e) { /* gone */ } } }
+  function netMessage(m) {
+    if (m.t === 'welcome') {
+      netOnline = true; netId = m.id; netRoom = m.room;
+      m.players.forEach(addOther);
+      m.plots.forEach((o, i) => { if (o && o.id !== netId) setOwner(i, o); });
+      addChat('', 'You\'re on Server ' + m.room + (m.players.length ? ' with ' + m.players.length + ' other player' + (m.players.length === 1 ? '' : 's') : ', and nobody else is here yet') + '. Chat goes to everyone on this server.', true);
+      toast('You joined Server ' + m.room + '!', 3);
+      if (myPlot >= 0) { if (plotOwners[myPlot]) { releasePlot(); toast('Someone already has that plot. Walk onto a free one!', 4); } else netSend({ t: 'claim', plot: myPlot }); }
+      petsSent = '';
+    } else if (m.t === 'full') toast('All 11 servers are full right now. Playing offline.', 5);
+    else if (m.t === 'join') { addOther(m.p); addChat('', m.p.name + ' joined the server.', true); }
+    else if (m.t === 'left') { const o = others.get(m.id); if (o) { addChat('', o.name + ' left the server.', true); removeOther(o); others.delete(m.id); } if (m.plot >= 0 && plotOwners[m.plot] && plotOwners[m.plot].id === m.id) setOwner(m.plot, null); }
+    else if (m.t === 'states') m.list.forEach(([id, x, y, z, yaw, ride, fly]) => { const o = others.get(id); if (o) { o.tx = x; o.ty = y; o.tz = z; o.tyaw = yaw; setRide(o, ride); if (!o.seen) { o.seen = true; o.x = x; o.y = y; o.z = z; o.yaw = yaw; } } });
+    else if (m.t === 'plot') { const o = others.get(m.id); if (m.id && o) { o.plot = m.plot; setOwner(m.plot, { id: m.id, name: m.name }); } else setOwner(m.plot, null); if (o) showPets(o); }
+    else if (m.t === 'claimed') { if (!m.ok && myPlot === m.plot) { releasePlot(); toast('That\'s ' + m.owner + '\'s Plot. Find a free one!', 4); } }
+    else if (m.t === 'pets') { const o = others.get(m.id); if (o) { o.pets = m.kinds; showPets(o); } }
+    else if (m.t === 'look') { const o = others.get(m.id); if (o) { o.look = m.look; removeOther(o); buildOther(o); } }
+    else if (m.t === 'chat') addChat(m.name + (m.admin ? ' (Admin)' : ''), m.text);
+    else if (m.t === 'announce') showAnnouncement(m.name, m.text);
+    else if (m.t === 'zapped') {                          // an admin's storm dragon hit you with lightning: bounced backwards
+      toast('⚡ ZAP! ' + m.by + '\'s storm dragon bounced you backwards!', 3);
+      for (let k = 0; k < 12; k++) if (!p.dungeon) tryMove(m.dx * 0.8, m.dz * 0.8);
+      p.vy = 9; p.onGround = false;
+    }
+  }
+  function setOwner(i, o) {
+    if (i < 0 || i >= 7) return;
+    plotOwners[i] = o;
+    if (i === myPlot && !o) return;
+    paintSign(i, o ? o.name + '\'s Plot' : 'Plot ' + (i + 1));
+  }
+  function addOther(c) {
+    const o = { id: c.id, name: c.name, admin: c.admin, look: c.look || {}, plot: c.plot, pets: c.pets || [], x: 0, y: -500, z: 0, yaw: 0, tx: 0, ty: -500, tz: 0, tyaw: 0, ride: '', dragon: null, petMeshes: [], seen: false, walkT: 0 };
+    if (c.s) { [o.x, o.y, o.z, o.yaw] = c.s; [o.tx, o.ty, o.tz, o.tyaw] = c.s; o.seen = true; }
+    others.set(o.id, o); buildOther(o);
+    if (o.plot >= 0) setOwner(o.plot, { id: o.id, name: o.name });
+    if (c.s) setRide(o, c.s[4]);
+    showPets(o);
+  }
+  const okColour = (c, d) => (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d);
+  function buildOther(o) {                               // a blocky person like yours, in their colours, with a name tag
+    const f = figure({ skin: lam(okColour(o.look.skin, '#e0ac69')), shirt: lam(okColour(o.look.shirt, '#d8433a')), pants: lam(okColour(o.look.pants, '#6b4a2b')), face: paint.face });
+    const hc = lam(okColour(o.look.hairColor, '#5a3a20'));
+    if (o.look.hair !== 'none') { block(f.head, hc, 0.57, 0.16, 0.57, 0, 0.5, 0.01); block(f.head, hc, 0.57, o.look.hair === 'long' || o.look.hair === 'ponytail' ? 0.7 : 0.34, 0.12, 0, o.look.hair === 'long' ? 0.12 : 0.3, 0.24); }
+    f.root.add(nameTag(o.name + (o.admin ? ' ★' : '')));
+    o.f = f;
+  }
+  function removeOther(o) { if (o.f) scene.remove(o.f.root); if (o.dragon) scene.remove(o.dragon.root); o.dragon = null; o.petMeshes.forEach((d) => scene.remove(d.root)); o.petMeshes = []; }
+  function setRide(o, kind) {
+    if ((kind || '') === o.ride) return;
+    o.ride = kind || '';
+    if (o.dragon) { scene.remove(o.dragon.root); o.dragon = null; }
+    if (o.ride && DRAGON_KINDS[o.ride]) { o.dragon = makeDragon(o.ride); const sc = RIDE_SIZE * (DRAGON_KINDS[o.ride].big || 1); o.dragon.root.scale.set(sc, sc, sc); }
+  }
+  function showPets(o) {                                 // their dragons, standing about on their plot
+    o.petMeshes.forEach((d) => scene.remove(d.root)); o.petMeshes = [];
+    if (o.plot < 0 || o.plot >= 7) return;
+    (o.pets || []).slice(0, 24).forEach((k, n) => {
+      if (!DRAGON_KINDS[k]) return;
+      const d = makeDragon(k), w = plotWorld(o.plot, ((n % 5) - 2) * 1.9, Math.floor(n / 5) * 1.9 - 2), ps = 0.75 * (DRAGON_KINDS[k].big || 1);
+      d.root.position.set(w.x, HUB.h + 0.1, w.z); d.root.scale.set(ps, ps, ps); d.root.rotation.y = Math.random() * 6.28; d.phase = Math.random() * 6;
+      o.petMeshes.push(d);
+    });
+  }
+  function netTick(dt, time) {                           // every frame: send where you are (10 times a second), move everyone else
+    if (netOnline && started) {
+      netT -= dt;
+      if (netT <= 0) { netT = 0.1; netSend({ t: 'state', x: p.x, y: p.y, z: p.z, yaw: p.yaw, ride: riding ? riding.kind : '', fly: flying }); }
+      petsT -= dt;
+      if (petsT <= 0) { petsT = 2; const kinds = myPlot >= 0 ? ownDragons.filter((k, i) => dragonPlaced[i]) : []; const key = myPlot + ':' + kinds.join(','); if (key !== petsSent) { petsSent = key; netSend({ t: 'pets', kinds }); } }
+    }
+    const k = Math.min(1, dt * 10);
+    others.forEach((o) => {
+      const moved = Math.hypot(o.tx - o.x, o.tz - o.z);
+      o.x += (o.tx - o.x) * k; o.y += (o.ty - o.y) * k; o.z += (o.tz - o.z) * k;
+      let dy = o.tyaw - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * k;
+      const f = o.f; if (!f) return;
+      const big = o.dragon ? DRAGON_KINDS[o.ride].big || 1 : 1, sc = RIDE_SIZE * big;
+      f.root.position.set(o.x, o.y + (o.dragon ? sc * 1.05 - 0.85 : 0), o.z); f.root.rotation.y = o.yaw;
+      o.walkT += moved > 0.02 ? dt * 10 : 0;
+      const sw = o.dragon ? 0 : Math.sin(o.walkT) * Math.min(1, moved * 4) * 0.7;
+      f.legL.rotation.x = sw; f.legR.rotation.x = -sw; f.armL.rotation.x = -sw; f.armR.rotation.x = sw;
+      if (o.dragon) { f.legL.rotation.set(-0.35, 0, -0.6); f.legR.rotation.set(-0.35, 0, 0.6); o.dragon.root.position.set(o.x, o.y, o.z); o.dragon.root.rotation.y = o.yaw; flapWings(o.dragon, 4, reduced ? 0 : 0.4, time); sparkStep(o.dragon, dt); }
+      o.petMeshes.forEach((d) => flapWings(d, 2, reduced ? 0 : 0.1, time + d.phase));
+    });
+  }
+
   /* ---------- Main loop ---------- */
   let vw = 0, vh = 0;
   function resize() {
@@ -5328,6 +5482,7 @@ const World = (function () {
     if (!reduced) flameMat.color.setScalar(0.86 + 0.14 * Math.sin(time * 11) * Math.sin(time * 6.3));   // torches flicker
     clouds.rotation.y += dt * 0.004;
     keeperPose(dt, time);
+    netTick(dt, time);
     if (fairyBulbs.length) twinkleLights(time);
     eggsAnimate(dt, time);
     if (bolts.length || knocked.length) zapStep(dt);
@@ -5338,7 +5493,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

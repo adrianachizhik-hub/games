@@ -1,7 +1,17 @@
-# Render Blueprint: serves the game as a static site. index.html is the whole game.
+# Render Blueprint.
+# 1) The game itself, as a static site. index.html is the whole game.
+# 2) The multiplayer server (server/server.js), on Render's free plan. It goes to sleep after 15 minutes with
+#    nobody playing; the first player after that waits about a minute while it wakes up (the game plays offline
+#    until it answers). The game looks for it at wss://dragon-keepers-server.onrender.com.
 services:
   - type: web
     name: mutation-mayhem
     runtime: static
     buildCommand: echo "nothing to build"
     staticPublishPath: .
+  - type: web
+    name: dragon-keepers-server
+    runtime: node
+    plan: free
+    buildCommand: echo "nothing to install"
+    startCommand: node server/server.js
