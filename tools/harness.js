@@ -770,8 +770,8 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   console.log('buy a Coin Cookie and a Fire Pepper: coins x' + I.treatCoins(), '| dragon speed +' + Math.round(I.treatSpeed() * 100) + '% | under the coins after a moment:', (hud(12), JSON.stringify(els.effect.textContent)));
   if (I.treatCoins() !== 2 || I.treatSpeed() !== 0.25) throw new Error('treats should boost coins and speed');
   { const c0 = I.coins(); for (let f = 0; f < 180; f++) I.earn(1 / 60); console.log('one payday with the cookie:', (I.coins() - c0).toFixed(0), 'coins (', r0, 'x 2 )'); }
-  tabs[1].fire('click', ev({})); const d0 = I.decorMeshes().length; buyBtn(rows()[3]).fire('click', ev({})); buyBtn(rows()[0]).fire('click', ev({}));
-  console.log('decorations tab:', rows().map(name).join(', '), '| bought fountain and flowers: on the plot', d0, '->', I.decorMeshes().length, '| fountain button now', JSON.stringify(buyBtn(rows()[3]).textContent));
+  tabs[1].fire('click', ev({})); const d0 = I.decorMeshes().length; buyBtn(rows()[4]).fire('click', ev({})); buyBtn(rows()[1]).fire('click', ev({}));
+  console.log('decorations tab:', rows().map(name).join(', '), '| bought fountain and fairy lights: on the plot', d0, '->', I.decorMeshes().length, '| fountain button now', JSON.stringify(buyBtn(rows()[4]).textContent));
   if (I.decorMeshes().length !== d0 + 2) throw new Error('decorations should appear on the plot');
   tabs[2].fire('click', ev({})); buyBtn(rows()[4]).fire('click', ev({}));
   const pickRows = rows(), firstPet = I.plotPets[0], idx = firstPet.index;
@@ -806,6 +806,19 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
 {
   const ab = I.annBtn(), ai = I.annInput();
   console.log('admin commands:', els.adminCommands.children.filter((c) => c.textContent).map((c) => JSON.stringify(c.textContent)).join(', '));
+  if (I.admin()) {                                     // restock shops, and lucky blocks + secret shop on the map
+    const btn = (re) => els.adminCommands.children.find((c) => re.test(c.textContent));
+    console.log('lucky blocks + secret shop on the map:', I.seeAllOn(), '| button', JSON.stringify(btn(/Lucky blocks/).textContent));
+    if (!I.seeAllOn()) throw new Error('admins should see lucky blocks and the secret shop on the map');
+    for (let k = 0; k < 6; k++) raf(95000 + k * 16);    // the map draws with the markers on
+    const before = I.UPGRADERS.map((u, i) => I.stockLeft(i)).join(',');
+    btn(/^Restock shops$/).fire('click', ev({ detail: 1 }));
+    const after = I.UPGRADERS.map((u, i) => I.stockLeft(i)).join(',');
+    console.log('restock shops: stock', before, '->', after, '|', JSON.stringify(els.toast.textContent));
+    if (after !== '5,3,2,1,1') throw new Error('restock should fill every upgrader');
+    btn(/Lucky blocks/).fire('click', ev({ detail: 1 })); console.log('switch the map markers off:', I.seeAllOn());
+    btn(/Lucky blocks/).fire('click', ev({ detail: 1 }));
+  }
   ab.fire('click', ev({})); ai.value = 'Fire village is lit, come join!'; window.fire('keydown', ev({ code: 'KeyW', target: ai })); window.fire('keydown', ev({ code: 'Enter', key: 'Enter', target: ai }));
   console.log('announce (admin ' + I.admin() + '): banner shown', !els.announce.hidden, '| says', JSON.stringify(els.announce.children.map((c) => c.textContent).join(' | ')), '| W walked', I.keys.has('KeyW'));
   if (I.admin() === els.announce.hidden) throw new Error('only admins should be able to announce');
