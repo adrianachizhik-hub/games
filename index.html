@@ -2854,9 +2854,118 @@ const World = (function () {
   }
   const sparkGeo = new THREE.BoxGeometry(0.05, 0.05, 0.42), sparkMat = new THREE.MeshBasicMaterial({ color: 0xbff6ff }), sparkMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const sparkMatY = new THREE.MeshBasicMaterial({ color: 0xfff27a });
+  /* ---------- Mutations ---------- */
+  /* Adriana's list. Each one changes how a dragon looks and multiplies its coins (coins), rarer ones more. Fire makes it
+     3x faster to ride instead, and Giant makes it twice as big. How a dragon gets one (got): 'zap' an admin's storm
+     lightning, 'fire' a fire storm, 'ufo' a UFO's beam, 'wind' an air jet, 'rocks' a falling rock, or 'random' (now and
+     then a dragon on your plot just mutates; tier says how rare: 1 common to 4 legendary). The look: tint (colour wash),
+     see (see-through), glow, and fx: little effects around it, each [kind, colours, how many, size]. */
+  const MUTATIONS = [
+    { id: 'lightning', name: 'Electric', emoji: '⚡', coins: 2, got: 'zap', fx: [['spark', [0xfff27a, 0xffffff], 10, 1]] },
+    { id: 'fire', name: 'Fire', emoji: '🔥', coins: 2, speed: 3, got: 'fire', fx: [['rise', [0xff6a10, 0xffd23f], 8, 1]] },
+    { id: 'water', name: 'Water', emoji: '💧', coins: 1.5, got: 'random', tier: 1, tint: 0x6fc8ff, see: 0.6, fx: [['rise', [0xd8f6ff, 0x8fe8ff], 8, 1.2, 'ball']] },
+    { id: 'inferno', name: 'Inferno', emoji: '🔥', coins: 2, got: 'random', tier: 2, tint: 0xff8a4a, fx: [['rise', [0xff3a1a, 0xff8a3d, 0xffd23f], 18, 1.6, 'flame']] },
+    { id: 'frozen', name: 'Frozen', emoji: '❄️', coins: 1.5, got: 'random', tier: 1, tint: 0xbfe9ff, fx: [['fall', [0xffffff], 14, 0.7], ['cover', [0xd8f6ff, 0x8fd0f5], 10, 1, 'shard']] },
+    { id: 'toxic', name: 'Toxic', emoji: '☣️', coins: 1.5, got: 'random', tier: 1, tint: 0xa8ff7a, fx: [['drip', [0x7dff3a, 0xb6ff3d], 10, 1, 'ball']] },
+    { id: 'magma', name: 'Magma', emoji: '🌋', coins: 2, got: 'random', tier: 2, tint: 0x3a2a26, fx: [['cover', [0xff5a1f, 0xffa020], 16, 1, 'crack'], ['rise', [0xff6a10], 4, 0.8]] },
+    { id: 'storm', name: 'Storm', emoji: '🌪️', coins: 3, got: 'random', tier: 3, tint: 0x7a8a9a, fx: [['orbit', [0x4a5058, 0x5f666e], 6, 2.2, 'cloud'], ['spark', [0xbff6ff, 0xffffff], 8, 1.2]] },
+    { id: 'crystal', name: 'Crystal', emoji: '💎', coins: 2, got: 'random', tier: 2, fx: [['cover', [0xb27bff, 0x8fe8ff, 0xff8fd6], 14, 1.2, 'crystal']] },
+    { id: 'cosmic', name: 'Cosmic', emoji: '🌌', coins: 5, got: 'random', tier: 4, tint: 0x3a2070, glow: 0x1a0a40, fx: [['stars', [0xffffff, 0xffe9a0, 0x8fe8ff], 22, 0.6], ['orbit', [0xff8fd6, 0x5bc0f0], 2, 1, 'ball']] },
+    { id: 'prismatic', name: 'Prismatic', emoji: '🌈', coins: 3, got: 'random', tier: 3, rainbow: true, fx: [] },
+    { id: 'glitched', name: 'Glitched', emoji: '👾', coins: 3, got: 'random', tier: 3, glitch: true, fx: [['spark', [0xff2adf, 0x2affff, 0x39ff14], 12, 1.4]] },
+    { id: 'void', name: 'Void', emoji: '🕳️', coins: 5, got: 'random', tier: 4, tint: 0x14101e, fx: [['orbit', [0x8a3aff, 0xb27bff, 0x5a1aa8], 14, 0.8, 'ball']] },
+    { id: 'solar', name: 'Solar', emoji: '☀️', coins: 2, got: 'random', tier: 2, tint: 0xffe88a, glow: 0x7a4a00, fx: [['aura', [0xffe14a], 1, 1.7], ['rise', [0xff8a3d, 0xffd23f], 8, 0.9, 'flame']] },
+    { id: 'lunar', name: 'Lunar', emoji: '🌙', coins: 2, got: 'random', tier: 2, tint: 0xd8dde6, glow: 0x30343c, fx: [['orbit', [0xffffff, 0xfff4d6], 8, 0.7, 'star']] },
+    { id: 'nature', name: 'Nature', emoji: '🌸', coins: 1.5, got: 'random', tier: 1, fx: [['cover', [0x3f8a3a, 0x5fb83a], 14, 1, 'leaf'], ['cover', [0xff8fd6, 0xffd23f, 0xffffff], 8, 1, 'flower']] },
+    { id: 'candy', name: 'Candy', emoji: '🍬', coins: 1.5, got: 'random', tier: 1, tint: 0xffb8e0, fx: [['cover', [0xff4f7a, 0x5bc0f0, 0xffd23f, 0x7ed957, 0xffffff], 26, 0.8, 'sprinkle']] },
+    { id: 'phantom', name: 'Phantom', emoji: '👻', coins: 2, got: 'random', tier: 2, tint: 0xe8f0ff, see: 0.35, fx: [['rise', [0xffffff], 8, 1.4, 'wisp']] },
+    { id: 'disco', name: 'Disco', emoji: '🪩', coins: 2, got: 'random', tier: 2, fx: [['beams', [0xff4fa8, 0x5bc0f0, 0xffd23f, 0x7ed957], 6, 1], ['spark', [0xffffff], 8, 0.8]] },
+    { id: 'magnetic', name: 'Magnetic', emoji: '🧲', coins: 2, got: 'random', tier: 2, fx: [['orbit', [0x9aa0a6, 0x6e7479, 0xc0c4c8], 10, 1, 'metal']] },
+    { id: 'nuclear', name: 'Nuclear', emoji: '💥', coins: 5, got: 'random', tier: 4, fx: [['core', [0xb6ff3d], 1, 1], ['spark', [0x7dff3a, 0xffe14a], 12, 1.2]] },
+    { id: 'bubble', name: 'Bubble', emoji: '🫧', coins: 1.5, got: 'random', tier: 1, fx: [['rise', [0xd8f6ff, 0xffd6f5, 0xbff6ff], 12, 2.2, 'bubble']] },
+    { id: 'golden', name: 'Golden', emoji: '🏆', coins: 3, got: 'random', tier: 3, tint: 0xffd23f, glow: 0x5a3a00, fx: [['spark', [0xffffff, 0xfff4b0], 6, 0.6]] },
+    { id: 'diamond', name: 'Diamond', emoji: '💠', coins: 3, got: 'random', tier: 3, tint: 0xd8f6ff, glow: 0x203a4a, fx: [['cover', [0xffffff, 0x8fe8ff, 0xbff6ff], 18, 1, 'gem']] },
+    { id: 'crimson', name: 'Crimson', emoji: '🩸', coins: 2, got: 'random', tier: 2, tint: 0x9a1a2a, fx: [['rise', [0xc8102e, 0x8a0a1a], 10, 1.6, 'wisp'], ['aura', [0xc8102e], 1, 1.6]] },
+    { id: 'eclipse', name: 'Eclipse', emoji: '🌑', coins: 5, got: 'random', tier: 4, tint: 0x101018, fx: [['ring', [0xffb020], 1, 1.4]] },
+    { id: 'vortex', name: 'Vortex', emoji: '🌀', coins: 3, got: 'random', tier: 3, fx: [['ring', [0x8a5ad6], 1, 1.3, 'spin'], ['orbit', [0x5bc0f0, 0xb27bff], 12, 1.3, 'ball']] },
+    { id: 'angel', name: 'Angel', emoji: '😇', coins: 3, got: 'random', tier: 3, fx: [['aura', [0xffffff], 1, 1.8], ['halo', [0xffd23f], 1, 1]] },
+    { id: 'devil', name: 'Devil', emoji: '😈', coins: 3, got: 'random', tier: 3, fx: [['aura', [0xff1a1a], 1, 1.8], ['horns', [0xc8102e], 1, 1]] },
+    { id: 'ufo', name: 'UFO', emoji: '🛸', coins: 4, got: 'ufo', tint: 0xc8ffc0, fx: [['saucer', [0xc0c4c8, 0x7dff3a], 1, 1], ['spark', [0x7dff3a], 6, 1]] },
+    { id: 'dirt', name: 'Dirt', emoji: '🟤', coins: 2, got: 'wind', fx: [['orbit', [0x6b4a2b, 0x8a6a45, 0x4a3320], 16, 1.1, 'clod']] },
+    { id: 'giant', name: 'Giant', emoji: '🪨', coins: 2, got: 'rocks', size: 2, fx: [] }
+  ];
+  const MUT = Object.fromEntries(MUTATIONS.map((m) => [m.id, m])), MUT_IDS = MUTATIONS.map((m) => m.id);
+  const fxMats = {}, fxMat = (c, op) => fxMats[c + ':' + (op || 1)] || (fxMats[c + ':' + (op || 1)] = new THREE.MeshBasicMaterial(op ? { color: c, transparent: true, opacity: op, depthWrite: false } : { color: c }));
+  const fxGeo = { box: new THREE.BoxGeometry(0.12, 0.12, 0.12), ball: new THREE.SphereGeometry(0.09, 6, 4), flame: new THREE.ConeGeometry(0.1, 0.28, 5), bubble: new THREE.SphereGeometry(0.14, 8, 6),
+    shard: new THREE.ConeGeometry(0.06, 0.32, 4), crack: new THREE.BoxGeometry(0.04, 0.03, 0.34), crystal: new THREE.ConeGeometry(0.08, 0.36, 5), cloud: new THREE.DodecahedronGeometry(0.32, 0),
+    star: new THREE.OctahedronGeometry(0.08, 0), leaf: new THREE.BoxGeometry(0.16, 0.03, 0.1), flower: new THREE.OctahedronGeometry(0.08, 0), sprinkle: new THREE.BoxGeometry(0.03, 0.03, 0.12),
+    wisp: new THREE.SphereGeometry(0.16, 6, 4), metal: new THREE.BoxGeometry(0.14, 0.06, 0.2), gem: new THREE.OctahedronGeometry(0.07, 0), clod: new THREE.DodecahedronGeometry(0.08, 0),
+    aura: new THREE.SphereGeometry(1, 14, 10), ring: new THREE.TorusGeometry(1, 0.07, 6, 28), beam: new THREE.BoxGeometry(0.03, 0.03, 2.2), horn: new THREE.ConeGeometry(0.08, 0.3, 5) };
+  const onBody = () => [(Math.random() - 0.5) * 0.7, 0.55 + Math.random() * 0.6, (Math.random() - 0.5) * 1.1];   // a point on the dragon's body
+  function buildMutFx(d) {                               // the effects for every mutation the dragon has, in one group on the dragon
+    if (d.fx) d.root.remove(d.fx);
+    d.fx = new THREE.Group(); d.fx.parts = []; d.root.add(d.fx);
+    const muts = (dragonMutation[d.index] || '').split(' ').map((id) => MUT[id]).filter(Boolean);
+    const meshes = [d.root.children[0], ...d.wings];
+    if (!d.baseMat) d.baseMat = meshes[0].material;
+    const look = muts.filter((m) => m.tint || m.see || m.glow || m.rainbow || m.glitch);
+    if (look.length && d.baseMat.clone) {               // a colour wash, see-through or glow, from the last such mutation
+      const m = d.baseMat.clone(), L = look[look.length - 1];
+      if (L.tint !== undefined && m.color) m.color.setHex(L.tint);
+      if (look.some((q) => q.see)) { m.transparent = true; m.opacity = Math.min(...look.filter((q) => q.see).map((q) => q.see)); m.depthWrite = false; }
+      if (L.glow !== undefined && m.emissive) m.emissive.setHex(L.glow);
+      d.fxMat = m; d.rainbow = look.some((q) => q.rainbow); d.glitch = look.some((q) => q.glitch);
+      meshes.forEach((x) => { x.material = m; });
+    } else { meshes.forEach((x) => { x.material = d.baseMat; }); d.fxMat = null; d.rainbow = d.glitch = false; }
+    muts.forEach((m) => m.fx.forEach(([kind, cols, n, size, shape]) => {
+      const col = (k) => cols[k % cols.length];
+      for (let k = 0; k < n; k++) {
+        let mesh;
+        if (kind === 'aura') { mesh = new THREE.Mesh(fxGeo.aura, fxMat(col(k), 0.18)); mesh.scale.set(size * 0.75, size * 0.7, size); mesh.position.set(0, 0.95, 0); }
+        else if (kind === 'ring') { mesh = new THREE.Mesh(fxGeo.ring, fxMat(col(k))); mesh.scale.set(size, size, size); mesh.position.set(0, 0.95, 0); mesh.rotation.x = shape === 'spin' ? 0 : Math.PI / 2; }
+        else if (kind === 'halo') { mesh = new THREE.Mesh(fxGeo.ring, fxMat(col(k))); mesh.scale.set(0.3, 0.3, 0.3); mesh.position.set(0, 2.0, -0.6); mesh.rotation.x = Math.PI / 2; }
+        else if (kind === 'horns') { mesh = new THREE.Group(); [-1, 1].forEach((sd) => { const h = new THREE.Mesh(fxGeo.horn, fxMat(col(0))); h.position.set(sd * 0.16, 1.82, -0.55); h.rotation.z = -sd * 0.35; mesh.add(h); }); }
+        else if (kind === 'core') { mesh = new THREE.Mesh(fxGeo.aura, fxMat(col(k))); mesh.scale.set(0.3, 0.3, 0.3); mesh.position.set(0, 0.8, -0.52); }
+        else if (kind === 'saucer') { mesh = new THREE.Group(); const disc = new THREE.Mesh(fxGeo.aura, fxMat(col(0))); disc.scale.set(0.38, 0.08, 0.38); mesh.add(disc); const dome = new THREE.Mesh(fxGeo.aura, fxMat(col(1), 0.7)); dome.scale.set(0.16, 0.12, 0.16); dome.position.y = 0.07; mesh.add(dome); const beam = new THREE.Mesh(fxGeo.flame, fxMat(col(1), 0.25)); beam.scale.set(3, 3, 3); beam.position.y = -0.45; mesh.add(beam); }
+        else if (kind === 'beams') { mesh = new THREE.Mesh(fxGeo.beam, fxMat(col(k))); mesh.position.set(0, 1.1, 0); }
+        else { mesh = new THREE.Mesh(fxGeo[shape] || (kind === 'spark' ? sparkGeo : fxGeo.box), fxMat(col(k), shape === 'bubble' || shape === 'wisp' ? 0.5 : 0)); mesh.scale.set(size, size, size); }
+        if (kind === 'cover' || kind === 'stars') { const [x, y, z] = onBody(); mesh.position.set(x * 1.05, y, z); mesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3); }
+        d.fx.add(mesh);
+        d.fx.parts.push({ mesh, kind, k, n, size, life: Math.random(), speed: 0.6 + Math.random() * 0.6, home: mesh.position.clone() });
+      }
+    }));
+  }
+  function mutStep(d, dt, time) {                        // every frame: the effects move
+    if (!d.fx || reduced) return;
+    if (d.rainbow && d.fxMat && d.fxMat.color) d.fxMat.color.setHSL((time * 0.25) % 1, 0.9, 0.6);
+    if (d.glitch) { const on = Math.random() > 0.06; d.root.children[0].visible = on; d.fx.position.x = Math.random() < 0.1 ? (Math.random() - 0.5) * 0.3 : 0; }
+    for (const q of d.fx.parts) {
+      const m = q.mesh;
+      q.life += dt * q.speed;
+      if (q.kind === 'rise' || q.kind === 'fall' || q.kind === 'drip') {
+        if (q.life > 1) { q.life -= 1; const [x, y, z] = onBody(); q.home.set(x, y, z); }
+        const t = q.life, up = q.kind === 'rise' ? t * 1.4 : q.kind === 'fall' ? 1.6 - t * 1.8 : -t * 0.9;
+        m.position.set(q.home.x + Math.sin(t * 6 + q.k) * 0.08, (q.kind === 'fall' ? 1.2 : q.home.y) + up, q.home.z);
+        const sc = q.size * (q.kind === 'rise' ? 1 - t * 0.7 : 1); m.scale.set(sc, sc, sc);
+      } else if (q.kind === 'orbit') {
+        const a = time * (q.speed * 1.6) + q.k / q.n * Math.PI * 2, r = 0.9 * q.size + 0.2 * Math.sin(time + q.k);
+        m.position.set(Math.cos(a) * r, 0.95 + Math.sin(time * 2 + q.k) * 0.35, Math.sin(a) * r * 1.2); m.rotation.y = -a;
+      } else if (q.kind === 'spark') {
+        if (q.life > 0.12) { q.life = 0; m.visible = Math.random() < 0.6; const [x, y, z] = onBody(); m.position.set(x * 1.6, y + 0.2, z * 1.3); m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3); }
+      } else if (q.kind === 'stars' || q.kind === 'cover') {
+        if (q.kind === 'stars') m.position.set(q.home.x + Math.sin(time * 0.6 + q.k) * 0.1, q.home.y + Math.cos(time * 0.5 + q.k) * 0.08, q.home.z);
+        if (q.mesh.geometry === fxGeo.gem || q.mesh.geometry === fxGeo.crystal || q.kind === 'stars') { const tw = 0.7 + 0.5 * Math.abs(Math.sin(time * 3 + q.k * 1.7)); m.scale.set(q.size * tw, q.size * tw, q.size * tw); }
+      } else if (q.kind === 'aura' || q.kind === 'core') { const pu = 1 + Math.sin(time * 3) * 0.06; m.scale.setScalar ? null : null; m.scale.x = (q.kind === 'core' ? 0.3 : q.size * 0.75) * pu; m.scale.y = (q.kind === 'core' ? 0.3 : q.size * 0.7) * pu; m.scale.z = (q.kind === 'core' ? 0.3 : q.size) * pu; }
+      else if (q.kind === 'ring') m.rotation.z = time * (m.rotation.x ? 0.6 : 2.5);
+      else if (q.kind === 'halo') m.position.y = 2.0 + Math.sin(time * 2) * 0.05;
+      else if (q.kind === 'beams') { m.rotation.y = time * 2 + q.k / q.n * Math.PI * 2; m.rotation.x = Math.sin(time * 1.3 + q.k) * 0.5; }
+      else if (q.kind === 'saucer') { const a = time * 1.5; m.position.set(Math.cos(a) * 0.5, 2.3 + Math.sin(time * 2) * 0.1, Math.sin(a) * 0.5 - 0.3); m.rotation.y = time * 3; }
+    }
+  }
+  const mutSize = (i) => (hasMut(i, 'giant') ? 2 : 1);
   const sparkMatF = new THREE.MeshBasicMaterial({ color: 0xff6a10 });
   function addSparks(d, mat) { d.sparks = d.sparks || []; for (let k = 0; k < 10; k++) { const m = new THREE.Mesh(sparkGeo, k % 3 ? mat : sparkMat2); m.visible = false; d.root.add(m); d.sparks.push(m); } }
-  const petSize = (d) => 0.75 * (DRAGON_KINDS[d.kind].big || 1);
+  const petSize = (d) => 0.75 * (DRAGON_KINDS[d.kind].big || 1) * (d.index !== undefined ? mutSize(d.index) : 1);   // Giant: twice as big
   function sparkStep(d, dt) {                            // every few hundredths of a second the sparks jump somewhere new
     if (!d.sparks || reduced) return;
     d.sparkT -= dt;
@@ -2918,7 +3027,7 @@ const World = (function () {
       dragonSpeed.push(typeof spd[i] === 'number' && spd[i] > 0 ? spd[i] : 0);
       dragonOutfit.push(Number.isInteger(outf[i]) && outf[i] >= 0 && outf[i] < 5 ? outf[i] : -1);
       dragonNames[ownDragons.length - 1] = typeof nms[i] === 'string' ? nms[i].slice(0, 16) : '';
-      dragonMutation[ownDragons.length - 1] = typeof muts[i] === 'string' ? muts[i].split(' ').filter((w) => w === 'lightning' || w === 'fire').join(' ') : '';
+      dragonMutation[ownDragons.length - 1] = typeof muts[i] === 'string' ? muts[i].split(' ').filter((w) => MUT_IDS.includes(w)).join(' ') : '';
     });
     const sl = +localStorage.getItem('mutation-mayhem-slots');
     if (sl >= 5 && sl <= MAX_SLOTS) plotSlots = Math.floor(sl);
@@ -2943,8 +3052,9 @@ const World = (function () {
   let coins = 0, coinsShown = -1, rateShown = -1, coinSaveT = 0, payT = 0;
   try { coins = Math.max(0, +localStorage.getItem('mutation-mayhem-coins') || 0); } catch (e) { /* none saved */ }
   const hasMut = (i, m) => (dragonMutation[i] || '').split(' ').includes(m);   // mutations: 'lightning' (×2 coins), 'fire' (×3 speed)
+  function mutCoins(i) { return (dragonMutation[i] || '').split(' ').reduce((k, id) => k * ((MUT[id] && MUT[id].coins) || 1), 1); }   // every mutation multiplies the coins
   function addMut(i, m) { if (!hasMut(i, m)) dragonMutation[i] = ((dragonMutation[i] || '') + ' ' + m).trim(); }
-  const dragonValue = (i) => (DRAGON_COINS[ownDragons[i]] || 0) * (dragonUpgrades[i] >= 0 ? UPGRADERS[dragonUpgrades[i]].boost : 1) * (hasMut(i, 'lightning') ? 2 : 1);   // the Lightning mutation doubles it
+  const dragonValue = (i) => (DRAGON_COINS[ownDragons[i]] || 0) * (dragonUpgrades[i] >= 0 ? UPGRADERS[dragonUpgrades[i]].boost : 1) * mutCoins(i);   // the Lightning mutation doubles it
   const coinRate = () => ownDragons.reduce((sum, k, i) => sum + (dragonPlaced[i] ? dragonValue(i) : 0), 0);   // coins each payout, from the dragons on your plot
   /* Which dragons are on the plot: as saved, or (the first time) the ones that earn the most. Then put them there. */
   ownDragons.forEach((k, i) => { dragonPlaced[i] = false; });
@@ -3164,7 +3274,7 @@ const World = (function () {
     }
     for (const d of plotPets) {                          // wander about the plot; rarer dragons walk faster
       if (myPlot < 0) break;
-      sparkStep(d, dt);
+      sparkStep(d, dt); mutStep(d, dt, time);
       if (d.ridden) continue;
       if (d.homing) {                                     // flying back to the plot after you got off
         const c = plotWorld(myPlot, 0, 0), rp = d.root.position, dx = c.x - rp.x, dz = c.z - rp.z, dist = Math.hypot(dx, dz);
@@ -3392,7 +3502,7 @@ const World = (function () {
   function poseRider(dt) {                               // sit the avatar on the dragon's back, and move the dragon with you
     const d = riding;
     if (!d) { legL.rotation.z = legR.rotation.z = 0; return; }
-    const big = DRAGON_KINDS[d.kind].big || 1, full = RIDE_SIZE * big;
+    const big = (DRAGON_KINDS[d.kind].big || 1) * mutSize(d.index), full = RIDE_SIZE * big;
     d.rideScale = Math.min(full, (d.rideScale || petSize(d)) + dt * 2 * big);   // it grows to riding size when you climb on
     d.root.scale.set(d.rideScale, d.rideScale, d.rideScale);
     avatar.position.y = p.y + d.rideScale * 1.05 - 0.85;                  // sit on its back
@@ -3657,7 +3767,7 @@ const World = (function () {
   const sellEl = $('sellShop'), sellList = $('sellList');
   let sellOpen = false;
   const sellPrice = (i) => Math.max(1, Math.round(dragonValue(i) * SELL_TIMES));
-  function dragonLabel(i) { const k = (hasMut(i, 'lightning') ? '⚡ Lightning ' : '') + (hasMut(i, 'fire') ? '🔥 Fire ' : '') + DRAGON_KINDS[ownDragons[i]].name; return dragonNames[i] ? dragonNames[i] + ' (' + k + ')' : k + ' dragon'; }   // "Sparky (Ruby)" once it has a name
+  function dragonLabel(i) { const k = (dragonMutation[i] || '').split(' ').filter((id) => MUT[id]).map((id) => MUT[id].emoji + ' ' + MUT[id].name + ' ×' + MUT[id].coins + ' ').join('') + DRAGON_KINDS[ownDragons[i]].name; return dragonNames[i] ? dragonNames[i] + ' (' + k + ')' : k + ' dragon'; }   // "Sparky (Ruby)" once it has a name
   function removeDragon(i) {                             // the dragon at ownDragons[i] is gone; everything after it moves up one
     const at = plotPets.findIndex((d) => d.index === i);
     if (at >= 0) scene.remove(plotPets.splice(at, 1)[0].root);
@@ -3979,8 +4089,7 @@ const World = (function () {
     if (d.collar) { d.root.remove(d.collar); d.collar = null; }
     const i = dragonOutfit[d.index];
     if (i >= 0 && OUTFITS[i]) { d.outfit = outfitModel(i); d.root.add(d.outfit); }
-    if (hasMut(d.index, 'lightning') && !d.mutL) { addSparks(d, sparkMatY); d.mutL = true; }   // Lightning mutation: yellow sparks crackle round it
-    if (hasMut(d.index, 'fire') && !d.mutF) { addSparks(d, sparkMatF); d.mutF = true; }        // Fire mutation: orange embers
+    if (dragonMutation[d.index] || d.fx) buildMutFx(d);   // what its mutations look like
     const nm = dragonNames[d.index];
     if (nm) {
       d.collar = new THREE.Group();
@@ -4689,7 +4798,7 @@ const World = (function () {
     const parts = [];
     if (fireResLeft() > 0) parts.push('Fire resistance ' + clock(fireResLeft()));
     if (radResLeft() > 0) parts.push('Radiation resistance ' + clock(radResLeft()));
-    if (fireStormOn()) parts.push('🔥 Fire storm ' + clock(fsLeft()));
+    Object.keys(EVENTS).forEach((id) => { if (eventOn(id)) parts.push(EVENTS[id].name + ' ' + clock(eventLeft(id))); });
     TREATS.forEach((t) => { if (treatLeft(t.id) > 0) parts.push(t.name + ' ' + clock(treatLeft(t.id))); });
     const txt = parts.join(' · ');
     if (txt !== effectShown) { effectShown = txt; effectEl.textContent = txt; effectEl.hidden = !txt; }
@@ -4959,11 +5068,7 @@ const World = (function () {
   seeAllBtn.addEventListener('click', (e) => { setSeeAll(!seeAllOn); if (e.detail > 0) seeAllBtn.blur(); });
   $('adminCommands').appendChild(seeAllBtn);
 
-  /* Admin command: start a fire storm now. */
-  const fsBtn = document.createElement('button');
-  fsBtn.type = 'button'; fsBtn.textContent = '🔥 Start a fire storm';
-  fsBtn.addEventListener('click', (e) => { startFireStorm(); toast('Fire storm started' + (netOnline ? ' for everyone!' : '!'), 3); if (e.detail > 0) fsBtn.blur(); });
-  $('adminCommands').appendChild(fsBtn);
+
 
   /* Admin command: restock the shops right now (the red stall's upgraders, all in stock). No server yet, so only
      for this admin's game; with a server it would restock for everyone. */
@@ -5461,24 +5566,32 @@ const World = (function () {
      Fire mutation for good: three times as fast to ride. Admins can start one whenever they like (for everyone, when
      there's a server). */
   const FS_PERIOD = 1800, FS_LEN = 300;                  // every 30 minutes, for 5 minutes
-  let fsUntil = 0, fsWas = false, fsSpawn = 0;
-  const fireballs = [], fbGeo = new THREE.SphereGeometry(0.9, 10, 8), fbMat = new THREE.MeshBasicMaterial({ color: 0xff6a10 }), fbCore = new THREE.MeshBasicMaterial({ color: 0xffe14a });
-  const fsLeft = () => Math.max(FS_LEN - (Date.now() / 1000) % FS_PERIOD, (fsUntil - Date.now()) / 1000, 0);
-  const fireStormOn = () => (Date.now() / 1000) % FS_PERIOD < FS_LEN || Date.now() < fsUntil;
-  function startFireStorm(by) {
-    fsUntil = Date.now() + FS_LEN * 1000;
-    if (by === undefined && isAdmin) netSend({ t: 'firestorm' });
-    if (by) toast(by + ' started a FIRE STORM!', 3);
+  /* All the sky events take turns through each half hour, 5 minutes each, the same for everyone; admins can start any
+     of them whenever they like. */
+  const EVENTS = { fire: { at: 0, name: '🔥 Fire storm' }, ufo: { at: 450, name: '🛸 UFO invasion' }, wind: { at: 900, name: '🌪️ Air jets' }, rocks: { at: 1350, name: '🪨 Rock fall' } };
+  const evUntil = {}, evWas = {};
+  const eventOn = (id) => ((Date.now() / 1000 - EVENTS[id].at) % FS_PERIOD + FS_PERIOD) % FS_PERIOD < FS_LEN || Date.now() < (evUntil[id] || 0);
+  const eventLeft = (id) => Math.max(FS_LEN - ((Date.now() / 1000 - EVENTS[id].at) % FS_PERIOD + FS_PERIOD) % FS_PERIOD, ((evUntil[id] || 0) - Date.now()) / 1000, 0);
+  function startEvent(id, by) {
+    if (!EVENTS[id]) return;
+    evUntil[id] = Date.now() + FS_LEN * 1000;
+    if (by === undefined && isAdmin) netSend({ t: 'event', kind: id });
+    if (by) toast(by + ' started: ' + EVENTS[id].name + '!', 3);
   }
-  function spawnFireball(x, z) {                         // anywhere on the island, at random (Adriana: "randomly go everywhere")
-    const target = null;
+  let fsUntil = 0, fsWas = false, fsSpawn = 0, rockSpawn = 0;
+  const rockGeo = new THREE.DodecahedronGeometry(1.1, 0), rockMat = new THREE.MeshLambertMaterial({ color: 0x77706a }), dustMat = new THREE.MeshBasicMaterial({ color: 0xb8a888, transparent: true, opacity: 0.6 });
+  const fireballs = [], fbGeo = new THREE.SphereGeometry(0.9, 10, 8), fbMat = new THREE.MeshBasicMaterial({ color: 0xff6a10 }), fbCore = new THREE.MeshBasicMaterial({ color: 0xffe14a });
+  const fsLeft = () => eventLeft('fire'), fireStormOn = () => eventOn('fire');
+  function startFireStorm(by) { startEvent('fire', by); }
+  function spawnFireball(x, z, kind) {                   // anywhere on the island, at random (Adriana: "randomly go everywhere"); kind 'rock' for the rock fall
+    const target = null, rock = kind === 'rock';
     if (x === undefined) for (let n = 0; n < 10; n++) { const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * 200; x = Math.cos(a) * r; z = Math.sin(a) * r; if (W.bil(H, x, z) > 0) break; }
-    const g = new THREE.Group(), ball = new THREE.Mesh(fbGeo, fbMat), core = new THREE.Mesh(fbGeo, fbCore);
+    const g = new THREE.Group(), ball = new THREE.Mesh(rock ? rockGeo : fbGeo, rock ? rockMat : fbMat), core = new THREE.Mesh(fbGeo, rock ? rockMat : fbCore);
     core.scale.set(0.55, 0.55, 0.55); g.add(ball); g.add(core);
-    for (let k = 1; k <= 4; k++) { const t = new THREE.Mesh(fbGeo, k % 2 ? fbMat : fbCore); t.scale.set(0.5 / k + 0.15, 0.5 / k + 0.15, 0.5 / k + 0.15); t.position.set(0, k * 1.1, 0); g.add(t); }   // a fiery tail
+    for (let k = 1; k <= 4; k++) { const t = new THREE.Mesh(fbGeo, rock ? dustMat : k % 2 ? fbMat : fbCore); t.scale.set(0.5 / k + 0.15, 0.5 / k + 0.15, 0.5 / k + 0.15); t.position.set(0, k * 1.1, 0); g.add(t); }   // a fiery tail
     const ox = (Math.random() - 0.5) * 30, oz = (Math.random() - 0.5) * 30;
     g.position.set(x + ox, 90, z + oz); scene.add(g);
-    fireballs.push({ g, target, x, z, ox, oz, t: 0, boom: null });
+    fireballs.push({ g, target, x, z, ox, oz, t: 0, boom: null, rock });
   }
   function fireStormStep(dt) {
     const on = started && fireStormOn();
@@ -5487,6 +5600,8 @@ const World = (function () {
       if (on) toast('🔥 FIRE STORM! Fireballs are falling! A dragon hit by one gets the FIRE mutation: 3× speed!', 5);
     }
     if (on) { fsSpawn -= dt; if (fsSpawn <= 0 && fireballs.length < 30) { fsSpawn = 0.2; spawnFireball(); } }
+    if (started && eventOn('rocks')) { rockSpawn -= dt; if (rockSpawn <= 0 && fireballs.length < 30) { rockSpawn = 0.25; spawnFireball(undefined, undefined, 'rock'); } }
+    eventStarts(); ufoStep(dt); windStep(dt); randomMutations(dt);
     for (let i = fireballs.length - 1; i >= 0; i--) {
       const f = fireballs[i];
       if (f.boom) {                                      // the blast: grows and fades
@@ -5501,15 +5616,134 @@ const World = (function () {
       f.g.rotation.z = Math.atan2(f.ox, 90) * 0.5;
       if (k < 1) continue;
       scene.remove(f.g);
-      const m = new THREE.Mesh(fbGeo, new THREE.MeshBasicMaterial({ color: 0xffa020, transparent: true, opacity: 0.8 })); m.position.copy(f.g.position); scene.add(m); f.boom = { m, t: 0 };
+      const m = new THREE.Mesh(fbGeo, new THREE.MeshBasicMaterial({ color: f.rock ? 0xb8a888 : 0xffa020, transparent: true, opacity: 0.8 })); m.position.copy(f.g.position); scene.add(m); f.boom = { m, t: 0 };
       const hitPet = plotPets.find((d) => !d.ridden && !d.loose && !d.homing && Math.hypot(d.root.position.x - f.g.position.x, d.root.position.z - f.g.position.z) < 3);   // landed on one of your dragons?
       if (hitPet && ownDragons[hitPet.index]) {
         f.target = hitPet; const i2 = f.target.index;
-        if (!hasMut(i2, 'fire')) { addMut(i2, 'fire'); saveProgress(); dressPet(f.target); renderInventory(); toast('🔥 A fireball hit your ' + DRAGON_KINDS[ownDragons[i2]].name + ' dragon! It got the FIRE mutation: 3× speed!', 5); }
+        giveMutation(f.target, f.rock ? 'giant' : 'fire', f.rock ? '🪨 A rock fell on your ' : '🔥 A fireball hit your ');
       }
-      if (Math.hypot(p.x - f.g.position.x, p.z - f.g.position.z) < 2.2 && Math.abs(p.y - f.g.position.y) < 3 && !p.dungeon) { p.vy = 8; p.onGround = false; toast('Ouch! A fireball!', 2); }
+      if (Math.hypot(p.x - f.g.position.x, p.z - f.g.position.z) < 2.2 && Math.abs(p.y - f.g.position.y) < 3 && !p.dungeon) { p.vy = 8; p.onGround = false; toast(f.rock ? 'Ouch! A rock!' : 'Ouch! A fireball!', 2); }
     }
   }
+
+  function giveMutation(d, id, why) {                    // a dragon on your plot gets a mutation (once)
+    const i = d.index, m = MUT[id];
+    if (!m || !ownDragons[i] || hasMut(i, id)) return false;
+    addMut(i, id); saveProgress(); dressPet(d); renderInventory();
+    if (id === 'giant') { const ps = petSize(d); d.root.scale.set(ps, ps, ps); }
+    toast((why ? '' : m.emoji + ' ') + (why || 'Your ') + DRAGON_KINDS[ownDragons[i]].name + ' dragon! It got the ' + m.name.toUpperCase() + ' mutation: ×' + m.coins + ' coins' + (m.speed ? ', ' + m.speed + '× speed' : '') + (m.size ? ', twice as big' : '') + '!', 5);
+    return true;
+  }
+  function eventStarts() {                               // a message when an event begins (and the orange sky for fire)
+    Object.keys(EVENTS).forEach((id) => {
+      const on = started && eventOn(id);
+      if (on === !!evWas[id]) return;
+      evWas[id] = on;
+      if (!on) return;
+      if (id === 'ufo') toast('🛸 UFO INVASION! If a UFO\'s green beam shines on your dragon, it gets the UFO mutation!', 5);
+      if (id === 'wind') toast('🌪️ AIR JETS! Air is blasting up from the ground. A dragon caught in one gets the DIRT mutation!', 5);
+      if (id === 'rocks') toast('🪨 ROCK FALL! A dragon hit by a falling rock becomes a GIANT: twice as big!', 5);
+    });
+  }
+  /* UFOs: three saucers glide around the island, stop, and shine a green beam down for a few seconds. Any dragon of yours in
+     the beam gets the UFO mutation. Some of their stops are over the plots in town. */
+  const ufos = [];
+  function makeUfo() {
+    const g = new THREE.Group(), disc = new THREE.Mesh(fxGeo.aura, new THREE.MeshLambertMaterial({ color: 0xc0c4c8 })); disc.scale.set(4, 0.8, 4); g.add(disc);
+    const dome = new THREE.Mesh(fxGeo.aura, fxMat(0x7dff3a, 0.75)); dome.scale.set(1.7, 1.2, 1.7); dome.position.y = 0.6; g.add(dome);
+    for (let k = 0; k < 8; k++) { const l = new THREE.Mesh(fxGeo.ball, fxMat(k % 2 ? 0xffe14a : 0xff4fa8)); l.scale.set(2.5, 2.5, 2.5); l.position.set(Math.cos(k * 0.785) * 3.6, -0.1, Math.sin(k * 0.785) * 3.6); g.add(l); }
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 4.5, 30, 14, 1, true), fxMat(0x7dff3a, 0.3)); beam.position.y = -15; beam.visible = false; g.add(beam);
+    scene.add(g);
+    const a = Math.random() * 6.28, r = Math.random() * 150;
+    return { g, beam, x: Math.cos(a) * r, z: Math.sin(a) * r, tx: 0, tz: 0, beamT: 0, wait: Math.random() * 2 };
+  }
+  function ufoTarget(u) {
+    if (Math.random() < 0.4) { const w = plotWorld(Math.floor(Math.random() * 7), (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6); u.tx = w.x; u.tz = w.z; }
+    else { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 190; u.tx = Math.cos(a) * r; u.tz = Math.sin(a) * r; }
+  }
+  function ufoStep(dt) {
+    const on = started && eventOn('ufo');
+    if (!on) { while (ufos.length) scene.remove(ufos.pop().g); return; }
+    while (ufos.length < 3) { const u = makeUfo(); ufoTarget(u); ufos.push(u); }
+    for (const u of ufos) {
+      const gy = Math.max(W.bil(H, u.x, u.z), 0) + 30;
+      if (u.beamT > 0) {                                 // beaming down
+        u.beamT -= dt; u.beam.visible = true; u.beam.material.opacity = 0.22 + Math.sin(u.beamT * 20) * 0.08;
+        plotPets.forEach((d) => { if (!d.ridden && !d.loose && !d.homing && Math.hypot(d.root.position.x - u.x, d.root.position.z - u.z) < 4.5) giveMutation(d, 'ufo', '🛸 A UFO beamed your '); });
+        if (u.beamT <= 0) { u.beam.visible = false; ufoTarget(u); }
+      } else {
+        const dx = u.tx - u.x, dz = u.tz - u.z, dist = Math.hypot(dx, dz), st = Math.min(dist, 28 * dt);
+        if (dist > 0.5) { u.x += dx / dist * st; u.z += dz / dist * st; } else u.beamT = 3.5;
+      }
+      u.g.position.set(u.x, gy + Math.sin(Date.now() / 400 + u.x) * 0.5, u.z); u.g.rotation.y += dt * 1.5;
+    }
+  }
+  /* Air jets: columns of air blast up from the ground here and there for a few seconds, throwing dirt about. A dragon of
+     yours standing in one gets the Dirt mutation. Some come up on the plots. */
+  const jets = [];
+  function windStep(dt) {
+    const on = started && eventOn('wind');
+    if (on) {
+      windStep.t = (windStep.t || 0) - dt;
+      if (windStep.t <= 0 && jets.length < 14) {
+        windStep.t = 0.45;
+        let x, z;
+        if (Math.random() < 0.35) { const w = plotWorld(Math.floor(Math.random() * 7), (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8); x = w.x; z = w.z; }
+        else { for (let n = 0; n < 10; n++) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 190; x = Math.cos(a) * r; z = Math.sin(a) * r; if (W.bil(H, x, z) > 0) break; } }
+        spawnJet(x, z);
+      }
+    }
+    for (let i = jets.length - 1; i >= 0; i--) {
+      const j = jets[i]; j.t += dt;
+      j.bits.forEach((m, k) => { const q = (j.t * 1.2 + k / 14) % 1, a = k * 2.4 + j.t * 5; m.position.set(Math.cos(a) * (0.6 + q * 1.5), q * 9, Math.sin(a) * (0.6 + q * 1.5)); });
+      plotPets.forEach((d) => { if (!d.ridden && !d.loose && !d.homing && Math.hypot(d.root.position.x - j.x, d.root.position.z - j.z) < 2.6) giveMutation(d, 'dirt', '🌪️ An air jet blasted your '); });
+      if (Math.hypot(p.x - j.x, p.z - j.z) < 1.8 && !p.dungeon && p.onGround) { p.vy = 14; p.onGround = false; }   // it throws you up in the air too
+      if (j.t > 3.5) { scene.remove(j.g); jets.splice(i, 1); }
+    }
+  }
+  function spawnJet(x, z) {
+        const g = new THREE.Group(), y = Math.max(W.bil(H, x, z), 0);
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 0.8, 9, 12, 1, true), fxMat(0xe8f0f8, 0.25)); col.position.y = 4.5; g.add(col);
+        const bits = []; for (let k = 0; k < 14; k++) { const m = new THREE.Mesh(fxGeo.clod, fxMat([0x6b4a2b, 0x8a6a45, 0x4a3320][k % 3])); m.scale.set(3, 3, 3); g.add(m); bits.push(m); }
+        g.position.set(x, y, z); scene.add(g);
+        jets.push({ g, bits, x, z, t: 0 });
+  }
+  /* Now and then a dragon on your plot just mutates by itself (once a minute, each has a small chance). Rarer mutations
+     come up less often: common 60%, uncommon 27%, rare 10%, legendary 3%. */
+  const RANDOM_CHANCE = 0.01, TIER_ODDS = [0, 60, 27, 10, 3];
+  function rollMutation() {
+    let r = Math.random() * 100, tier = 1;
+    for (let t = 1; t <= 4; t++) { r -= TIER_ODDS[t]; if (r < 0) { tier = t; break; } }
+    const list = MUTATIONS.filter((m) => m.got === 'random' && m.tier === tier);
+    return list[Math.floor(Math.random() * list.length)].id;
+  }
+  function randomMutations(dt) {
+    if (!started || myPlot < 0) return;
+    randomMutations.t = (randomMutations.t || 60) - dt;
+    if (randomMutations.t > 0) return;
+    randomMutations.t = 60;
+    plotPets.forEach((d) => { if (!d.loose && !d.ridden && Math.random() < RANDOM_CHANCE) giveMutation(d, rollMutation(), '✨ Something strange happened to your '); });
+  }
+
+  /* Admin commands: start any event, and give any mutation. */
+  const evRow = adminSection('Start an event (5 minutes)');
+  Object.keys(EVENTS).forEach((id) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'small'; b.textContent = EVENTS[id].name;
+    b.addEventListener('click', (e) => { startEvent(id); toast(EVENTS[id].name + ' started' + (netOnline ? ' for everyone!' : '!'), 3); if (e.detail > 0) b.blur(); });
+    evRow.appendChild(b);
+  });
+  const mutRow = adminSection('Give a mutation'), mutPick = document.createElement('select'), mutBtn = document.createElement('button');
+  MUTATIONS.forEach((m) => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.emoji + ' ' + m.name + ' ×' + m.coins; mutPick.appendChild(o); });
+  mutPick.setAttribute('aria-label', 'Mutation to give'); mutBtn.type = 'button'; mutBtn.className = 'small'; mutBtn.textContent = 'Give';
+  mutRow.appendChild(mutPick); mutRow.appendChild(mutBtn);
+  function adminGiveMutation(id) {                       // to the dragon you're riding, or a random dragon on your plot without it
+    if (!isAdmin || !started) return;
+    const pool = riding ? [riding] : plotPets.filter((d) => !d.loose && !hasMut(d.index, id));
+    if (!pool.length) { toast(myPlot < 0 ? 'Claim a plot first, or ride a dragon.' : 'Every dragon on your plot already has that one.', 3); return; }
+    const d = pool[Math.floor(Math.random() * pool.length)];
+    if (!giveMutation(d, id, '⭐ An admin gave your ')) toast('That dragon already has it.', 3);
+  }
+  mutBtn.addEventListener('click', (e) => { adminGiveMutation(mutPick.value); if (e.detail > 0) mutBtn.blur(); });
 
   /* ---------- Multiplayer ---------- */
   /* Adriana's request: everyone who plays joins the same server, unless all 7 plots there are taken; then the next of
@@ -5594,6 +5828,7 @@ const World = (function () {
     else if (m.t === 'chat') addChat(m.name + (m.admin ? ' (Admin)' : ''), m.text);
     else if (m.t === 'announce') showAnnouncement(m.name, m.text);
     else if (m.t === 'firestorm') startFireStorm(m.name || m.by || 'An admin');
+    else if (m.t === 'event') startEvent(m.kind, m.by || 'An admin');
     else if (m.t === 'zapped') {                          // an admin's storm dragon hit you with lightning: bounced backwards
       toast('⚡ ZAP! ' + m.by + '\'s storm dragon bounced you backwards!', 3);
       for (let k = 0; k < 12; k++) if (!p.dungeon) tryMove(m.dx * 0.8, m.dz * 0.8);
@@ -5711,7 +5946,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, rollMutation, spawnJet, adminGiveMutation, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

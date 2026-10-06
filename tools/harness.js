@@ -39,12 +39,12 @@ class Matrix4 { constructor() { this.e = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0,
   compose(p, q, s) { if (!(p instanceof Vector3) || !(s instanceof Vector3) || !q || !q.eul) throw new Error('compose args');
     const m = new Matrix4().makeTranslation(p.x, p.y, p.z).multiply(Matrix4.rot('x', q.eul.x)).multiply(Matrix4.rot('y', q.eul.y)).multiply(Matrix4.rot('z', q.eul.z)).multiply(new Matrix4().makeScale(s.x, s.y, s.z)); this.e = m.e; return this; }
   apply(x, y, z) { const e = this.e; return [e[0] * x + e[1] * y + e[2] * z + e[3], e[4] * x + e[5] * y + e[6] * z + e[7], e[8] * x + e[9] * y + e[10] * z + e[11]]; } }
-class Vector3 { constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; } set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
+class Vector3 { clone() { return new Vector3(this.x, this.y, this.z); } constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; } set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
   normalize() { const l = Math.hypot(this.x, this.y, this.z) || 1; this.x /= l; this.y /= l; this.z /= l; return this; } copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; }
   multiplyScalar(s) { this.x *= s; this.y *= s; this.z *= s; return this; } }
 class Color { constructor(v) { this.r = this.g = this.b = 1; if (v !== undefined) this.set(v); }
   set(v) { if (typeof v === 'string') { if (!/^#[0-9a-f]{6}$/i.test(v)) throw new Error('bad colour string ' + v); v = parseInt(v.slice(1), 16); } if (typeof v !== 'number' || isNaN(v)) throw new Error('bad colour'); this.r = ((v >> 16) & 255) / 255; this.g = ((v >> 8) & 255) / 255; this.b = (v & 255) / 255; return this; }
-  setScalar(v) { this.r = this.g = this.b = v; return this; } clone() { return new Color().copy(this); } multiplyScalar(s) { this.r *= s; this.g *= s; this.b *= s; return this; }
+  setScalar(v) { this.r = this.g = this.b = v; return this; } clone() { return new Color().copy(this); } multiplyScalar(s) { this.r *= s; this.g *= s; this.b *= s; return this; } setHex(v) { return this.set(v); } setHSL(h, s, l) { const q = l < 0.5 ? l * (1 + s) : l + s - l * s, pp = 2 * l - q, f = (t) => { t = (t % 1 + 1) % 1; return t < 1 / 6 ? pp + (q - pp) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? pp + (q - pp) * (2 / 3 - t) * 6 : pp; }; this.r = f(h + 1 / 3); this.g = f(h); this.b = f(h - 1 / 3); return this; }
   copy(c) { this.r = c.r; this.g = c.g; this.b = c.b; return this; } lerp(c, t) { this.r += (c.r - this.r) * t; this.g += (c.g - this.g) * t; this.b += (c.b - this.b) * t; return this; }
   setRGB(r, g, b) { if ([r, g, b].some((v) => typeof v !== 'number' || isNaN(v))) throw new Error('bad colour'); this.r = r; this.g = g; this.b = b; return this; } }
 class Obj { constructor() { this.position = new Vector3(); this.rotation = { x: 0, y: 0, z: 0, order: 'XYZ', set(x, y, z) { this.x = x; this.y = y; this.z = z; } }; this.scale = new Vector3(1, 1, 1); this.children = []; this.matrix = null; this.visible = true; }
@@ -54,7 +54,7 @@ const allMeshes = [];
 class Mesh extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; allMeshes.push(this); } }
 class InstancedMesh extends Mesh { constructor(g, m, n) { super(g, m); if (!(g instanceof Geo) || !g.attributes.position) throw new Error('instanced geometry'); this.count = n; this.items = []; this.instanceMatrix = {}; this.instanceColor = null; meshes.push(this); }
   setMatrixAt(i, m) { this.items[i] = m; } setColorAt(i, c) { this.instanceColor = this.instanceColor || {}; } }
-const mat = class { constructor(o) { o = o || {}; Object.assign(this, o); this.color = new Color(o.color === undefined ? 0xffffff : o.color); } };
+const mat = class { constructor(o) { o = o || {}; Object.assign(this, o); this.color = new Color(o.color === undefined ? 0xffffff : o.color); if (o.emissive !== undefined) this.emissive = new Color(o.emissive); } clone() { const m = new mat(); Object.assign(m, this); m.color = this.color.clone(); if (this.emissive) m.emissive = this.emissive.clone(); return m; } };
 const tex = () => ({ repeat: { set() {} }, offset: { y: 0 } });
 const THREE = {
   WebGLRenderer: class { setPixelRatio() {} setSize() {} render() {} },
@@ -1060,6 +1060,39 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     if (I.decorMeshes().length !== d0 + I.ADMIN_DECOR.length) throw new Error('admin decorations should go on the plot');
     window.fire('keydown', ev({ code: 'Escape' }));
   } else if (I.allOpen()) throw new Error('only admins can open the admin shop');
+  for (let k = 0; k < 60 * 310; k++) I.fireStormStep(1 / 60);
+  const pickWithout = (id) => { const ok = I.plotPets.filter((q) => !q.loose && !q.ridden), d = ok.find((q) => !I.hasMut(q.index, id)) || ok[0]; I.dragonMutation[d.index] = (I.dragonMutation[d.index] || '').split(' ').filter((w) => w && w !== id).join(' '); I.buildMutFx(d); return d; };
+  { // every mutation: its look builds and moves, and the coins multiply
+    const d = I.plotPets.find((q) => !q.loose && !q.ridden), i = d.index, was = I.dragonMutation[i], base = I.DRAGON_COINS[d.kind] * (I.dragonUpgrades[i] >= 0 ? I.UPGRADERS[I.dragonUpgrades[i]].boost : 1);
+    I.MUTATIONS.forEach((m) => { I.dragonMutation[i] = m.id; I.buildMutFx(d); for (let k = 0; k < 20; k++) I.mutStep(d, 1 / 30, k / 30); });
+    console.log(I.MUTATIONS.length, 'mutations all build and move:', I.MUTATIONS.map((m) => m.emoji + m.name + '×' + m.coins).join(' '));
+    I.dragonMutation[i] = 'cosmic golden'; console.log('Cosmic + Golden on a', d.kind, 'dragon: coins', base, '->', I.dragonValue(i), '(×5 ×3)');
+    if (I.dragonValue(i) !== base * 15) throw new Error('mutations should multiply the coins');
+    I.dragonMutation[i] = was; I.buildMutFx(d);
+    const n = {}; for (let k = 0; k < 20000; k++) { const id = I.rollMutation(); const t = I.MUT[id].tier; n[t] = (n[t] || 0) + 1; }
+    console.log('random mutations by rarity: common', (n[1] / 200).toFixed(0) + '%, uncommon', (n[2] / 200).toFixed(0) + '%, rare', (n[3] / 200).toFixed(0) + '%, legendary', (n[4] / 200).toFixed(0) + '%');
+  }
+  { // the rock fall: a rock on a dragon makes it a Giant
+    const d = pickWithout('giant'), s0 = d.root.scale.x; d.wait = 999;
+    I.startEvent('rocks'); I.spawnFireball(d.root.position.x, d.root.position.z, 'rock'); let k = 0; while (k++ < 300 && !I.hasMut(d.index, 'giant')) I.fireStormStep(1 / 60);
+    for (let f = 0; f < 30; f++) I.update(1 / 60, 0);
+    console.log('rock fall: a rock lands on a', d.kind, 'dragon: Giant', I.hasMut(d.index, 'giant'), '| size', s0.toFixed(2), '->', d.root.scale.x.toFixed(2), '|', said());
+    if (!I.hasMut(d.index, 'giant') || d.root.scale.x < s0 * 1.9) throw new Error('a rock should make the dragon twice as big');
+  }
+  { // UFOs: the green beam gives the UFO mutation
+    const d = pickWithout('ufo'); d.wait = 999;
+    I.startEvent('ufo'); I.fireStormStep(1 / 60); console.log('UFO invasion: UFOs in the sky', I.ufos.length);
+    const u = I.ufos[0]; u.x = u.tx = d.root.position.x; u.z = u.tz = d.root.position.z; u.beamT = 3; I.fireStormStep(1 / 60);
+    console.log('  a beam shines on a', d.kind, 'dragon: UFO mutation', I.hasMut(d.index, 'ufo'), '| beam showing', u.beam.visible, '|', said());
+    if (!I.hasMut(d.index, 'ufo')) throw new Error('the UFO beam should give the UFO mutation');
+  }
+  { // air jets: the Dirt mutation
+    const d = pickWithout('dirt'); d.wait = 999;
+    I.startEvent('wind'); I.spawnJet(d.root.position.x, d.root.position.z); I.fireStormStep(1 / 60);
+    console.log('air jets: one blasts up under a', d.kind, 'dragon: Dirt', I.hasMut(d.index, 'dirt'), '| jets', I.jets.length, '|', said());
+    if (!I.hasMut(d.index, 'dirt')) throw new Error('an air jet should give the Dirt mutation');
+  }
+  console.log('admin: give a mutation (admin ' + I.admin() + ')'); { const before = I.plotPets.filter((q) => I.hasMut(q.index, 'angel')).length; I.adminGiveMutation('angel'); const after = I.plotPets.filter((q) => I.hasMut(q.index, 'angel')).length; console.log('  angels on my plot', before, '->', after); if (I.admin() ? after !== before + 1 : after !== before) throw new Error('only admins can give mutations'); }
   for (let k = 0; k < 60 * 310; k++) I.fireStormStep(1 / 60);
 }
 
