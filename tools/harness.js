@@ -334,8 +334,10 @@ els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear();
 if (I.myPlot() >= 0 || !document.body.classList.contains('playing')) { els.leave.fire('click', ev({ detail: 1 })); document.getElementById('confirm').hidden = true; els.name.value = MODE === 'admin' ? AN : I.name(); els.name.fire('input', ev({})); els.code.value = AC; els.start.fire('click', ev({ pointerType: 'mouse' })); }   // start with no plot
 { const where = {}, pr = I.eggs.find((e) => e.tier === 4), keep = pr.spot;
   for (let k = 0; k < 300; k++) { pr.taken = true; I.goTo(k % 8); I.eggsRespawn(pr); stand(pr.spot); const z = I.zoneName(); where[z] = (where[z] || 0) + 1; }
-  console.log('all hiding places:', I.eggSpots.length, '| where the Prismatic egg turned up over 300 respawns:', JSON.stringify(where));
-  if (Object.keys(where).length < 5) throw new Error('the prismatic egg should turn up all over the island'); I.goTo(0); }
+  console.log('all hiding places:', I.eggSpots.length, '(hard places', I.hardSpots.length + ') | where the Prismatic egg turned up over 300 respawns:', JSON.stringify(where));
+  if (Object.keys(where).some((z) => !['Mountains', 'Snowy peak', 'Crystal cave', 'Dungeon'].includes(z)) || Object.keys(where).length < 3) throw new Error('prismatic eggs belong in the hard places');
+  const cw = {}, cm = I.eggs.find((e) => e.tier === 0); for (let k = 0; k < 300; k++) { cm.taken = true; I.goTo(k % 8); I.eggsRespawn(cm); stand(cm.spot); const z = I.zoneName(); cw[z] = (cw[z] || 0) + 1; }
+  console.log('where a Common egg turned up over 300 respawns:', JSON.stringify(cw)); if (Object.keys(cw).length < 5) throw new Error('other eggs should still turn up anywhere'); I.goTo(0); }
 const common = I.eggs.find((e) => e.tier === 0);
 stand(common.spot); tick(0.2);
 console.log('touch an egg with no plot : carrying', !!I.carrying(), '| message', said());
@@ -734,6 +736,39 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     if (document.body.classList.contains('playing')) throw new Error('a banned name got in');
     playAgain(); reclaim(); I.banned.length = 0;
   } else if (I.eggs.length !== nE) throw new Error('only admins can spawn eggs');
+}
+
+// ---- the yellow stall: the Everything Shop ----
+{
+  let T = 99000; const hud = (n = 12) => { for (let k = 0; k < n; k++) raf(T += 16); };
+  const lab = () => document.getElementById('shopOpenLabel').textContent;
+  if (I.riding()) I.dismount(true);
+  I.goTo(7); I.p.x = I.allFront.x; I.p.z = I.allFront.z; I.p.y = 6.3; hud();
+  console.log('at the yellow stall: button', JSON.stringify(lab()), '| sign', JSON.stringify(I.signLabels[11]));
+  if (lab() !== 'Open the Everything Shop') throw new Error('no Everything Shop button at the yellow stall');
+  window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); hud(2);
+  const tabs = els.allTabs.children, rows = () => els.allList.children.filter((r) => r.className === 'uprow'), buyBtn = (r) => r.children[2], name = (r) => r.children[1].children[0].textContent;
+  console.log('shop open', I.allOpen(), '| tabs:', tabs.map((t) => t.textContent).join(', '), '| treats:', rows().map(name).join(', '));
+  I.setCoins(100); buyBtn(rows()[0]).fire('click', ev({})); console.log('Coin Cookie with 100 coins:', said());
+  I.setCoins(1e6); const r0 = I.coinRate(), sp0 = I.treatSpeed(); buyBtn(rows()[0]).fire('click', ev({})); buyBtn(rows()[2]).fire('click', ev({}));
+  console.log('buy a Coin Cookie and a Fire Pepper: coins x' + I.treatCoins(), '| dragon speed +' + Math.round(I.treatSpeed() * 100) + '% | under the coins after a moment:', (hud(12), JSON.stringify(els.effect.textContent)));
+  if (I.treatCoins() !== 2 || I.treatSpeed() !== 0.25) throw new Error('treats should boost coins and speed');
+  { const c0 = I.coins(); for (let f = 0; f < 180; f++) I.earn(1 / 60); console.log('one payday with the cookie:', (I.coins() - c0).toFixed(0), 'coins (', r0, 'x 2 )'); }
+  tabs[1].fire('click', ev({})); const d0 = I.decorMeshes().length; buyBtn(rows()[3]).fire('click', ev({})); buyBtn(rows()[0]).fire('click', ev({}));
+  console.log('decorations tab:', rows().map(name).join(', '), '| bought fountain and flowers: on the plot', d0, '->', I.decorMeshes().length, '| fountain button now', JSON.stringify(buyBtn(rows()[3]).textContent));
+  if (I.decorMeshes().length !== d0 + 2) throw new Error('decorations should appear on the plot');
+  tabs[2].fire('click', ev({})); buyBtn(rows()[4]).fire('click', ev({}));
+  const pickRows = rows(), firstPet = I.plotPets[0], idx = firstPet.index;
+  console.log('outfits tab: bought a Crown -> asks', JSON.stringify(els.allList.children[0].textContent), '|', pickRows.length, 'dragons to choose from');
+  pickRows[idx].children[2].fire('click', ev({}));
+  console.log('put it on dragon', idx, '(' + I.ownDragons[idx] + '): wearing', I.OUTFITS[I.dragonOutfit[idx]].name, '| model on the plot has it', !!firstPet.outfit, '| crowns left to put on', I.outfitsOwned[4]);
+  if (I.dragonOutfit[idx] !== 4 || !firstPet.outfit) throw new Error('the outfit should go on the dragon');
+  tabs[2].fire('click', ev({})); buyBtn(rows()[0]).fire('click', ev({})); rows()[idx].children[2].fire('click', ev({}));
+  console.log('then a Party hat on the same dragon: wearing', I.OUTFITS[I.dragonOutfit[idx]].name, '| the crown came back:', I.outfitsOwned[4]);
+  window.fire('keydown', ev({ code: 'Escape' })); console.log('Escape closes it:', !I.allOpen());
+  els.leave.fire('click', ev({ detail: 1 })); console.log('leave: decorations taken off the plot', I.decorMeshes().length === 0);
+  playAgain(); reclaim(); console.log('back on a plot: decorations', I.decorMeshes().length, '| saved', store['mutation-mayhem-decor'], '| outfit saved', JSON.parse(store['mutation-mayhem-dragon-outfits'])[idx]);
+  for (const k in I.treatUntil) delete I.treatUntil[k]; I.setCoins(0);
 }
 
 // ---- admin announcement ----
