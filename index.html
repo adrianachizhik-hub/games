@@ -459,13 +459,16 @@
   #admin.open #adminPanel { visibility: visible; transition-delay: 0s; }
   @media (max-height: 470px) { #adminPanel { max-height: calc(100vh - clamp(92px, 17vmin, 132px) - 96px); } }   /* a phone on its side: let the open panel cover Jump */
   #adminPanel h2 { margin: 0 0 10px; font-size: 1.25rem; font-weight: 600; line-height: 1.1; }
-  #adminCommands { display: grid; gap: 8px; }
+  #adminCommands { display: grid; gap: 6px; }
+  body:not(.touch) #adminPanel { max-height: calc(100vh - clamp(92px, 17vmin, 132px) - 120px); }   /* computers: down to just above Leave */
+  #adminPanel .more { position: sticky; bottom: -16px; margin: 6px -16px -16px; padding: 6px 0 8px; text-align: center; font-size: 0.85rem; font-weight: 700; background: linear-gradient(transparent, var(--panel) 45%); pointer-events: none; }
+  #adminPanel .more[hidden] { display: none; }
   #adminCommands button {
     font: inherit;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     text-align: left;
-    padding: 9px 14px;
+    padding: 6px 12px;
     border-radius: 12px;
     border: 3px solid #0d2f37;
     background: #fff;
@@ -905,6 +908,7 @@
     <h2>Admin commands</h2>
     <div id="adminCommands"></div>
     <p class="none">No commands yet. Restocking shops, giving coins and the others will go here.</p>
+    <p class="more" id="adminMore" hidden>More below ▾</p>
   </div>
 </div>
 
@@ -3735,10 +3739,17 @@ const World = (function () {
   $('shopTurn').addEventListener('click', () => { shopTurnTo = shopTurnTo ? 0 : Math.PI; });
 
   /* The admin panel: the arrow on the right edge opens and closes it. Commands get added to #adminCommands later. */
-  const adminEl = $('admin'), adminTab = $('adminTab');
+  const adminEl = $('admin'), adminTab = $('adminTab'), adminPanel = $('adminPanel');
+  function moreHint() {                                  // "More below" while there are commands further down the panel
+    const more = adminPanel.scrollHeight - adminPanel.clientHeight - adminPanel.scrollTop > 12;
+    if ($('adminMore').hidden === more) $('adminMore').hidden = !more;
+  }
+  adminPanel.addEventListener('scroll', moreHint);
+  window.addEventListener('resize', moreHint);
   adminTab.addEventListener('click', (e) => {
     const open = !adminEl.classList.contains('open');
     if (open) adminEl.classList.add('open'); else adminEl.classList.remove('open');
+    moreHint();
     adminTab.setAttribute('aria-expanded', String(open));
     adminTab.setAttribute('aria-label', open ? 'Close admin commands' : 'Open admin commands');
     if (e.detail > 0) adminTab.blur();                    // after a click or tap, hand the keys back to walking
