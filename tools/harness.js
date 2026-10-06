@@ -1069,8 +1069,8 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     I.dragonMutation[i] = 'cosmic golden'; console.log('Cosmic + Golden on a', d.kind, 'dragon: coins', base, '->', I.dragonValue(i), '(×5 ×3)');
     if (I.dragonValue(i) !== base * 15) throw new Error('mutations should multiply the coins');
     I.dragonMutation[i] = was; I.buildMutFx(d);
-    const n = {}; for (let k = 0; k < 20000; k++) { const id = I.rollMutation(); const t = I.MUT[id].tier; n[t] = (n[t] || 0) + 1; }
-    console.log('random mutations by rarity: common', (n[1] / 200).toFixed(0) + '%, uncommon', (n[2] / 200).toFixed(0) + '%, rare', (n[3] / 200).toFixed(0) + '%, legendary', (n[4] / 200).toFixed(0) + '%');
+    console.log('events:', I.EVENT_LIST.length, '| every mutation has its own event:', I.MUTATIONS.every((m) => I.EVENTS[m.id]), '| next up:', I.nextEvent().e.name, 'in', I.nextEvent().inS.toFixed(0), 's');
+    if (!I.MUTATIONS.every((m) => I.EVENTS[m.id])) throw new Error('every mutation needs an event');
   }
   { // the rock fall: a rock on a dragon makes it a Giant
     const d = pickWithout('giant'), s0 = d.root.scale.x; d.wait = 999;
@@ -1088,11 +1088,34 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   }
   { // air jets: the Dirt mutation
     const d = pickWithout('dirt'); d.wait = 999;
-    I.startEvent('wind'); I.spawnJet(d.root.position.x, d.root.position.z); I.fireStormStep(1 / 60);
+    I.startEvent('dirt'); I.spawnJet(d.root.position.x, d.root.position.z); I.fireStormStep(1 / 60);
     console.log('air jets: one blasts up under a', d.kind, 'dragon: Dirt', I.hasMut(d.index, 'dirt'), '| jets', I.jets.length, '|', said());
     if (!I.hasMut(d.index, 'dirt')) throw new Error('an air jet should give the Dirt mutation');
   }
-  console.log('admin: give a mutation (admin ' + I.admin() + ')'); { const before = I.plotPets.filter((q) => I.hasMut(q.index, 'angel')).length; I.adminGiveMutation('angel'); const after = I.plotPets.filter((q) => I.hasMut(q.index, 'angel')).length; console.log('  angels on my plot', before, '->', after); if (I.admin() ? after !== before + 1 : after !== before) throw new Error('only admins can give mutations'); }
+  { // the volcano: magma rocks
+    const d = pickWithout('magma'); d.wait = 999; I.startEvent('magma');
+    I.spawnFireball(d.root.position.x, d.root.position.z, 'magma', I.crater); let k = 0; while (k++ < 400 && !I.hasMut(d.index, 'magma')) I.fireStormStep(1 / 60);
+    console.log('volcano at', I.VOLCANO.x, I.VOLCANO.z, '| a magma rock arcs onto a', d.kind, 'dragon after', (k / 60).toFixed(1), 's: Magma', I.hasMut(d.index, 'magma'), '|', said());
+    if (!I.hasMut(d.index, 'magma')) throw new Error('magma rocks should give the Magma mutation');
+  }
+  { // every event starts and runs without trouble, and gives its mutation
+    let got = 0; const errs = [];
+    I.EVENT_LIST.forEach((ev) => {
+      try {
+        const d = pickWithout(ev.id); d.wait = 999; I.startEvent(ev.id);
+        for (let k = 0; k < 30; k++) I.fireStormStep(1 / 60);
+        if (ev.kind === 'fall') I.spawnFireball(d.root.position.x, d.root.position.z, ev.id);
+        if (ev.kind === 'volcano') I.spawnFireball(d.root.position.x, d.root.position.z, ev.id, I.crater);
+        if (ev.kind === 'spot') I.spawnJet(d.root.position.x, d.root.position.z, ev.id);
+        if (ev.kind === 'fly') { const u = I.ufos.find((q) => q.ev.id === ev.id); u.x = u.tx = d.root.position.x; u.z = u.tz = d.root.position.z; u.beamT = 3; }
+        let k = 0; while (k++ < 60 * 8 && !I.hasMut(d.index, ev.id)) I.fireStormStep(1 / 60);
+        if (I.hasMut(d.index, ev.id)) got++; else errs.push(ev.id);
+      } catch (e) { errs.push(ev.id + ': ' + e.message); }
+    });
+    console.log('all', I.EVENT_LIST.length, 'events ran: gave their mutation', got, '| problems', JSON.stringify(errs));
+    if (errs.length) throw new Error('some events did not work: ' + errs.join(', '));
+  }
+  console.log('admin commands now:', els.adminCommands.children.filter((c) => c.className === 'adminhead').map((c) => c.textContent).join(' | '));
   for (let k = 0; k < 60 * 310; k++) I.fireStormStep(1 / 60);
 }
 

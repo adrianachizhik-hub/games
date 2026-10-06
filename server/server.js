@@ -103,8 +103,8 @@ function handle(pl, m) {
   } else if (m.t === 'announce') {
     const text = clean(m.text, 100);
     if (text && pl.admin) rooms.forEach((r) => broadcast(r, { t: 'announce', name: pl.name, text }, pl));   // admins speak to every server
-  } else if (m.t === 'event') {                       // an admin starts a sky event (fire, ufo, wind, rocks) for everyone, on every server
-    if (pl.admin && ['fire', 'ufo', 'wind', 'rocks'].includes(m.kind)) rooms.forEach((r) => broadcast(r, { t: 'event', kind: m.kind, by: pl.name }, pl));
+  } else if (m.t === 'event') {                       // an admin starts an event (one per mutation) for everyone, on every server
+    if (pl.admin && /^[a-z]{2,12}$/.test(String(m.kind))) rooms.forEach((r) => broadcast(r, { t: 'event', kind: m.kind, by: pl.name }, pl));
   } else if (m.t === 'firestorm') {                   // an admin starts a fire storm for everyone, on every server
     if (pl.admin) rooms.forEach((r) => broadcast(r, { t: 'firestorm', by: pl.name }, pl));
   } else if (m.t === 'zap') {                          // a storm dragon's lightning hit another player: they get bounced back
