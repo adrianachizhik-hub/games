@@ -72,7 +72,7 @@ const THREE = {
   TorusGeometry: class extends Geo { constructor(r, t, a, b) { if ([r, t, a, b].some((v) => typeof v !== "number" || isNaN(v))) throw new Error("torus args"); super(a * b); } }, CircleGeometry: class extends Geo { constructor(r, n) { if ([r, n].some((v) => typeof v !== "number" || isNaN(v))) throw new Error("circle args"); super(n); } },
   PlaneGeometry: class extends Geo { constructor(w, h, a = 1, b = 1) { super(); this.attributes.position = new Attr(new Float32Array((a + 1) * (b + 1) * 3), 3); } },
   MeshBasicMaterial: mat, MeshLambertMaterial: mat, MeshStandardMaterial: mat, MeshPhongMaterial: mat, SpriteMaterial: mat, PointsMaterial: mat,
-  Mesh, InstancedMesh, Sprite: class extends Obj {}, Points: class extends Obj {},
+  Mesh, InstancedMesh, Sprite: class extends Obj { constructor(m) { super(); this.material = m || new mat(); } }, Points: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m || new mat(); } },
   BackSide: 1, DoubleSide: 2, RepeatWrapping: 1000
 };
 function ctx2d(canvas) {
@@ -126,7 +126,7 @@ let MODE = process.env.MODE || 'other';
 const playAgain = () => { document.getElementById('confirm').hidden = true; if (MODE === 'admin') { els.name.value = AN; els.name.fire('input', ev({})); els.code.value = AC; } els.start.fire('click', ev({ pointerType: 'mouse' })); };   // Play, signing an admin back in
 if (MODE !== 'other' && !(AN && AC)) { console.log('ADMIN_NAME and ADMIN_CODE are not set: skipping the admin sign-in checks'); MODE = 'other'; }
 const flip = (s) => s.replace(/[a-z]/gi, (c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase())), st = () => 'started ' + document.body.classList.contains('playing') + ' | admin ' + I.admin() + ' | name ' + JSON.stringify(I.name()) + ' | tag ' + JSON.stringify(document.getElementById('who').textContent) + ' badge ' + JSON.stringify((document.getElementById('who').children[0] || {}).textContent) + ' | code box hidden ' + els.code.hidden + ' | message ' + JSON.stringify(els.codeMsg.hidden ? '' : els.codeMsg.textContent);
-els.code.hidden = true; els.codeMsg.hidden = true; els.admin.hidden = true; document.getElementById("confirm").hidden = true; document.getElementById("announce").hidden = true;   // hidden in the markup, as in the page
+els.code.hidden = true; els.codeMsg.hidden = true; els.admin.hidden = true; document.getElementById("confirm").hidden = true; document.getElementById("announce").hidden = true; document.getElementById("tutorial").hidden = true;   // hidden in the markup, as in the page
 if (MODE === 'admin') {
   els.name.value = AN.slice(0, -1); els.name.fire('input', ev({})); console.log('typing, one letter short :', st());
   els.name.value = flip(AN); els.name.fire('input', ev({})); console.log('admin name typed         :', st());
@@ -147,6 +147,20 @@ if (MODE === 'admin') {
   els.start.fire('click', ev({ pointerType: 'mouse' })); document.getElementById('confirmSure').fire('click', ev({}));
   console.log('Play, I\'m sure          :', st(), '| name locked', store['mutation-mayhem-name-locked'] === '1', 'as', JSON.stringify(store['mutation-mayhem-name']));
   if (!document.body.classList.contains('playing') || store['mutation-mayhem-name-locked'] !== '1') throw new Error('I\'m sure should start and lock the name');
+}
+{ // the tutorial: only the very first time on this device
+  const tut = document.getElementById('tutorial'), txt = () => document.getElementById('tutText').textContent;
+  if (MODE === 'admin' || process.env.SAVED === '1') { console.log('tutorial shown (admin or saved progress):', !tut.hidden); if (!tut.hidden) throw new Error('no tutorial for admins or returning players'); }
+  else {
+    console.log('tutorial, first time: shown', !tut.hidden, '| step', I.tutAt() + 1, 'of', I.TUTORIAL.length, '|', JSON.stringify(txt().slice(0, 60)));
+    if (tut.hidden || I.tutAt() !== 0) throw new Error('a first-time player should get the tutorial');
+    document.getElementById('tutNext').fire('click', ev({})); console.log('  Next:', JSON.stringify(txt().slice(0, 50)));
+    I.goTo(7); for (let k = 0; k < 3; k++) raf(500 + k * 16); I.p.x += 12; for (let k = 0; k < 3; k++) raf(600 + k * 16);
+    console.log('  walk a bit: moves on by itself to step', I.tutAt() + 1, '|', JSON.stringify(txt().slice(0, 50)));
+    if (I.tutAt() !== 2) throw new Error('walking should move the tutorial on');
+    document.getElementById('tutSkip').fire('click', ev({})); console.log('  Skip tutorial: hidden', tut.hidden, '| saved as played', store['mutation-mayhem-played']);
+    if (!tut.hidden) throw new Error('skip should close the tutorial');
+  }
 }
 function moved(setup, frames = 60) { I.goTo(6); I.p.yaw = 0; const x0 = I.p.x, z0 = I.p.z; setup(); for (let f = 0; f < frames; f++) I.update(1 / 60, f / 60); return { dx: +(I.p.x - x0).toFixed(1), dz: +(I.p.z - z0).toFixed(1), turned: +(I.p.yaw).toFixed(2), air: !I.p.onGround }; }
 for (const combo of [['ArrowUp'], ['ArrowDown'], ['ArrowLeft'], ['ArrowRight'], ['ArrowUp', 'ArrowLeft'], ['ArrowUp', 'ArrowRight'], ['KeyW'], ['KeyA'], ['KeyD'], ['KeyS'], ['KeyQ'], ['KeyE'], ['Space']]) {
@@ -894,7 +908,8 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
       const from = I.camera.position, tx = pet.root.position.x - from.x, ty = pet.root.position.y + 0.7 - from.y, tz = pet.root.position.z - from.z;
       I.zap({ dx: tx, dy: ty, dz: tz, len: Math.hypot(tx, ty, tz), o: from });
       console.log('zap my', pet.kind, 'dragon:', JSON.stringify(els.toast.textContent), '| mutation', I.dragonMutation[i], '| its coins', I.DRAGON_COINS[pet.kind], '->', I.dragonValue(i) / (I.dragonUpgrades[i] >= 0 ? I.UPGRADERS[I.dragonUpgrades[i]].boost : 1), '| plot rate', r0, '->', I.coinRate(), '| sparks', !!pet.sparks, '| saved', JSON.parse(store['mutation-mayhem-mutations'])[i]);
-      if (I.dragonMutation[i] !== 'lightning' || I.dragonValue(i) !== 2 * I.DRAGON_COINS[pet.kind] * (I.dragonUpgrades[i] >= 0 ? I.UPGRADERS[I.dragonUpgrades[i]].boost : 1)) throw new Error('lightning should mutate the dragon and double its coins');
+      const hitI = I.ownDragons.findIndex((k, j) => (I.dragonMutation[j] || '').includes('lightning'));   // the bolt may hit a dragon standing next to the one aimed at
+      if (hitI < 0 || I.dragonValue(hitI) !== 2 * I.DRAGON_COINS[I.ownDragons[hitI]] * (I.dragonUpgrades[hitI] >= 0 ? I.UPGRADERS[I.dragonUpgrades[hitI]].boost : 1) || !(I.coinRate() > r0)) throw new Error('lightning should mutate a dragon and double its coins');
       for (let k = 0; k < 30; k++) I.zapStep(1 / 60);
     }
     const v = I.villagers[0]; I.p.x = v.x + 12; I.p.z = v.z; I.update(1 / 60, 0);
@@ -1095,6 +1110,11 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     I.startEvent('dirt'); I.spawnJet(d.root.position.x, d.root.position.z); I.fireStormStep(1 / 60);
     console.log('air jets: one blasts up under a', d.kind, 'dragon: Dirt', I.hasMut(d.index, 'dirt'), '| jets', I.jets.length, '|', said());
     if (!I.hasMut(d.index, 'dirt')) throw new Error('an air jet should give the Dirt mutation');
+  }
+  { // day and night, and the ghost event makes it night
+    const n0 = I.nightness(); I.startEvent('phantom'); for (let k = 0; k < 10; k++) I.dayNightStep(0.5);
+    console.log('night now (by the clock)', n0.toFixed(2), '| ghost night: night', I.nightness(), '| sky darkened to', I.nightShown().toFixed(2), '| effects', JSON.stringify((raf(700000), raf(700016), els.effect.textContent)));
+    if (I.nightness() !== 1 || I.nightShown() < 0.9) throw new Error('the ghost event should make it night');
   }
   { // the volcano: magma rocks
     const d = pickWithout('magma'); d.wait = 999; I.startEvent('magma');

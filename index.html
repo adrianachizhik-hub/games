@@ -211,6 +211,13 @@
   #talk .talkrow[hidden] { display: none; }
   #talk button { font: inherit; font-weight: 600; padding: 6px 14px; border: 3px solid #0d2f37; border-radius: 12px; cursor: pointer; color: #0d2f37; }
   #talkYes { background: #ffd23f; }
+  #tutorial { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); padding: 12px 16px; border: 4px solid #0d2f37; border-radius: 18px; background: #fff8e6; color: #0d2f37; box-shadow: 0 6px 0 #0d2f37; z-index: 20; }
+  #tutorial[hidden], body.shopping #tutorial { display: none; }
+  #tutorial .tutstep { margin: 0 0 4px; font-weight: 700; color: #b8392a; font-size: 0.9rem; }
+  #tutText { margin: 0; font-size: 1.05rem; line-height: 1.4; }
+  #tutorial .tutrow { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+  #tutorial button { font: inherit; font-weight: 600; padding: 5px 14px; border: 3px solid #0d2f37; border-radius: 12px; cursor: pointer; color: #0d2f37; background: #fff; }
+  #tutNext { background: #ffd23f !important; }
   #keypad { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(300px, calc(100vw - 32px)); padding: 14px 18px; border: 4px solid #0d2f37; border-radius: 18px; background: #2a2f33; color: #fff; box-shadow: 0 6px 0 #0d2f37; z-index: 30; }
   #keypad[hidden] { display: none; }
   #keypad h2 { margin: 0 0 4px; font-size: 1.3rem; } #keypad .sub { margin: 0 0 10px; opacity: 0.85; }
@@ -1008,6 +1015,11 @@
   <div class="uprow"><div class="what"><b>Radioactive resistant upgrader</b><small>Lets you into the nuke bunker without the radiation bouncing you back. Lasts 5 minutes; buying more adds time.</small></div><button id="secretBuyRad" type="button"></button></div>
   <div class="foot"><button id="secretDone" type="button">Done</button></div>
 </div>
+<div id="tutorial" role="dialog" aria-labelledby="tutTitle" hidden>
+  <p class="tutstep" id="tutTitle"></p>
+  <p id="tutText"></p>
+  <div class="tutrow"><button id="tutSkip" type="button">Skip tutorial</button><button id="tutNext" type="button">Next</button></div>
+</div>
 <div id="keypad" role="dialog" aria-label="Bunker keypad" hidden>
   <h2>Bunker keypad</h2>
   <p class="sub">Type the 4-number code.</p>
@@ -1307,7 +1319,8 @@ const World = (function () {
   camera.rotation.order = 'YXZ';
 
   /* ---------- Light and sky ---------- */
-  scene.add(new THREE.HemisphereLight(0xdcefff, 0x8b7b5c, 0.62));
+  const hemi = new THREE.HemisphereLight(0xdcefff, 0x8b7b5c, 0.62);
+  scene.add(hemi);
   const SUN = new THREE.Vector3(0.5, 0.72, 0.4).normalize();
   const sun = new THREE.DirectionalLight(0xfff1d0, 0.72);
   sun.position.copy(SUN).multiplyScalar(100);
@@ -1321,7 +1334,7 @@ const World = (function () {
     return new THREE.CanvasTexture(c);
   }
 
-  const skyGroup = new THREE.Group();
+  const skyGroup = new THREE.Group(), sky = {};
   (function buildSky() {
     const geo = new THREE.SphereGeometry(1600, 24, 16);
     const pa = geo.attributes.position, cols = new Float32Array(pa.count * 3);
@@ -1332,14 +1345,25 @@ const World = (function () {
       cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-    skyGroup.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false })));
-    const disc = new THREE.Mesh(new THREE.SphereGeometry(46, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff7d6, fog: false }));
+    sky.dome = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+    skyGroup.add(sky.dome);
+    const disc = new THREE.Mesh(new THREE.SphereGeometry(46, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff7d6, fog: false, transparent: true }));
     disc.position.copy(SUN).multiplyScalar(1450);
-    skyGroup.add(disc);
+    skyGroup.add(disc); sky.sun = disc;
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture('rgba(255,244,200,0.75)', 'rgba(255,244,200,0)'), fog: false, depthWrite: false, transparent: true }));
     glow.scale.set(620, 620, 1);
     glow.position.copy(SUN).multiplyScalar(1400);
-    skyGroup.add(glow);
+    skyGroup.add(glow); sky.glow = glow;
+    const MOON = new THREE.Vector3(-0.45, 0.7, -0.5).normalize();   // the moon, on the other side of the sky
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(34, 16, 12), new THREE.MeshBasicMaterial({ color: 0xe8eef6, fog: false, transparent: true, opacity: 0 }));
+    moon.position.copy(MOON).multiplyScalar(1450); skyGroup.add(moon); sky.moon = moon;
+    const mglow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture('rgba(200,215,255,0.5)', 'rgba(200,215,255,0)'), fog: false, depthWrite: false, transparent: true, opacity: 0 }));
+    mglow.scale.set(380, 380, 1); mglow.position.copy(MOON).multiplyScalar(1400); skyGroup.add(mglow); sky.mglow = mglow;
+    const sp = [], R = World.rng(777);                    // stars
+    for (let i = 0; i < 500; i++) { const a = R() * Math.PI * 2, y = 0.08 + R() * 0.92, r = Math.sqrt(1 - y * y); sp.push(Math.cos(a) * r * 1500, y * 1500, Math.sin(a) * r * 1500); }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+    sky.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, fog: false, transparent: true, opacity: 0, depthWrite: false }));
+    skyGroup.add(sky.stars);
     scene.add(skyGroup);
   })();
 
@@ -2016,7 +2040,7 @@ const World = (function () {
   }
 
   /* ---------- Clouds ---------- */
-  const clouds = new THREE.Group();
+  const clouds = new THREE.Group(), cloudMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });   // cloudMat dims at night
   (function buildClouds() {
     const items = [];
     for (let n = 0; n < 18; n++) {
@@ -2032,7 +2056,7 @@ const World = (function () {
       cc[i * 3] = lerp(0.90, 1, k); cc[i * 3 + 1] = lerp(0.93, 1, k); cc[i * 3 + 2] = lerp(0.98, 1, k);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cc, 3));
-    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), items.length);
+    const mesh = new THREE.InstancedMesh(geo, cloudMat, items.length);
     const d = new THREE.Object3D();
     items.forEach((it, i) => { d.position.set(it.x, it.y, it.z); d.rotation.set(0, it.ry, 0); d.scale.set(it.sx, it.sy, it.sz); d.updateMatrix(); mesh.setMatrixAt(i, d.matrix); });
     mesh.instanceMatrix.needsUpdate = true;
@@ -4800,6 +4824,7 @@ const World = (function () {
     if (fireResLeft() > 0) parts.push('Fire resistance ' + clock(fireResLeft()));
     if (radResLeft() > 0) parts.push('Radiation resistance ' + clock(radResLeft()));
     Object.keys(EVENTS).forEach((id) => { if (eventOn(id)) parts.push(EVENTS[id].name + ' ' + clock(eventLeft(id))); });
+    if (started && nightShown > 0.6) parts.push('🌙 Night');
     if (started && !activeEvents().length) { const n = nextEvent(); if (n.inS < 120) parts.push('Next event in ' + clock(n.inS)); }
     TREATS.forEach((t) => { if (treatLeft(t.id) > 0) parts.push(t.name + ' ' + clock(treatLeft(t.id))); });
     const txt = parts.join(' · ');
@@ -5182,6 +5207,39 @@ const World = (function () {
     for (const egg of eggs) { if (egg.taken) continue; const d = Math.hypot(egg.spot.x - p.x, egg.spot.z - p.z); if (d < bd) { bd = d; best = egg; } }
     return best && { egg: best, dist: bd };
   }
+  /* ---------- The tutorial ---------- */
+  /* Only for someone playing for the very first time on this device (no saved dragons, no name yet, never played):
+     a few tips at the top of the screen. Some move on by themselves when you do the thing. Once seen, never again. */
+  const tutPhone = () => document.body.classList.contains('touch');
+  const TUTORIAL = [
+    { text: () => 'Welcome to Dragon Keepers! Hatch dragon eggs, raise your dragons, and ride them all over Isla Verde.' },
+    { text: () => tutPhone() ? 'Walk with the circle in the bottom left. Tap Jump to jump. Drag anywhere else to look around. Try walking a little!' : 'Walk with W A S D or the arrow keys. Space jumps, Shift runs. Try walking a little!', done: () => Math.hypot(p.x - tutFrom.x, p.z - tutFrom.z) > 8 },
+    { text: () => 'You\'re in town. Walk onto any free plot (the grassy squares with fences) to make it yours.', done: () => myPlot >= 0 },
+    { text: () => 'This is your plot! Now explore the island to find dragon eggs. Walk into one, then bring it home to your plot before the timer runs out.' },
+    { text: () => 'Your dragons make coins every 3 seconds. Spend them in the shops in the middle of town: upgraders, selling, avatars and the Everything Shop.' },
+    { text: () => (tutPhone() ? 'Tap' : 'Click') + ' a dragon on your plot to ride it. Jump twice to fly! Jump once on the ground to get off.' },
+    { text: () => 'Watch out for events every 30 minutes! A dragon caught in one gets a mutation that makes it earn more. Have fun!' }
+  ];
+  let tutAt = -1, tutFrom = { x: 0, z: 0 };
+  function tutorialStart() {
+    let fresh = false;
+    try { fresh = !localStorage.getItem('mutation-mayhem-played') && !ownDragons.length && !lockedName; localStorage.setItem('mutation-mayhem-played', '1'); } catch (e) { fresh = false; }
+    if (!fresh || isAdmin) return;
+    tutAt = 0; tutShow();
+  }
+  function tutShow() {
+    if (tutAt < 0 || tutAt >= TUTORIAL.length) { tutAt = -1; $('tutorial').hidden = true; return; }
+    const st = TUTORIAL[tutAt];
+    $('tutTitle').textContent = 'Tutorial ' + (tutAt + 1) + ' of ' + TUTORIAL.length;
+    $('tutText').textContent = st.text();
+    $('tutNext').textContent = tutAt === TUTORIAL.length - 1 ? 'Let\'s play!' : st.done ? 'Skip this step' : 'Next';
+    $('tutorial').hidden = false;
+    tutFrom = { x: p.x, z: p.z };
+  }
+  function tutNext() { if (tutAt < 0) return; tutAt++; tutShow(); }
+  function tutorialStep() { if (tutAt >= 0 && started) { const st = TUTORIAL[tutAt]; if (st && st.done && st.done()) tutNext(); } }
+  $('tutNext').addEventListener('click', (e) => { tutNext(); if (e.detail > 0) $('tutNext').blur(); });
+  $('tutSkip').addEventListener('click', (e) => { tutAt = -1; tutShow(); if (e.detail > 0) $('tutSkip').blur(); });
   function start(fromTouch, sure) {
     if (started || (!confirmEl.hidden && !sure)) return;   // still waiting for an answer to "are you sure?"
     const typed = typedName();
@@ -5220,6 +5278,7 @@ const World = (function () {
     if (isAdmin && realCoins === null) { realCoins = coins; coins = Infinity; }   // and unlimited coins (never saved)
     document.body.classList[isAdmin ? 'add' : 'remove']('admin');
     greetChat();
+    tutorialStart();
     netConnect(codeEl.value);
     if (isAdmin) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Admin'; who.appendChild(badge); }
     try {
@@ -5242,7 +5301,7 @@ const World = (function () {
     netSend({ t: 'release' }); netClose();
     closeShop(); closeUpShop(); closePlotMenu(); closeTalk(); shopBtn.hidden = true; avatar.visible = false;
     if (riding && DRAGON_KINDS[riding.kind].storm) dismount(true);
-    removeStorms(); closeKeypad(); bunkerOpen = false;
+    removeStorms(); closeKeypad(); bunkerOpen = false; tutAt = -1; $('tutorial').hidden = true;
     if (realCoins !== null) { coins = realCoins; realCoins = null; }   // an admin's unlimited coins end when they leave
     while (placedCount() > plotSlots) { let w = -1; dragonPlaced.forEach((on, i) => { if (on && (w < 0 || dragonValue(i) < dragonValue(w))) w = i; }); dragonPlaced[w] = false; }   // and their unlimited plot space
     saveProgress();
@@ -5562,6 +5621,38 @@ const World = (function () {
     mapCtx.restore();
   }
 
+  /* ---------- Day and night ---------- */
+  /* Adriana's request. A day lasts DAY_LEN seconds on the clock, the same for everyone: 13 minutes of day, a minute of
+     sunset, 5 minutes of night with a moon and stars, and a minute of sunrise. The ghost event makes it night while it
+     lasts. Things that glow (torches, fairy lights, lava, crystals) keep glowing in the dark. */
+  const DAY_LEN = 1200, NIGHT_STARTS = 840, NIGHT_ENDS = 1140, FADE = 60;
+  let nightShown = 0, nightWas = false;
+  function nightness() {                                // 0 day, 1 night
+    if (started && eventOn('phantom')) return 1;        // the ghost event: night
+    const t = (Date.now() / 1000) % DAY_LEN;
+    if (t < NIGHT_STARTS - FADE) return 0;
+    if (t < NIGHT_STARTS) return (t - (NIGHT_STARTS - FADE)) / FADE;
+    if (t < NIGHT_ENDS) return 1;
+    if (t < NIGHT_ENDS + FADE) return 1 - (t - NIGHT_ENDS) / FADE;
+    return 0;
+  }
+  const DAY_BG = new THREE.Color(HORIZON), NIGHT_BG = new THREE.Color(0x0b1430), bgNow = new THREE.Color();
+  function dayNightStep(dt) {
+    const want = nightness();
+    nightShown += (want - nightShown) * Math.min(1, dt * 1.5);
+    const n = nightShown;
+    bgNow.copy(DAY_BG).lerp(NIGHT_BG, n);
+    if (scene.background && scene.background.copy) scene.background.copy(bgNow); if (scene.fog && scene.fog.color && scene.fog.color.copy) scene.fog.color.copy(bgNow);
+    sky.dome.material.color.setRGB(1 - n * 0.86, 1 - n * 0.82, 1 - n * 0.62);
+    hemi.intensity = 0.62 - n * 0.5; sun.intensity = 0.72 - n * 0.66;
+    cloudMat.color.setRGB(1 - n * 0.7, 1 - n * 0.68, 1 - n * 0.55);
+    if (sun.color && sun.color.setRGB) sun.color.setRGB(1 - n * 0.45, 0.95 - n * 0.3, 0.82 + n * 0.18);
+    sky.sun.material.opacity = 1 - n; sky.glow.material.opacity = 1 - n;
+    sky.moon.material.opacity = n; sky.mglow.material.opacity = n; sky.stars.material.opacity = n;
+    const isNight = n > 0.6;
+    if (started && isNight !== nightWas) { nightWas = isNight; if (!eventOn('phantom')) toast(isNight ? '🌙 Night is falling...' : '☀️ The sun is coming up!', 3); }
+  }
+
   /* ---------- Mutation events ---------- */
   /* Adriana: every mutation comes from its own event. Every EV_EVERY seconds (30 minutes) on the clock an event picked at random
      (the same for everyone) starts and lasts EV_LEN seconds (5 minutes), and now and then (EV_DOUBLE) two play at once; admins can start any of them whenever they like (for everyone,
@@ -5590,7 +5681,7 @@ const World = (function () {
     { id: 'toxic', name: '☣️ Toxic rain', kind: 'fall', look: 'goo', say: 'Toxic goo is raining down' },
     { id: 'cosmic', name: '🌌 Shooting stars', kind: 'fall', look: 'star', say: 'Shooting stars are falling' },
     { id: 'inferno', name: '🔥 Fire tornadoes', kind: 'spot', look: 'tornado', say: 'Fire tornadoes are spinning up' },
-    { id: 'phantom', name: '👻 Ghost night', kind: 'fly', look: 'ghost', beam: 0xe8f0ff, say: 'Ghosts are floating about' },
+    { id: 'phantom', name: '👻 Ghost night', kind: 'fly', look: 'ghost', beam: 0xe8f0ff, say: 'It turned to night and ghosts are floating about' },
     { id: 'solar', name: '☀️ Solar flares', kind: 'fall', look: 'flare', say: 'Solar flares are falling' },
     { id: 'magnetic', name: '🧲 Magnet storm', kind: 'spot', look: 'magnet', say: 'Magnet storms are spinning metal about' },
     { id: 'lunar', name: '🌙 Moon rocks', kind: 'fall', look: 'moonrock', say: 'Moon rocks are falling' },
@@ -6025,6 +6116,8 @@ const World = (function () {
     clouds.rotation.y += dt * 0.004;
     keeperPose(dt, time);
     netTick(dt, time);
+    dayNightStep(dt);
+    tutorialStep(dt);
     serverPickerStep(dt);
     if (fairyBulbs.length) twinkleLights(time);
     if (adminAnims.length) adminAnims.forEach((f) => f(reduced ? 0 : time));
@@ -6038,7 +6131,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, nightness, nightShown: () => nightShown, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
