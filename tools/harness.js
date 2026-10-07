@@ -1298,6 +1298,24 @@ if (process.env.MODE !== 'admin') {
   I.setMonth(''); I.clockEventsOff(true);
 }
 
+// ---- admins give mutations; the first admin's special look ----
+{
+  const pet = I.plotPets.find((d) => !d.homing && !d.ridden && !I.hasMut(d.index, 'pumpkin'));
+  const ok = pet ? I.adminGiveMut(pet.index, 'pumpkin') : false;
+  console.log('give a mutation (' + (process.env.MODE === 'admin' ? 'admin' : 'player') + '): given', ok, '| has it', pet && I.hasMut(pet.index, 'pumpkin'), '|', said());
+  if (pet && ok !== (process.env.MODE === 'admin')) throw new Error('only admins can give mutations');
+  console.log('special hooded look on me:', I.hoodOn(), '| shown', I.myHood[0].visible, '(only the first admin has it; these tests sign in as the second)');
+  if (I.hoodOn() || I.myHood[0].visible) throw new Error('only the first admin wears the hood');
+  const look = { skin: '#c68642', shirt: '#ff0000', pants: '#00ff00', hairColor: '#000000', hair: 'short', special: 'hood' };
+  I.netMessage({ t: 'join', p: { id: 901, name: 'Admin1', admin: true, look, plot: -1, pets: [], s: [0, 0, 0, 0, '', 0] } });
+  I.netMessage({ t: 'join', p: { id: 902, name: 'Faker', admin: false, look, plot: -1, pets: [], s: [0, 0, 0, 0, '', 0] } });
+  const count = (o) => { let n = 0; const walk = (g) => { n++; (g.children || []).forEach(walk); }; walk(o.f.root); return n; };
+  const a1 = I.others.get(901), fk = I.others.get(902);
+  console.log('another player sees the first admin in the hood: pieces', count(a1), 'vs a non-admin asking for it', count(fk));
+  if (count(a1) <= count(fk) + 15) throw new Error('the hood should only show on a real admin');
+  I.netMessage({ t: 'left', id: 901, plot: -1 }); I.netMessage({ t: 'left', id: 902, plot: -1 });
+}
+
 // ---- the hatching timer ----
 {
   if (I.riding()) I.dismount(true);

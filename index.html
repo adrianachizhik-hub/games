@@ -2349,11 +2349,38 @@ const World = (function () {
     bx(0.62, 0.26, 0.04, 0xffffff, sd * 0.42, 1.42, 0.3, 0, sd * 0.35, sd * 0.45),
     bx(0.5, 0.22, 0.04, 0xf1f5f8, sd * 0.36, 1.18, 0.29, 0, sd * 0.3, sd * 0.2),
     bx(0.32, 0.2, 0.04, 0xffffff, sd * 0.27, 0.98, 0.28, 0, sd * 0.25, 0)]), []));
+  /* The first admin's own look (Adriana, 7 October 2026), only for her: a black hood with thin strands of brown hair
+     falling in front of her face (beside her eyes, not over them), a white shirt under an open black sweater, a utility
+     belt with pouches, and black pants. Other players see it too (look.special, shown only on a real admin). */
+  const HOOD = { black: lam('#16181b'), hood: lam('#1d2024'), hair: lam('#6b4426'), belt: lam('#4a3420'), pouch: lam('#5e4630'), metal: lam('#b8bec4') };
+  function hoodLook(f) {                                 // adds the hood outfit to a figure; returns its groups, to show or hide
+    const G = (parent) => { const g = new THREE.Group(); parent.add(g); return g; }, head = G(f.head), body = G(f.root), arms = [G(f.armL), G(f.armR)], H = HOOD;
+    block(head, H.hood, 0.64, 0.12, 0.62, 0, 0.58, 0.02);                       // the hood: top, sides and back, open at the front
+    [-1, 1].forEach((sd) => block(head, H.hood, 0.07, 0.62, 0.6, sd * 0.3, 0.27, 0.02));
+    block(head, H.hood, 0.64, 0.66, 0.08, 0, 0.26, 0.31);
+    block(head, H.black, 0.6, 0.06, 0.06, 0, 0.52, -0.285);                     // its rim over the forehead
+    [-1, 1].forEach((sd) => block(head, H.hair, 0.04, 0.5, 0.12, sd * 0.255, 0.26, -0.2));   // brown hair showing inside the hood
+    [[-0.215, 0.24, 0.42, 0.1], [-0.175, 0.3, 0.28, -0.08], [0.2, 0.22, 0.46, -0.1], [0.235, 0.3, 0.3, 0.06], [0.04, 0.42, 0.14, 0.35]].forEach(([x, y, h, tilt]) =>   // thin strands in her face
+      block(head, H.hair, 0.03, h, 0.02, x, y, -0.275, 0, 0, tilt));
+    block(body, H.hood, 0.6, 0.16, 0.3, 0, 1.52, 0.12);                         // the hood's fold on her shoulders
+    block(body, H.black, 0.76, 0.78, 0.04, 0, 1.17, 0.215);                     // the open sweater: back, sides and two front panels
+    [-1, 1].forEach((sd) => { block(body, H.black, 0.04, 0.78, 0.44, sd * 0.375, 1.17, 0); block(body, H.black, 0.2, 0.78, 0.04, sd * 0.27, 1.17, -0.215); });
+    arms.forEach((a) => block(a, H.black, 0.24, 0.46, 0.3, 0, -0.19, 0));      // sweater sleeves
+    block(body, H.belt, 0.76, 0.1, 0.44, 0, 0.84, 0);                           // the utility belt, with a buckle and pouches
+    block(body, H.metal, 0.1, 0.08, 0.03, 0, 0.84, -0.225);
+    [[-0.25, -0.235], [0.25, -0.235], [-0.39, 0], [0.39, 0]].forEach(([x, z]) => block(body, H.pouch, Math.abs(z) > 0 ? 0.13 : 0.06, 0.15, Math.abs(z) > 0 ? 0.06 : 0.14, x, 0.8, z));
+    return [head, body, ...arms];
+  }
+  const myHood = hoodLook(me);
+  const hoodOn = () => { try { return isAdmin && adminNo === 0; } catch (e) { return false; } };   // (try: dress() first runs before the admin code has loaded)
   function dress(save) {                                 // put on whatever AV says
     paint.skin.color.set(AV.skin); paint.shirt.color.set(AV.shirt); paint.pants.color.set(AV.pants); paint.hair.color.set(AV.hairColor);
-    for (const k in gear) gear[k].visible = k === AV.head || k === AV.back;
+    const hood = hoodOn();
+    if (hood) { paint.shirt.color.set('#f4f4f2'); paint.pants.color.set('#16181b'); }   // the first admin's special look
+    myHood.forEach((g) => { g.visible = hood; });
+    for (const k in gear) gear[k].visible = (k === AV.head && !hood) || k === AV.back;
     const hat = AV.head === 'cap' || AV.head === 'crown' || AV.head === 'tophat';
-    for (const k in hair) { hair[k].all.visible = k === AV.hair; hair[k].up.visible = !hat; }
+    for (const k in hair) { hair[k].all.visible = k === AV.hair && !hood; hair[k].up.visible = !hat; }
     if (save) { try { localStorage.setItem('mutation-mayhem-avatar', JSON.stringify(AV)); } catch (e) { /* not saved, still wearing it */ } }
     if (save) netSend({ t: 'look', look: myLook() });   // other players see your new look
   }
@@ -5562,6 +5589,28 @@ const World = (function () {
   addPick.setAttribute('aria-label', 'Dragon to add'); addBtn.type = 'button'; addBtn.className = 'small'; addBtn.textContent = 'Add';
   addRow.appendChild(addPick); addRow.appendChild(addBtn);
   addBtn.addEventListener('click', (e) => { adminAddDragon(addPick.value); if (e.detail > 0) addBtn.blur(); });
+  /* Admin command: give one of your dragons any mutation (Adriana, 7 October 2026: admins can give mutations again). */
+  const mutRow = adminSection('Give a mutation'), mutDragon = document.createElement('select'), mutPick = document.createElement('select'), mutBtn = document.createElement('button');
+  MUTATIONS.forEach((m) => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.emoji + ' ' + m.name + ' ×' + m.coins; mutPick.appendChild(o); });
+  mutDragon.setAttribute('aria-label', 'Which dragon'); mutPick.setAttribute('aria-label', 'Which mutation'); mutBtn.type = 'button'; mutBtn.className = 'small'; mutBtn.textContent = 'Give';
+  function fillMutDragons() {                            // the list of your dragons, kept up to date
+    const keep = mutDragon.value;
+    while (mutDragon.firstChild) mutDragon.removeChild(mutDragon.firstChild);
+    ownDragons.forEach((k, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = dragonLabel(i) + (dragonPlaced[i] ? '' : ' (inventory)'); mutDragon.appendChild(o); });
+    if (keep && +keep < ownDragons.length) mutDragon.value = keep;
+  }
+  function adminGiveMut(i, id) {
+    if (!isAdmin || !ownDragons[i] || !MUT[id]) return false;
+    if (hasMut(i, id)) { toast('That dragon already has the ' + MUT[id].name + ' mutation.', 3); return false; }
+    const d = plotPets.find((q) => q.index === i);
+    if (d) return giveMutation(d, id, '⭐ Admin gift! Your ');
+    addMut(i, id); saveProgress(); renderInventory();
+    toast('⭐ Admin gift! Your ' + DRAGON_KINDS[ownDragons[i]].name + ' dragon (in your inventory) got the ' + MUT[id].name.toUpperCase() + ' mutation!', 4);
+    return true;
+  }
+  ['focus', 'pointerdown'].forEach((n) => mutDragon.addEventListener(n, fillMutDragons));
+  mutBtn.addEventListener('click', (e) => { fillMutDragons(); if (!ownDragons.length) toast('You have no dragons yet.', 3); else adminGiveMut(+mutDragon.value || 0, mutPick.value); fillMutDragons(); if (e.detail > 0) mutBtn.blur(); });
+  mutRow.appendChild(mutDragon); mutRow.appendChild(mutPick); mutRow.appendChild(mutBtn);
   const stormBtn = document.createElement('button');
   stormBtn.type = 'button'; stormBtn.className = 'storm'; stormBtn.textContent = '⚡ Add a Storm dragon (admins only)';
   stormBtn.addEventListener('click', (e) => { adminAddDragon(stormKind()); if (e.detail > 0) stormBtn.blur(); });
@@ -5685,7 +5734,7 @@ const World = (function () {
     who.textContent = playerName;
     nameMyPlot();
     adminEl.hidden = !isAdmin;                            // only admins get the arrow
-    if (isAdmin) { setRadar(true); setSeeAll(true); addStorms(); }   // admins start with the egg radar and the lucky-block map on, and get their storm dragons
+    if (isAdmin) { setRadar(true); setSeeAll(true); addStorms(); dress(false); }   // (dress: the first admin's own look)   // admins start with the egg radar and the lucky-block map on, and get their storm dragons
     if (isAdmin && realCoins === null) { realCoins = coins; coins = Infinity; }   // and unlimited coins (never saved)
     document.body.classList[isAdmin ? 'add' : 'remove']('admin');
     greetChat();
@@ -5725,7 +5774,7 @@ const World = (function () {
     while (placedCount() > plotSlots) { let w = -1; dragonPlaced.forEach((on, i) => { if (on && (w < 0 || dragonValue(i) < dragonValue(w))) w = i; }); dragonPlaced[w] = false; }   // and their unlimited plot space
     saveProgress();
     dropEgg(); dropBlock(); villagersHome(); dismount(true); releasePlot(); saveCoins(); closeSecret(); closeSell(); closeAll(); toastEl.hidden = true;
-    started = false; isAdmin = false; adminNo = -1; setRadar(false); setSeeAll(false);
+    started = false; isAdmin = false; adminNo = -1; setRadar(false); setSeeAll(false); dress(false);
     keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
     stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
     document.body.classList.remove('playing');
@@ -6434,7 +6483,7 @@ const World = (function () {
     });
   }
 
-  /* Admin command: start any event. (Admins can't hand out mutations: they only come from events.) */
+  /* Admin command: start any event. */
   const evRow = adminSection('Start or stop an event (5 minutes)'), evPick = document.createElement('select'), evBtn = document.createElement('button');
   EVENT_LIST.forEach((e) => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.name; evPick.appendChild(o); });
   evPick.setAttribute('aria-label', 'Event to start'); evBtn.type = 'button'; evBtn.className = 'small'; evBtn.textContent = 'Start';
@@ -6480,7 +6529,7 @@ const World = (function () {
   let sock = null, netId = 0, netRoom = 0, netOnline = false, netT = 0, petsT = 0, petsSent = '';
   const others = new Map(), plotOwners = new Array(7).fill(null);
   function netSend(m) { if (sock && netOnline) { try { sock.send(JSON.stringify(m)); } catch (e) { /* lost */ } } }
-  const myLook = () => ({ skin: AV.skin, shirt: AV.shirt, pants: AV.pants, hairColor: AV.hairColor, hair: AV.hair });
+  const myLook = () => ({ skin: AV.skin, shirt: AV.shirt, pants: AV.pants, hairColor: AV.hairColor, hair: AV.hair, special: hoodOn() ? 'hood' : '' });
   function netConnect(code) {
     if (!NET_URL || typeof WebSocket === 'undefined') return;
     try { sock = new WebSocket(NET_URL); } catch (e) { sock = null; return; }
@@ -6753,8 +6802,10 @@ const World = (function () {
   }
   const okColour = (c, d) => (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d);
   function buildOther(o) {                               // a blocky person like yours, in their colours, with a name tag
-    const f = figure({ skin: lam(okColour(o.look.skin, '#e0ac69')), shirt: lam(okColour(o.look.shirt, '#d8433a')), pants: lam(okColour(o.look.pants, '#6b4a2b')), face: paint.face });
+    const hood = o.admin && o.look.special === 'hood';  // the first admin's special look (only ever shown on a real admin)
+    const f = figure({ skin: lam(okColour(o.look.skin, '#e0ac69')), shirt: hood ? lam('#f4f4f2') : lam(okColour(o.look.shirt, '#d8433a')), pants: hood ? HOOD.black : lam(okColour(o.look.pants, '#6b4a2b')), face: paint.face });
     const hc = lam(okColour(o.look.hairColor, '#5a3a20'));
+    if (hood) { hoodLook(f); f.root.add(nameTag(o.name + ' ★')); o.f = f; return; }
     const shape = HAIR_SHAPES[o.look.hair] || HAIR_SHAPES.short;   // the same hairstyle shapes as your own (bug fix: a ponytail looked like a wide flat slab)
     [...(shape.on || []), ...(shape.up || [])].forEach((q) => block(f.head, hc, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
     (shape.tie || []).forEach((q) => block(f.head, paint[shape.tieColor || 'tie'], q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
@@ -6854,7 +6905,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, adminGiveMut, hoodOn, myHood, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
