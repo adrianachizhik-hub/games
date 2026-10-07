@@ -2973,6 +2973,52 @@ const World = (function () {
      lightning, 'fire' a fire storm, 'ufo' a UFO's beam, 'wind' an air jet, 'rocks' a falling rock, or 'random' (now and
      then a dragon on your plot just mutates; tier says how rare: 1 common to 4 legendary). The look: tint (colour wash),
      see (see-through), glow, and fx: little effects around it, each [kind, colours, how many, size]. */
+  /* Monthly specials (Adriana, 7 October 2026): one special event for each month, the rest of 2026 and all of 2027,
+     each about that time of year. In its month it plays every half hour at a quarter past (MONTH_AT), for 5 minutes,
+     and the town is decorated for it all month. Each has its own mutation (×4 coins, Claude's number) with little
+     copies of the falling things flying round the dragon. Admins can start any of them whenever they like. */
+  const MONTHLY = [
+    { month: '2026-10', id: 'pumpkin', name: '🎃 Pumpkin Patch', emoji: '🎃', mut: 'Pumpkin', say: 'Happy Halloween! Glowing jack-o\'-lanterns are falling' },
+    { month: '2026-11', id: 'harvest', name: '🍂 Autumn Leaves', emoji: '🍂', mut: 'Autumn', say: 'Giant autumn leaves are falling' },
+    { month: '2026-12', id: 'present', name: '🎁 Christmas Presents', emoji: '🎁', mut: 'Festive', say: 'Merry Christmas! Presents are falling from the sky' },
+    { month: '2027-01', id: 'firework', name: '🎆 New Year Fireworks', emoji: '🎆', mut: 'Firework', say: 'Happy New Year 2027! Fireworks are shooting down' },
+    { month: '2027-02', id: 'heart', name: '💖 Valentine Hearts', emoji: '💖', mut: 'Lovely', say: 'Happy Valentine\'s Day! Hearts are floating down' },
+    { month: '2027-03', id: 'clover', name: '☘️ Lucky Clovers', emoji: '☘️', mut: 'Lucky', say: 'Happy St Patrick\'s Day! Four-leaf clovers are falling' },
+    { month: '2027-04', id: 'easter', name: '🐣 Easter Egg Hunt', emoji: '🐣', mut: 'Easter', say: 'Happy Easter! Painted eggs are falling' },
+    { month: '2027-05', id: 'butterfly', name: '🦋 Butterfly Spring', emoji: '🦋', mut: 'Butterfly', say: 'Spring is here! Butterflies are fluttering down' },
+    { month: '2027-06', id: 'icecream', name: '🍦 Ice Cream Summer', emoji: '🍦', mut: 'Ice Cream', say: 'Summer is here! Ice cream is falling' },
+    { month: '2027-07', id: 'melon', name: '🍉 Watermelon Splash', emoji: '🍉', mut: 'Watermelon', say: 'Hot summer days! Watermelon slices are falling' },
+    { month: '2027-08', id: 'beachball', name: '🏖️ Beach Party', emoji: '🏖️', mut: 'Beach', say: 'Beach party! Beach balls are bouncing down' },
+    { month: '2027-09', id: 'apple', name: '🍎 Apple Harvest', emoji: '🍎', mut: 'Apple', say: 'Back to school! Apples are falling' },
+    { month: '2027-10', id: 'bat', name: '🦇 Spooky Bats', emoji: '🦇', mut: 'Spooky', say: 'Happy Halloween! Bats are swooping down' },
+    { month: '2027-11', id: 'pie', name: '🥧 Pie Feast', emoji: '🥧', mut: 'Pie', say: 'Happy Thanksgiving! Pies are falling' },
+    { month: '2027-12', id: 'snowman', name: '⛄ Snowman Winter', emoji: '⛄', mut: 'Snowy', say: 'Winter wonderland! Snowmen are falling' }
+  ];
+  const MONTH_AT = 900;                                  // seconds into each half hour
+  let monthOverride = '';                                // tests (and ?month=2026-12 in the preview): pretend it's another month
+  try { const q = new URLSearchParams(location.search).get('month'); if (q && /^\d{4}-\d{2}$/.test(q)) monthOverride = q; } catch (e) { /* none */ }
+  const monthKey = () => { if (monthOverride) return monthOverride; const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+  function monthModel(look, s) {                         // a little model for each month, about s across: falls, flies round dragons, decorates town
+    const g = new THREE.Group(), M = (geo, c, x, y, z, sx, sy, sz, rx, ry, rz) => { const m = new THREE.Mesh(geo, fxMat(c)); m.position.set(x || 0, y || 0, z || 0); m.scale.set(sx || 1, sy || sx || 1, sz || sx || 1); m.rotation.set(rx || 0, ry || 0, rz || 0); g.add(m); return m; };
+    const S = fxGeo.aura, Bx = fxGeo.box, K = fxGeo.flame;   // a sphere of radius 1, a 0.12 box, a small cone
+    if (look === 'pumpkin') { M(S, 0xff7a10, 0, 0, 0, 0.5, 0.38, 0.5); M(Bx, 0x3f8a3a, 0, 0.42, 0, 0.8, 1.6, 0.8); [-0.17, 0.17].forEach((x) => M(Bx, 0xffe14a, x, 0.08, -0.47, 0.9, 0.9, 0.3)); M(Bx, 0xffe14a, 0, -0.12, -0.47, 2.4, 0.6, 0.3); }
+    else if (look === 'harvest') { const c = [0xe2483d, 0xff8a3d, 0xffc21f][Math.floor(Math.random() * 3)]; M(Bx, c, 0, 0, 0, 6, 0.4, 4, 0, 0.6, 0); M(Bx, c, 0.2, 0, 0.2, 3.5, 0.4, 3.5, 0, 0.6 + 0.8, 0); M(Bx, 0x6b4a2b, -0.3, 0, -0.3, 2.4, 0.3, 0.3, 0, -0.8, 0); }
+    else if (look === 'present') { const c = [0xe2483d, 0x3f7fd6, 0x5fb83a, 0xb27bff][Math.floor(Math.random() * 4)]; M(Bx, c, 0, 0, 0, 6, 6, 6); M(Bx, 0xffd23f, 0, 0, 0, 6.2, 6.2, 1.2); M(Bx, 0xffd23f, 0, 0, 0, 1.2, 6.2, 6.2); [-1, 1].forEach((sd) => M(Bx, 0xffd23f, sd * 0.13, 0.44, 0, 2, 1.4, 0.8, 0, 0, sd * 0.6)); }
+    else if (look === 'firework') { M(fxGeo.horn, 0xe2483d, 0, 0, 0, 2.2, 2.6, 2.2); M(K, 0xffd23f, 0, 0.52, 0, 2.4, 1.4, 2.4); [0xff4fa8, 0x5bc0f0, 0xffe14a, 0x7ed957].forEach((c, k) => M(fxGeo.star, c, Math.cos(k * 1.57) * 0.42, -0.45, Math.sin(k * 1.57) * 0.42, 2.4)); }
+    else if (look === 'heart') { [-0.2, 0.2].forEach((x) => M(S, 0xff3b7f, x, 0.12, 0, 0.26, 0.26, 0.2)); M(K, 0xff3b7f, 0, -0.22, 0, 3.6, 2.2, 1.6, Math.PI, 0, 0); }
+    else if (look === 'clover') { [[0.18, 0.18], [-0.18, 0.18], [0.18, -0.18], [-0.18, -0.18]].forEach(([x, z]) => M(S, 0x3fa04a, x, 0, z, 0.2, 0.06, 0.2)); M(S, 0x2f8a3a, 0, 0.02, 0, 0.08, 0.06, 0.08); M(Bx, 0x2f8a3a, 0.3, 0, 0.3, 0.4, 0.4, 3, 0, 0.8, 0); M(fxGeo.ring, 0xffc21f, 0, -0.3, 0, 0.14, 0.14, 0.14, Math.PI / 2, 0, 0); }
+    else if (look === 'easter') { const c = [0xff8fd6, 0x8fe8ff, 0xfff27a, 0xb6ff8a, 0xd8b0ff][Math.floor(Math.random() * 5)]; M(S, c, 0, 0, 0, 0.36, 0.5, 0.36); M(fxGeo.ring, 0xffffff, 0, 0.08, 0, 0.36, 0.36, 0.9, Math.PI / 2, 0, 0); M(fxGeo.ring, 0xff4fa8, 0, -0.14, 0, 0.34, 0.34, 0.9, Math.PI / 2, 0, 0); }
+    else if (look === 'butterfly') { const c = [0xff8a3d, 0x5bc0f0, 0xff4fa8, 0xffd23f][Math.floor(Math.random() * 4)]; [-1, 1].forEach((sd) => { M(Bx, c, sd * 0.24, 0.06, 0, 3.6, 0.15, 3.2, 0, 0, sd * 0.4); M(Bx, 0x1d1f22, sd * 0.3, 0.07, 0.12, 1, 0.2, 1, 0, 0, sd * 0.4); }); M(Bx, 0x1d1f22, 0, 0, 0, 0.6, 0.6, 3.6); }
+    else if (look === 'icecream') { M(K, 0xe0b070, 0, -0.25, 0, 3.4, 4, 3.4, Math.PI, 0, 0); M(S, 0xff8fd6, 0, 0.18, 0, 0.26); M(S, 0xfff4d6, 0, 0.42, 0, 0.22); M(S, 0xe2483d, 0, 0.66, 0, 0.07); }
+    else if (look === 'melon') { M(fxGeo.taco, 0x2f8a3a, 0, -0.03, 0, 3.2, 1.8, 3.2, -Math.PI / 2, 0, 0); M(fxGeo.taco, 0xe2483d, 0, 0, 0, 2.8, 2.2, 2.8, -Math.PI / 2, 0, 0); [-0.2, 0, 0.2].forEach((x) => M(Bx, 0x1d1f22, x, -0.17 + Math.abs(x) * 0.3, -0.12, 0.4, 0.6, 0.3)); }
+    else if (look === 'beachball') { M(S, 0xffffff, 0, 0, 0, 0.45); [[0xe2483d, 0, 0], [0x3f7fd6, Math.PI / 2, 0], [0xffd23f, 0, Math.PI / 2]].forEach(([c, rx, rz]) => M(fxGeo.ring, c, 0, 0, 0, 0.46, 0.46, 1.6, rx, 0, rz)); }
+    else if (look === 'apple') { M(S, 0xd8241a, 0, 0, 0, 0.42, 0.38, 0.42); M(Bx, 0x6b4a2b, 0, 0.4, 0, 0.5, 1.8, 0.5); M(Bx, 0x3fa04a, 0.1, 0.42, 0, 1.8, 0.3, 1, 0, 0, -0.4); }
+    else if (look === 'bat') { M(S, 0x2a1e30, 0, 0, 0, 0.18, 0.2, 0.16); [-1, 1].forEach((sd) => { M(Bx, 0x3a2a4a, sd * 0.32, 0.02, 0, 4, 0.2, 2.2, 0, 0, sd * 0.3); M(K, 0x2a1e30, sd * 0.1, 0.22, 0, 0.8, 0.8, 0.8); M(Bx, 0xff3a1a, sd * 0.07, 0.04, -0.15, 0.4, 0.4, 0.2); }); }
+    else if (look === 'pie') { M(fxGeo.aura, 0xe0b070, 0, 0, 0, 0.5, 0.12, 0.5); M(fxGeo.aura, 0x8a3a2a, 0, 0.07, 0, 0.42, 0.08, 0.42); [0, 1.05, 2.1].forEach((a) => M(Bx, 0xf0d090, 0, 0.13, 0, 7, 0.3, 0.5, 0, a, 0)); }
+    else if (look === 'snowman') { M(S, 0xffffff, 0, -0.25, 0, 0.32); M(S, 0xffffff, 0, 0.12, 0, 0.24); M(S, 0xffffff, 0, 0.42, 0, 0.17); M(K, 0xff8a3d, 0, 0.42, -0.2, 0.6, 0.6, 1.4, -Math.PI / 2, 0, 0); [-0.06, 0.06].forEach((x) => M(Bx, 0x1d1f22, x, 0.48, -0.15, 0.4, 0.4, 0.4)); M(Bx, 0x1d1f22, 0, 0.62, 0, 2.2, 1.6, 2.2); M(Bx, 0xe2483d, 0, 0.27, 0, 2.6, 0.5, 2.6); }
+    g.scale.set(s, s, s);
+    return g;
+  }
   const MUTATIONS = [
     { id: 'lightning', name: 'Electric', emoji: '⚡', coins: 2, got: 'zap', fx: [['spark', [0xfff27a, 0xffffff], 10, 1]] },
     { id: 'fire', name: 'Fire', emoji: '🔥', coins: 2, speed: 3, got: 'fire', fx: [['rise', [0xff6a10, 0xffd23f], 8, 1]] },
@@ -3006,8 +3052,10 @@ const World = (function () {
     { id: 'ufo', name: 'UFO', emoji: '🛸', coins: 4, got: 'ufo', tint: 0xc8ffc0, fx: [['saucer', [0xc0c4c8, 0x7dff3a], 1, 1], ['spark', [0x7dff3a], 6, 1]] },
     { id: 'dirt', name: 'Dirt', emoji: '🟤', coins: 2, got: 'wind', fx: [['orbit', [0x6b4a2b, 0x8a6a45, 0x4a3320], 16, 1.1, 'clod']] },
     { id: 'giant', name: 'Giant', emoji: '🪨', coins: 2, got: 'rocks', size: 2, fx: [] },
-    { id: 'taco', name: 'Taco', emoji: '🌮', coins: 3, got: 'random', tier: 3, fx: [['orbit', [0xf2c14e], 9, 1.1, 'taco']] }   // Adriana: little tacos fly round it
+    { id: 'taco', name: 'Taco', emoji: '🌮', coins: 3, got: 'random', tier: 3, fx: [['orbit', [0xf2c14e], 9, 1.1, 'taco']] },   // Adriana: little tacos fly round it
+    ...MONTHLY.map((m) => ({ id: m.id, name: m.mut, emoji: m.emoji, coins: 4, got: 'month', fx: [['orbit', [0xffffff], 7, 1, m.id], ['spark', [0xffffff, 0xffe14a], 4, 0.6]] }))   // the monthly specials
   ];
+  const MONTH_LOOK = Object.fromEntries(MONTHLY.map((m) => [m.id, true]));
   const MUT = Object.fromEntries(MUTATIONS.map((m) => [m.id, m])), MUT_IDS = MUTATIONS.map((m) => m.id);
   const fxMats = {}, fxMat = (c, op) => fxMats[c + ':' + (op || 1)] || (fxMats[c + ':' + (op || 1)] = new THREE.MeshBasicMaterial(op ? { color: c, transparent: true, opacity: op, depthWrite: false } : { color: c }));
   const fxGeo = { box: new THREE.BoxGeometry(0.12, 0.12, 0.12), ball: new THREE.SphereGeometry(0.09, 6, 4), flame: new THREE.ConeGeometry(0.1, 0.28, 5), bubble: new THREE.SphereGeometry(0.14, 8, 6),
@@ -3050,6 +3098,7 @@ const World = (function () {
         else if (kind === 'saucer') { mesh = new THREE.Group(); const disc = new THREE.Mesh(fxGeo.aura, fxMat(col(0))); disc.scale.set(0.38, 0.08, 0.38); mesh.add(disc); const dome = new THREE.Mesh(fxGeo.aura, fxMat(col(1), 0.7)); dome.scale.set(0.16, 0.12, 0.16); dome.position.y = 0.07; mesh.add(dome); const beam = new THREE.Mesh(fxGeo.flame, fxMat(col(1), 0.25)); beam.scale.set(3, 3, 3); beam.position.y = -0.45; mesh.add(beam); }
         else if (kind === 'beams') { mesh = new THREE.Mesh(fxGeo.beam, fxMat(col(k))); mesh.position.set(0, 1.1, 0); }
         else if (shape === 'taco') { mesh = tacoModel(size); }
+        else if (MONTH_LOOK[shape]) { mesh = monthModel(shape, size * 0.32); }
         else { mesh = new THREE.Mesh(fxGeo[shape] || (kind === 'spark' ? sparkGeo : fxGeo.box), fxMat(col(k), shape === 'bubble' || shape === 'wisp' ? 0.5 : 0)); mesh.scale.set(size, size, size); }
         if (kind === 'cover' || kind === 'stars') { const [x, y, z] = onBody(); mesh.position.set(x * 1.05, y, z); mesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3); }
         d.fx.add(mesh);
@@ -3438,6 +3487,7 @@ const World = (function () {
     villageAnimate(dt, time);
     bunkerAnimate(dt, time);
     atlantisAnimate(dt, time);
+    monthDecorStep(dt);
     const tw = (s, k) => { const v = reduced ? 1 : 0.55 + 0.45 * Math.sin(time * 4 + k); s.scale.set(v, v, v); };
     for (const egg of eggs) {
       if (!egg.g.visible) continue;
@@ -5160,6 +5210,7 @@ const World = (function () {
     Object.keys(EVENTS).forEach((id) => { if (eventOn(id)) parts.push(EVENTS[id].name + ' ' + clock(eventLeft(id))); });
     if (started && nightShown > 0.6) parts.push('🌙 Night');
     if (started && !activeEvents().length) { const n = nextEvent(); if (n.inS < 120) parts.push('Next event in ' + clock(n.inS)); }
+    if (started && thisMonth() && !eventOn(thisMonth().id)) parts.push(thisMonth().name + ' in ' + clock(monthNext()));
     TREATS.forEach((t) => { if (treatLeft(t.id) > 0) parts.push(t.name + ' ' + clock(treatLeft(t.id))); });
     const txt = parts.join(' · ');
     if (txt !== effectShown) { effectShown = txt; effectEl.textContent = txt; effectEl.hidden = !txt; }
@@ -6102,23 +6153,29 @@ const World = (function () {
     { id: 'golden', name: '🏆 Golden meteors', kind: 'fall', look: 'gold', say: 'Golden meteors are falling' },
     { id: 'eclipse', name: '🌑 Eclipse', kind: 'fall', look: 'ring', dark: true, say: 'The sun went dark and glowing rings are falling' },
     { id: 'diamond', name: '💠 Diamond rain', kind: 'fall', look: 'diamond', say: 'Diamonds are raining down' },
+    ...MONTHLY.map((m) => ({ id: m.id, name: m.name, kind: 'fall', look: m.id, month: m.month, slow: m.id === 'heart' || m.id === 'butterfly' || m.id === 'harvest', say: m.say })),
     { id: 'taco', name: '🌮 Raining tacos', kind: 'fall', look: 'taco', swarm: true, say: 'It\'s raining LOTS of tacos', hint: 'Only a BIG taco landing on your dragon gives it the' }   // Adriana: lots of little ones, the big ones mutate
   ];
   const EVENTS = Object.fromEntries(EVENT_LIST.map((e) => [e.id, e]));
   const FS_LEN = EV_LEN, FS_PERIOD = EV_EVERY;
   const evUntil = {}, evWas = {}, slotCache = new Map();
+  const ROTATION = EVENT_LIST.filter((e) => !e.month);    // the monthly specials have their own times
   function slotEvents(k) {                               // which event(s) play in half hour number k: picked by a dice roll everyone shares
     if (slotCache.has(k)) return slotCache.get(k);
-    const r = W.rng(k * 7919 + 13), first = EVENT_LIST[Math.floor(r() * EVENT_LIST.length)], list = [first];
-    if (r() < EV_DOUBLE) { let second; do second = EVENT_LIST[Math.floor(r() * EVENT_LIST.length)]; while (second === first); list.push(second); }
+    const r = W.rng(k * 7919 + 13), first = ROTATION[Math.floor(r() * ROTATION.length)], list = [first];
+    if (r() < EV_DOUBLE) { let second; do second = ROTATION[Math.floor(r() * ROTATION.length)]; while (second === first); list.push(second); }
     if (slotCache.size > 50) slotCache.clear();
     slotCache.set(k, list); return list;
   }
   const slotNow = () => { const t = Date.now() / 1000; return { k: Math.floor(t / EV_EVERY), phase: t % EV_EVERY }; };
   let clockEventsOff = false;                            // tests only: no events from the clock
   const evStopped = {};                                  // an admin turned this event off: it stays off until then (the rest of its 5 minutes)
-  const eventOn = (id) => { if (!EVENTS[id]) return false; if (Date.now() < (evStopped[id] || 0)) return false; if (Date.now() < (evUntil[id] || 0)) return true; if (clockEventsOff) return false; const { k, phase } = slotNow(); return phase < EV_LEN && slotEvents(k).includes(EVENTS[id]); };
-  const eventLeft = (id) => { if (Date.now() < (evStopped[id] || 0)) return 0; const { k, phase } = slotNow(); return Math.max(phase < EV_LEN && slotEvents(k).includes(EVENTS[id]) ? EV_LEN - phase : 0, ((evUntil[id] || 0) - Date.now()) / 1000, 0); };
+  const monthOn = (e) => { if (!e.month || e.month !== monthKey()) return 0; const ph = slotNow().phase - MONTH_AT; return ph >= 0 && ph < EV_LEN ? EV_LEN - ph : 0; };   // this month's special: seconds left, or 0
+  const clockLeft = (id) => { const e = EVENTS[id]; if (e.month) return monthOn(e); const { k, phase } = slotNow(); return phase < EV_LEN && slotEvents(k).includes(e) ? EV_LEN - phase : 0; };
+  const eventOn = (id) => { if (!EVENTS[id]) return false; if (Date.now() < (evStopped[id] || 0)) return false; if (Date.now() < (evUntil[id] || 0)) return true; if (clockEventsOff) return false; return clockLeft(id) > 0; };
+  const eventLeft = (id) => { if (!EVENTS[id] || Date.now() < (evStopped[id] || 0)) return 0; return Math.max(clockEventsOff ? 0 : clockLeft(id), ((evUntil[id] || 0) - Date.now()) / 1000, 0); };
+  const thisMonth = () => MONTHLY.find((m) => m.month === monthKey());
+  const monthNext = () => { const ph = slotNow().phase; return ph < MONTH_AT ? MONTH_AT - ph : EV_EVERY - ph + MONTH_AT; };
   const nextEvent = () => { const t = Date.now() / 1000, k = Math.floor(t / EV_EVERY) + 1; return { e: slotEvents(k)[0], both: slotEvents(k), inS: k * EV_EVERY - t }; };
   function startEvent(id, by) {
     if (!EVENTS[id]) return;
@@ -6168,16 +6225,32 @@ const World = (function () {
     diamond: { geo: new THREE.OctahedronGeometry(0.9, 0), mat: [0xbff6ff, 0xffffff], boom: 0x8fe8ff, glow: true },
     taco: { taco: true, mat: [0xf2c14e, 0x5fb83a], boom: 0xf2c14e }
   };
+  MONTHLY.forEach((m) => { FALLS[m.id] = { model: true, mat: [0xffffff, 0xffe14a], boom: 0xffe14a }; });
+  /* All month long, the town is decorated for it: big ones in a ring round the edge of town. */
+  let monthDeco = null, monthDecoKey = null, monthDecoT = 0;
+  function monthDecorStep(dt) {
+    monthDecoT -= dt; if (monthDecoT > 0) return; monthDecoT = 10;
+    const m = thisMonth(), key = m ? m.id : '';
+    if (key === monthDecoKey) return;
+    monthDecoKey = key; if (monthDeco) scene.remove(monthDeco); monthDeco = null;
+    if (!m) return;
+    monthDeco = new THREE.Group();
+    for (let k = 0; k < 16; k++) {
+      const a = k / 16 * Math.PI * 2 + 0.2, r = HUB.r + 2.5, x = HUB.x + Math.cos(a) * r, z = HUB.z + Math.sin(a) * r, md = monthModel(m.id, 1.7);
+      md.position.set(x, Math.max(W.bil(H, x, z), 0) + 0.85, z); md.rotation.y = -a + Math.PI / 2; monthDeco.add(md);
+    }
+    scene.add(monthDeco);
+  }
   function fbGeo0() { return new THREE.SphereGeometry(0.9, 10, 8); }
   const fireballs = [];                                  // everything falling or flying through the air (name kept from the fire storm)
   function spawnFireball(x, z, kind, from) {             // kind: an event id ('fire', 'giant'...) or 'rock'; from: a volcano's crater
     const ev = EVENTS[kind === 'rock' ? 'giant' : kind || 'fire'] || EVENTS.fire, look = from ? 'magma' : ev.look, F = FALLS[look] || FALLS.fireball;
     if (x === undefined) ({ x, z } = from ? randomLand(220) : aimSpot());
     const g = new THREE.Group(), mat = (c) => (F.glow ? new THREE.MeshBasicMaterial({ color: c, transparent: !!F.see, opacity: F.see || 1 }) : F.see ? fxMat(c, F.see) : L_(c));
-    const ball = F.taco ? tacoModel(18) : new THREE.Mesh(F.geo, mat(F.mat[0])); g.add(ball);
+    const ball = F.taco ? tacoModel(18) : F.model ? monthModel(look, 2.6) : new THREE.Mesh(F.geo, mat(F.mat[0])); g.add(ball);
     if (F.stretch) ball.scale.set(0.8, 1.4, 0.8);
     if (F.wrap) [-1, 1].forEach((sd) => { const w = new THREE.Mesh(fxGeo.flame, mat(F.mat[1])); w.scale.set(3, 3, 3); w.position.x = sd * 0.9; w.rotation.z = sd * Math.PI / 2; g.add(w); });
-    if (look !== 'bolt' && look !== 'bubble' && look !== 'taco') for (let k = 1; k <= 4; k++) { const t = new THREE.Mesh(fbGeo, mat(F.mat[k % 2])); const sc = 0.5 / k + 0.15; t.scale.set(sc, sc, sc); t.position.set(0, k * 1.1, 0); g.add(t); }   // a tail
+    if (look !== 'bolt' && look !== 'bubble' && look !== 'taco' && !F.model) for (let k = 1; k <= 4; k++) { const t = new THREE.Mesh(fbGeo, mat(F.mat[k % 2])); const sc = 0.5 / k + 0.15; t.scale.set(sc, sc, sc); t.position.set(0, k * 1.1, 0); g.add(t); }   // a tail
     const ox = from ? 0 : (Math.random() - 0.5) * 30, oz = from ? 0 : (Math.random() - 0.5) * 30;
     g.position.set(from ? from.x : x + ox, from ? from.y : 90, from ? from.z : z + oz); scene.add(g);
     fireballs.push({ g, x, z, ox, oz, t: 0, boom: null, mut: from ? 'magma' : ev.id, look, F, from, dur: from ? 3.2 : F.fast ? 0.35 : ev.slow ? 7 : 2, rock: look === 'rock' });
@@ -6781,7 +6854,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

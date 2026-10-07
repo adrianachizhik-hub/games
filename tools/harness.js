@@ -1090,7 +1090,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     console.log('events:', I.EVENT_LIST.length, '| every mutation has its own event:', I.MUTATIONS.every((m) => I.EVENTS[m.id]), '| next up:', I.nextEvent().e.name, 'in', I.nextEvent().inS.toFixed(0), 's');
     { let two = 0, seen = new Set(); for (let k = 0; k < 4000; k++) { const l = I.slotEvents(100000 + k); if (l.length === 2) two++; l.forEach((e) => seen.add(e.id)); }
       console.log('events every 30 minutes for 5 minutes | over 4000 half hours: two at once', (two / 40).toFixed(1) + '% | different events seen', seen.size);
-      if (two / 4000 < 0.05 || two / 4000 > 0.2 || seen.size !== I.EVENT_LIST.length) throw new Error('events should be random, sometimes two at once'); }
+      if (two / 4000 < 0.05 || two / 4000 > 0.2 || seen.size !== I.EVENT_LIST.filter((e) => !e.month).length) throw new Error('events should be random, sometimes two at once'); }
     if (!I.MUTATIONS.every((m) => I.EVENTS[m.id])) throw new Error('every mutation needs an event');
   }
   { // the rock fall: a rock on a dragon makes it a Giant
@@ -1279,6 +1279,23 @@ if (process.env.MODE !== 'admin') {
     I.sendHome('test'); pet.kind = kind0; if (I.riding()) I.dismount(true); }
   I.makeDragon('aquaboy'); I.makeDragon('aquagirl');
   I.setWaterRes(0); I.setAquaTaken(-1);
+}
+
+// ---- monthly specials ----
+{
+  console.log('monthly specials:', I.MONTHLY.map((m) => m.month + ' ' + m.name).join(' | '));
+  if (I.MONTHLY.length !== 15 || I.MONTHLY[0].month !== '2026-10' || I.MONTHLY[14].month !== '2027-12') throw new Error('one special for every month from October 2026 to December 2027');
+  I.clockEventsOff(false);
+  for (const m of I.MONTHLY) {
+    I.setMonth(m.month); I.eggsAnimate(1 / 60, 0);
+    const deco = I.monthDeco(), other = I.MONTHLY.filter((q) => q !== m && I.eventOn(q.id)).length, t = Date.now() / 1000 % 1800, should = t >= 900 && t < 1200;
+    if (!deco || deco.children.length < 10 || other || I.eventOn(m.id) !== should) throw new Error(m.name + ': decorations or timing wrong');
+  }
+  I.setMonth('2026-10'); I.eggsAnimate(1 / 60, 0);
+  console.log('in October 2026: town decorated with', I.monthDeco().children.length, 'pumpkins | the special is', I.thisMonth().name, '| on now', I.eventOn('pumpkin'), '| other months\' specials on', I.MONTHLY.filter((q) => q.id !== 'pumpkin' && I.eventOn(q.id)).length);
+  I.setMonth('2030-01'); I.eggsAnimate(1 / 60, 0); console.log('a month with no special: decorations', I.monthDeco(), '| special', I.thisMonth());
+  if (I.monthDeco() || I.thisMonth()) throw new Error('no special after 2027');
+  I.setMonth(''); I.clockEventsOff(true);
 }
 
 // ---- the hatching timer ----
