@@ -3237,6 +3237,7 @@ const World = (function () {
   function pickUp(egg) {
     const t = EGG_TIERS[egg.tier], home = plots[myPlot], total = Math.round(t.base + Math.hypot(egg.spot.x - home.x, egg.spot.z - home.z) * EXTRA_PER_UNIT + (egg.spot.mud ? 20 : 0));   // 20 s more from the mud cavern, to walk out
     egg.taken = true; egg.g.visible = false;
+    if (egg.netId) netSend({ t: 'eggtaken', id: egg.netId });   // gone for everyone else
     carrying = { egg, left: total, total, shown: -1 };
     carryMeshes[egg.tier].visible = true;
     carryDot.style.background = '#' + (t.shell || t.swirl[0]).toString(16).padStart(6, '0');
@@ -3272,6 +3273,7 @@ const World = (function () {
     }
     const spot = { x: p.x, y: p.dungeon ? (p.mud ? MUD.floor : DG.floor) : p.inCave ? W.bil(H, p.x, p.z) : standing(p.x, p.z), z: p.z, dungeon: p.dungeon, cave: p.inCave, mud: !!p.mud };
     placeEgg(egg, spot); egg.waitAway = true;            // not picked straight back up: walk away from it first
+    if (egg.netId) netSend({ t: 'egg', id: egg.netId, tier: egg.tier, spot });   // an admin's egg: everyone sees it again
     toast('You dropped the ' + EGG_TIERS[egg.tier].name + ' egg. Walk back to it to pick it up again.', 3);
   }
   dropBtn.addEventListener('click', (e) => { dropCarried(); if (e.detail > 0) dropBtn.blur(); });
@@ -3298,7 +3300,7 @@ const World = (function () {
   }
   function dropEgg() {                                    // leaving the game: the egg goes back where it was
     const egg = stopCarrying();
-    if (egg && !egg.lucky) placeEgg(egg, egg.spot);
+    if (egg && !egg.lucky) { placeEgg(egg, egg.spot); if (egg.netId) netSend({ t: 'egg', id: egg.netId, tier: egg.tier, spot: egg.spot }); }
   }
   function jumpTo(i) {
     if (!isAdmin) { toast('Only admins can jump to places. Walk there, or ride your dragon!', 3); return; }   // Adriana's rule
@@ -3992,8 +3994,8 @@ const World = (function () {
   /* Decorations, built on whichever plot is yours this visit. Spots are in the plot's own frame (lz toward the back). */
   let decorMeshes = [], fairyBulbs = [];               // fairyBulbs: { m, base, phase } for the twinkling
   function decorModel(id) {
-    const g = new THREE.Group(), L = (c) => lam(c), at = (lx, lz) => { const w = plotWorld(myPlot, lx, lz); return [w.x, HUB.h + 0.1, w.z]; };
-    const put = (lx, lz, build) => { const s = new THREE.Group(); s.position.set(...at(lx, lz)); s.rotation.y = Math.PI / 2 - plots[myPlot].phi; build(s); g.add(s); };
+    const g = new THREE.Group(), L = (c) => lam(c), at = (lx, lz) => { const w = plotWorld(decorPlot, lx, lz); return [w.x, HUB.h + 0.1, w.z]; };
+    const put = (lx, lz, build) => { const s = new THREE.Group(); s.position.set(...at(lx, lz)); s.rotation.y = Math.PI / 2 - plots[decorPlot].phi; build(s); g.add(s); };
     if (id === 'flowers') [-3.8, 3.8].forEach((lx) => put(lx, 4.2, (s) => { block(s, L(0x6b4a2b), 2.2, 0.25, 1.1, 0, 0.12, 0); [0xef6fae, 0xffd23f, 0x8a5ad6, 0xffffff, 0xe2483d].forEach((c, k) => { block(s, L(0x3f8a3a), 0.06, 0.4, 0.06, -0.8 + k * 0.4, 0.42, 0); block(s, L(c), 0.24, 0.18, 0.24, -0.8 + k * 0.4, 0.66, 0); }); }));
     if (id === 'fairy') {                                // little poles around the edge with coloured lights hanging between them
       const half = PLOT / 2, cols = [0xff6fae, 0xffd23f, 0x5bc0f0, 0x7ed957, 0xb27bff, 0xff8a3d];
@@ -4002,10 +4004,10 @@ const World = (function () {
         [[-1.8, -half], [-half, -half]], [[-half, -half], [-half, 0]], [[-half, 0], [-half, half]]];   // the far side, the right, the front (leaving the way in open), the left
       let n = 0;
       runs.forEach(([a, b]) => {
-        [a, b].forEach(([lx, lz]) => { const w = plotWorld(myPlot, lx, lz); block(g, pole, 0.1, 1.5, 0.1, w.x, H0 + 0.75, w.z); });
+        [a, b].forEach(([lx, lz]) => { const w = plotWorld(decorPlot, lx, lz); block(g, pole, 0.1, 1.5, 0.1, w.x, H0 + 0.75, w.z); });
         const len = Math.hypot(b[0] - a[0], b[1] - a[1]), steps = Math.max(3, Math.round(len / 0.45));
         for (let k = 0; k <= steps; k++) {
-          const t = k / steps, lx = a[0] + (b[0] - a[0]) * t, lz = a[1] + (b[1] - a[1]) * t, y = H0 + 1.45 - Math.sin(Math.PI * t) * 0.35, w = plotWorld(myPlot, lx, lz);
+          const t = k / steps, lx = a[0] + (b[0] - a[0]) * t, lz = a[1] + (b[1] - a[1]) * t, y = H0 + 1.45 - Math.sin(Math.PI * t) * 0.35, w = plotWorld(decorPlot, lx, lz);
           block(g, wire, 0.03, 0.03, 0.03, w.x, y + 0.05, w.z);
           if (k > 0 && k < steps) { const m = new THREE.MeshBasicMaterial({ color: cols[n++ % cols.length] }); block(g, m, 0.12, 0.16, 0.12, w.x, y - 0.06, w.z); fairyBulbs.push({ m, base: m.color.clone(), phase: n * 2.39, speed: 1.5 + (n % 5) * 0.4 }); }
         }
@@ -4021,8 +4023,8 @@ const World = (function () {
   /* An arch over the way in (the gap in the near edge, lz = -5.5, 3.2 wide). Posts at lx ±1.9, a curved top from blocks. */
   function archModel(id) {
     const g = new THREE.Group(), L = (c) => lam(c), glow = (c) => new THREE.MeshBasicMaterial({ color: c });
-    const w = plotWorld(myPlot, 0, -PLOT / 2), s = new THREE.Group();
-    s.position.set(w.x, HUB.h + 0.1, w.z); s.rotation.y = Math.PI / 2 - plots[myPlot].phi; g.add(s);
+    const w = plotWorld(decorPlot, 0, -PLOT / 2), s = new THREE.Group();
+    s.position.set(w.x, HUB.h + 0.1, w.z); s.rotation.y = Math.PI / 2 - plots[decorPlot].phi; g.add(s);
     const R = 1.9, TOP = 2.5, RY = 0.9;                  // half width, post height, how tall the curve is
     const arcAt = (t, r = R, ry = RY) => { const a = Math.PI * t; return [Math.cos(a) * r, TOP + Math.sin(a) * ry, Math.atan2(Math.cos(a) * ry, -Math.sin(a) * r)]; };
     const arc = (m, size, n = 11, r = R, ry = RY, thick = size) => { for (let k = 0; k <= n; k++) { const [x, y, rz] = arcAt(k / n, r, ry); block(s, typeof m === 'function' ? m(k) : m, size, size, thick, x, y, 0, 0, 0, rz); } };
@@ -4090,7 +4092,7 @@ const World = (function () {
   let adminAnims = [];                                   // things in admin decorations that move
   function adminDecorModel(id) {
     const g = new THREE.Group(), L = (c) => lam(c), G = (c) => new THREE.MeshBasicMaterial({ color: c });
-    const put = (lx, lz, y, build) => { const w = plotWorld(myPlot, lx, lz), s = new THREE.Group(); s.position.set(w.x, HUB.h + 0.1 + (y || 0), w.z); s.rotation.y = Math.PI / 2 - plots[myPlot].phi; build(s); g.add(s); return s; };
+    const put = (lx, lz, y, build) => { const w = plotWorld(decorPlot, lx, lz), s = new THREE.Group(); s.position.set(w.x, HUB.h + 0.1 + (y || 0), w.z); s.rotation.y = Math.PI / 2 - plots[decorPlot].phi; build(s); g.add(s); return s; };
     const RAIN = [0xe2483d, 0xff8a3d, 0xffd23f, 0x5fb83a, 0x3f7fd6, 0x8a5ad6];
     if (id === 'portal') put(0, 8.6, 0, (s) => {
       block(s, L(0x3a2f45), 5.6, 0.4, 1.4, 0, 0.2, 0);
@@ -4155,8 +4157,33 @@ const World = (function () {
     scene.add(g);
     return g;
   }
-  function buildDecor() { clearDecor(); if (myPlot >= 0) { decorMeshes = decorOwned.filter((id) => !decorOff.includes(id)).map(decorModel); if (archOn) decorMeshes.push(archModel(archOn)); if (isAdmin) adminDecorOn.forEach((id) => decorMeshes.push(adminDecorModel(id))); } }
-  function clearDecor() { decorMeshes.forEach((g) => scene.remove(g)); decorMeshes = []; fairyBulbs = []; adminAnims = []; }
+  /* Everyone's decorations show (bug fix, 7 October 2026: other players' plots looked bare). Yours are built while you
+     have a plot; other players' come from the server (o.decor: { d: decorations, arch, admin: admin decorations }) and
+     are built on their plot. Everything is rebuilt together, since the twinkling lights and moving admin things are kept
+     in one list. */
+  let decorPlot = -1, ownDecorOn = false;              // decorPlot: the plot the models are being built on
+  const decorIds = (list, all) => (Array.isArray(list) ? list : []).filter((id) => all.some((x) => x.id === id));
+  function drawAllDecor() {
+    decorMeshes.forEach((g) => scene.remove(g)); decorMeshes = []; fairyBulbs = []; adminAnims = [];
+    if (ownDecorOn && myPlot >= 0) {
+      decorPlot = myPlot;
+      decorMeshes = decorOwned.filter((id) => !decorOff.includes(id)).map(decorModel); if (archOn) decorMeshes.push(archModel(archOn)); if (isAdmin) adminDecorOn.forEach((id) => decorMeshes.push(adminDecorModel(id)));
+    }
+    others.forEach((o) => {
+      dropOtherDecor(o);
+      if (!(o.plot >= 0 && o.plot < 7) || o.plot === myPlot || !o.decor) return;
+      decorPlot = o.plot;
+      o.decorMeshes = decorIds(o.decor.d, DECOR).map(decorModel);
+      if (decorIds([o.decor.arch], ARCHES).length) o.decorMeshes.push(archModel(o.decor.arch));
+      if (o.admin) decorIds(o.decor.admin, ADMIN_DECOR).forEach((id) => o.decorMeshes.push(adminDecorModel(id)));
+    });
+    decorPlot = myPlot;
+  }
+  function dropOtherDecor(o) { (o.decorMeshes || []).forEach((g) => scene.remove(g)); o.decorMeshes = []; }
+  const myDecor = () => ({ d: decorOwned.filter((id) => !decorOff.includes(id)), arch: archOn, admin: isAdmin ? adminDecorOn.slice() : [] });
+  function sendDecor() { netSend({ t: 'decor', decor: myDecor() }); }
+  function buildDecor() { ownDecorOn = true; drawAllDecor(); sendDecor(); }
+  function clearDecor() { ownDecorOn = false; drawAllDecor(); }
   function twinkleLights(time) {                         // each bulb fades up and down at its own pace
     for (const b of fairyBulbs) { const k = reduced ? 1 : 0.35 + 0.65 * Math.max(0, Math.sin(time * b.speed + b.phase)); b.m.color.copy(b.base).multiplyScalar(k); }
   }
@@ -5222,13 +5249,27 @@ const World = (function () {
     if (!isAdmin || !started) return;
     const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), x = p.x + fx * 3, z = p.z + fz * 3;
     const spot = p.mud ? { x: p.x, y: MUD.floor, z: p.z, dungeon: true, mud: true } : { x, y: p.dungeon ? DG.floor : p.inCave ? W.bil(H, x, z) : standing(x, z), z, dungeon: p.dungeon, cave: p.inCave };
+    const egg = makeSpawnedEgg(tier, spot, (netId || 'me') + '-' + Date.now().toString(36) + Math.floor(Math.random() * 1000));
+    netSend({ t: 'egg', id: egg.netId, tier, spot });       // everyone else on the server sees it too, and can pick it up
+    toast('A ' + EGG_TIERS[tier].name + ' egg appeared in front of you!' + (netOnline ? ' Everyone on the server can see it.' : ''), 3);
+  }
+  function makeSpawnedEgg(tier, spot, id) {             // an admin's egg, here or from another player's game
     const t = EGG_TIERS[tier], g = new THREE.Group(), body = new THREE.Mesh(eggGeo[tier], eggMat(tier));
     g.add(body); g.scale.set(1.4, 1.4, 1.4);
     const stars = t.shiny ? [twinkle(g, -0.5, 1.1, 0, 0.7), twinkle(g, 0.45, 0.75, 0.1, 0.55), twinkle(g, 0.2, 1.35, -0.3, 0.45)] : [];
     scene.add(g);
-    const egg = { tier, g, body, stars, spot: null, taken: false, phase: Math.random() * 6, spawned: true };
+    const egg = { tier, g, body, stars, spot: null, taken: false, phase: Math.random() * 6, spawned: true, netId: id };
     placeEgg(egg, spot); eggs.push(egg);
-    toast('A ' + t.name + ' egg appeared in front of you!', 3);
+    return egg;
+  }
+  function netEgg(e) {                                   // a spawned egg from the server
+    if (!e || !EGG_TIERS[e.tier] || !e.spot || eggs.some((q) => q.netId === e.id)) return;
+    makeSpawnedEgg(e.tier, e.spot, e.id);
+  }
+  function netEggTaken(id) {                             // someone else picked it up first
+    const egg = eggs.find((q) => q.netId === id);
+    if (!egg || (carrying && carrying.egg === egg)) return;
+    scene.remove(egg.g); eggs.splice(eggs.indexOf(egg), 1);
   }
   const addRow = adminSection('Add a dragon to your base'), addPick = document.createElement('select'), addBtn = document.createElement('button');
   Object.keys(DRAGON_KINDS).filter((k) => !DRAGON_KINDS[k].storm).forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = DRAGON_KINDS[k].name; addPick.appendChild(o); });
@@ -6115,7 +6156,7 @@ const World = (function () {
   function serverPickerStep(dt) { if (started || !statusUrl) return; srvTimer -= dt; if (srvTimer <= 0) { srvTimer = 8; refreshServers(); } }
   function netGone() {
     netOnline = false; sock = null; netId = 0;
-    others.forEach((o) => removeOther(o)); others.clear();
+    others.forEach((o) => { removeOther(o); dropOtherDecor(o); }); others.clear();
     plotOwners.forEach((o, i) => { if (o) { plotOwners[i] = null; if (i !== myPlot) paintSign(i, 'Plot ' + (i + 1)); } });
   }
   function netClose() { if (sock) { const s0 = sock; netGone(); try { s0.close(); } catch (e) { /* gone */ } } }
@@ -6126,13 +6167,17 @@ const World = (function () {
       m.plots.forEach((o, i) => { if (o && o.id !== netId) setOwner(i, o); });
       addChat('', 'You\'re on Server ' + m.room + (m.players.length ? ' with ' + m.players.length + ' other player' + (m.players.length === 1 ? '' : 's') : ', and nobody else is here yet') + '. Chat goes to everyone on this server.', true);
       toast(m.room === chosenRoom || !chosenRoom ? 'You joined Server ' + m.room + '!' : 'Server ' + chosenRoom + ' filled up, so you joined Server ' + m.room + '.', 4);
+      sendDecor(); drawAllDecor(); (m.eggs || []).forEach(netEgg);
       if (myPlot >= 0) { if (plotOwners[myPlot]) { releasePlot(); toast('Someone already has that plot. Walk onto a free one!', 4); } else netSend({ t: 'claim', plot: myPlot }); }
       petsSent = '';
     } else if (m.t === 'full') toast('All 11 servers are full right now. Playing offline.', 5);
     else if (m.t === 'join') { addOther(m.p); addChat('', m.p.name + ' joined the server.', true); }
-    else if (m.t === 'left') { const o = others.get(m.id); if (o) { addChat('', o.name + ' left the server.', true); removeOther(o); others.delete(m.id); } if (m.plot >= 0 && plotOwners[m.plot] && plotOwners[m.plot].id === m.id) setOwner(m.plot, null); }
+    else if (m.t === 'left') { const o = others.get(m.id); if (o) { addChat('', o.name + ' left the server.', true); removeOther(o); dropOtherDecor(o); others.delete(m.id); } if (m.plot >= 0 && plotOwners[m.plot] && plotOwners[m.plot].id === m.id) setOwner(m.plot, null); }
     else if (m.t === 'states') m.list.forEach(([id, x, y, z, yaw, ride, fly]) => { const o = others.get(id); if (o) { o.tx = x; o.ty = y; o.tz = z; o.tyaw = yaw; setRide(o, ride); if (!o.seen) { o.seen = true; o.x = x; o.y = y; o.z = z; o.yaw = yaw; } } });
-    else if (m.t === 'plot') { const o = others.get(m.id); if (m.id && o) { o.plot = m.plot; setOwner(m.plot, { id: m.id, name: m.name }); } else setOwner(m.plot, null); if (o) showPets(o); }
+    else if (m.t === 'plot') { const o = others.get(m.id); if (m.id && o) { o.plot = m.plot; setOwner(m.plot, { id: m.id, name: m.name }); } else { [...others.values()].forEach((q) => { if (q.plot === m.plot) q.plot = -1; }); setOwner(m.plot, null); } if (o) showPets(o); drawAllDecor(); }
+    else if (m.t === 'egg') { netEgg(m.egg); if (m.egg && EGG_TIERS[m.egg.tier]) addChat('', 'An admin spawned a ' + EGG_TIERS[m.egg.tier].name + ' egg! Find it and take it home.', true); }
+    else if (m.t === 'eggtaken') netEggTaken(m.id);
+    else if (m.t === 'decor') { const o = others.get(m.id); if (o) { o.decor = m.decor; drawAllDecor(); } }
     else if (m.t === 'claimed') { if (!m.ok && myPlot === m.plot) { releasePlot(); toast('That\'s ' + m.owner + '\'s Plot. Find a free one!', 4); } }
     else if (m.t === 'pets') { const o = others.get(m.id); if (o) { o.pets = m.kinds; showPets(o); } }
     else if (m.t === 'look') { const o = others.get(m.id); if (o) { o.look = m.look; removeOther(o); buildOther(o); } }
@@ -6339,6 +6384,7 @@ const World = (function () {
     if (o.plot >= 0) setOwner(o.plot, { id: o.id, name: o.name });
     if (c.s) setRide(o, c.s[4]);
     showPets(o);
+    o.decor = c.decor || null; o.decorMeshes = []; drawAllDecor();
   }
   const okColour = (c, d) => (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d);
   function buildOther(o) {                               // a blocky person like yours, in their colours, with a name tag
@@ -6440,7 +6486,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

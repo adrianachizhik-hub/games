@@ -65,11 +65,29 @@ function player(name, code) {
   check(c.got.some((m) => m.t === 'tradeclosed' && /stopped/.test(m.why)), 'stopping a trade tells the other player');
   c.send({ t: 'gift', to: d.welcome.id, coins: -50, dragons: 'lots' }); await wait(80);
   check(d.got.filter((m) => m.t === 'gifted').length === 1, 'a gift of nothing (or minus coins) is ignored');
+  // plot decorations and spawned eggs
+  c.send({ t: 'decor', decor: { d: ['flowers', 'fountain'], arch: 'rainbow', admin: ['portal'] } }); await wait(80);
+  const dm = d.got.find((m) => m.t === 'decor');
+  check(dm && dm.id === c.welcome.id && dm.decor.d.join() === 'flowers,fountain' && dm.decor.arch === 'rainbow', 'other players hear about your plot decorations');
+  check(dm && dm.decor.admin.length === 0, 'a non-admin can\'t show admin decorations');
+  const spot = { x: 5, y: 6, z: 7 };
+  c.send({ t: 'egg', id: 'x1', tier: 4, spot }); await wait(80);
+  check(!d.got.some((m) => m.t === 'egg'), 'a non-admin can\'t spawn eggs');
   const adminName = process.env.ADMIN_NAME, adminCode = process.env.ADMIN_CODE;
   if (adminName) {
-    ps[7].ws.close(); await wait(80);
+    ps[7].ws.close(); ps[6].ws.close(); ps[5].ws.close(); await wait(80);   // room on Server 1 for the admin (and one more)
     const ad = await player(adminName, adminCode);
+    check(ad.welcome.room === 1, 'the admin joins Server 1, with the others');
     check(ad.welcome.admin === true, 'an admin with the right code is an admin on the server');
+    ad.send({ t: 'egg', id: 'ad-1', tier: 4, spot: { x: 1, y: 2, z: 3 } }); await wait(80);
+    check(b.got.some((m) => m.t === 'egg' && m.egg.id === 'ad-1' && m.egg.tier === 4 && m.egg.spot.z === 3), 'an admin\'s spawned egg shows up for everyone on the server');
+    const late3 = await player('LateEgg'); check(late3.welcome.eggs.some((e) => e.id === 'ad-1'), 'someone joining later sees it too'); late3.ws.close(); await wait(80);
+    b.send({ t: 'eggtaken', id: 'ad-1' }); await wait(80);
+    check(ad.got.some((m) => m.t === 'eggtaken' && m.id === 'ad-1'), 'when someone picks it up, it\'s gone for everyone else');
+    b.send({ t: 'egg', id: 'ad-1', tier: 4, spot: { x: 9, y: 2, z: 9 } }); await wait(80);
+    check(ad.got.some((m) => m.t === 'egg' && m.egg.id === 'ad-1' && m.egg.spot.x === 9), 'if they drop it, everyone sees it again where it was dropped');
+    ad.send({ t: 'decor', decor: { d: [], arch: '', admin: ['portal', 'volcano'] } }); await wait(80);
+    check(b.got.some((m) => m.t === 'decor' && m.decor.admin.join() === 'portal,volcano'), 'an admin\'s admin decorations show for everyone');
     ad.send({ t: 'announce', text: 'Hello all servers' }); await wait(80);
     ad.send({ t: 'time', mode: 'night' }); await wait(80);
     check(b.got.some((m) => m.t === 'time' && m.mode === 'night'), 'an admin can make it night for everyone');
@@ -78,7 +96,8 @@ function player(name, code) {
     check(b.got.some((m) => m.t === 'firestorm'), 'an admin can start a fire storm for everyone');
     check(b.got.some((m) => m.t === 'announce' && m.text === 'Hello all servers'), 'an admin announcement reaches everyone');
     const fake = await player(adminName, '0000'); check(fake.welcome.admin === false, 'the admin name with a wrong code is not an admin');
-    fake.ws.close(); ad.ws.close();
+    fake.ws.close(); ad.ws.close(); await wait(80);
+    await player('Kid6b'); await player('Kid7b');   // Server 1 full again, for the checks below
   } else console.log('(skipped the admin checks: set ADMIN_NAME and ADMIN_CODE to run them)');
   a.ws.close(); await wait(120);
   check(b.got.some((m) => m.t === 'left' && m.id === a.welcome.id && m.plot === 2), 'when Kid1 leaves, everyone hears, and Plot 3 is free again');

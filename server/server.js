@@ -19,7 +19,7 @@ function scramble(str) {
 }
 const isAdmin = (name, code) => { const n = String(name || '').toLowerCase(); return ADMINS.some((a) => a[0] === scramble(n) && a[1] === scramble(n + '#' + String(code || '').trim())); };
 
-const rooms = Array.from({ length: ROOMS }, (_, i) => ({ id: i + 1, players: new Map(), plots: new Array(PLOTS).fill(null) }));
+const rooms = Array.from({ length: ROOMS }, (_, i) => ({ id: i + 1, players: new Map(), plots: new Array(PLOTS).fill(null), eggs: [], taken: new Map() }));   // eggs: ones admins spawned, still waiting to be picked up
 let nextId = 1, timeMode = 'auto';                    // timeMode: an admin made it 'day' or 'night' for everyone, until 'auto' again
 
 /* ---------- A tiny WebSocket: just enough for text messages ---------- */
@@ -54,7 +54,8 @@ function frames(state, chunk, onText, onClose) {     // read whole frames out of
 const clean = (t, n) => String(t || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : 0);
 function broadcast(room, msg, except) { const t = JSON.stringify(msg); room.players.forEach((pl) => { if (pl !== except) sendRaw(pl.sock, t); }); }
-const card = (pl) => ({ id: pl.id, name: pl.name, admin: pl.admin, look: pl.look, plot: pl.plot, pets: pl.pets, s: pl.s });
+const card = (pl) => ({ id: pl.id, name: pl.name, admin: pl.admin, look: pl.look, plot: pl.plot, pets: pl.pets, s: pl.s, decor: pl.decor });
+const ids = (list) => (Array.isArray(list) ? list : []).slice(0, 24).map((x) => clean(x, 20)).filter(Boolean);
 function pickRoom(want) {                             // the server the player chose, if it has a free plot; else the first one that does
   const w = rooms[(want | 0) - 1];
   if (w && w.players.size < PLOTS) return w;
@@ -80,10 +81,10 @@ function endTrade(pl, why) {                          // the trade stops; the ot
 function join(sock, hello) {
   const room = pickRoom(hello.room);
   if (!room) { sendRaw(sock, JSON.stringify({ t: 'full' })); sock.end(); return null; }
-  const pl = { id: nextId++, sock, room, name: clean(hello.name, 16) || 'Player', admin: isAdmin(hello.name, hello.code), look: hello.look && typeof hello.look === 'object' ? hello.look : {}, plot: -1, pets: [], s: null };
+  const pl = { id: nextId++, sock, room, name: clean(hello.name, 16) || 'Player', admin: isAdmin(hello.name, hello.code), look: hello.look && typeof hello.look === 'object' ? hello.look : {}, plot: -1, pets: [], s: null, decor: null };
   if (JSON.stringify(pl.look).length > 600) pl.look = {};
   room.players.set(pl.id, pl);
-  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
+  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), eggs: room.eggs, plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
   broadcast(room, { t: 'join', p: card(pl) }, pl);
   return pl;
 }
@@ -126,6 +127,25 @@ function handle(pl, m) {
     if (pl.admin && ['day', 'night', 'auto'].includes(m.mode)) { timeMode = m.mode; rooms.forEach((r) => broadcast(r, { t: 'time', mode: m.mode, by: pl.name }, pl)); }
   } else if (m.t === 'firestorm') {                   // an admin starts a fire storm for everyone, on every server
     if (pl.admin) rooms.forEach((r) => broadcast(r, { t: 'firestorm', by: pl.name }, pl));
+  } else if (m.t === 'decor') {                        // the decorations on this player's plot, for everyone to see
+    const d = m.decor && typeof m.decor === 'object' ? m.decor : {};
+    pl.decor = { d: ids(d.d), arch: clean(d.arch, 20), admin: pl.admin ? ids(d.admin) : [] };
+    broadcast(room, { t: 'decor', id: pl.id, decor: pl.decor }, pl);
+  } else if (m.t === 'egg') {                          // an admin spawned an egg: everyone on this server sees it and can pick it up
+    const sp = m.spot && typeof m.spot === 'object' ? m.spot : null, tier = m.tier | 0;
+    const id0 = clean(m.id, 24), dropped = room.taken.get(id0) === tier;   // or someone put down an admin's egg they had picked up
+    if (!(pl.admin || dropped) || !sp || tier < 0 || tier > 9) return;
+    room.taken.delete(id0);
+    const egg = { id: id0, tier, spot: { x: num(sp.x), y: num(sp.y), z: num(sp.z), dungeon: !!sp.dungeon, cave: !!sp.cave, mud: !!sp.mud } };
+    if (!egg.id) return;
+    room.eggs.push(egg); if (room.eggs.length > 40) room.eggs.shift();
+    broadcast(room, { t: 'egg', egg }, pl);
+  } else if (m.t === 'eggtaken') {                     // someone picked up a spawned egg: it's gone for everyone else
+    const id = clean(m.id, 24), at = room.eggs.findIndex((e) => e.id === id);
+    if (at < 0) return;
+    room.taken.set(id, room.eggs[at].tier); if (room.taken.size > 40) room.taken.delete(room.taken.keys().next().value);
+    room.eggs.splice(at, 1);
+    broadcast(room, { t: 'eggtaken', id, by: pl.name }, pl);
   } else if (m.t === 'gift') {                         // coins and/or dragons for another player; if they've gone, it all comes back
     const to = room.players.get(m.to | 0), offer = cleanOffer(m);
     if (!offer.coins && !offer.dragons.length) return;
