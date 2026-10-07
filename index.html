@@ -2593,10 +2593,29 @@ const World = (function () {
      (Leaving the name empty plays as "Player" and locks nothing. The admin name is never locked.) */
   let lockedName = '';
   try {
-    const saved = localStorage.getItem('mutation-mayhem-name');
-    if (saved) nameEl.value = saved.slice(0, 16);
+    const saved = localStorage.getItem('mutation-mayhem-name'), last = localStorage.getItem('mutation-mayhem-last');
+    if (last || saved) nameEl.value = (last || saved).slice(0, 16);
     if (saved && localStorage.getItem('mutation-mayhem-name-locked') === '1') lockedName = saved.slice(0, 16);
   } catch (e) { /* no storage: just start blank */ }
+  /* Accounts (fixed 7 October 2026: a new name used to get the old name's dragons, avatar and coins). Each name has its
+     own save. The game's normal keys hold the save of the account in use ('mutation-mayhem-active'); the others are put
+     away as 'dk-acct:<name>'. Pressing Play with a different name puts the current save away, brings that name's save
+     out (or nothing, for a new name), and reloads the page, which then starts by itself. A few things belong to the
+     device, not an account (ACCOUNT_SHARED). The save from before accounts existed goes to whoever plays first. */
+  const ACCOUNT_SHARED = ['banned', 'storm', 'storm-0', 'storm-1', 'admin-decor', 'active', 'last'].map((k) => 'mutation-mayhem-' + k);
+  const accountKey = (name) => (name || 'Player').trim().toLowerCase();
+  const activeAccount = () => { try { return localStorage.getItem('mutation-mayhem-active'); } catch (e) { return null; } };
+  function switchAccount(acct) {                         // put the current save away and bring out acct's
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('mutation-mayhem-') && !ACCOUNT_SHARED.includes(k)) keys.push(k); }
+    const cur = activeAccount();
+    if (cur) localStorage.setItem('dk-acct:' + cur, JSON.stringify(Object.fromEntries(keys.map((k) => [k, localStorage.getItem(k)]))));
+    keys.forEach((k) => localStorage.removeItem(k));
+    const saved = JSON.parse(localStorage.getItem('dk-acct:' + acct) || 'null');
+    if (saved) Object.entries(saved).forEach(([k, v]) => { if (v !== null) localStorage.setItem(k, v); });
+    localStorage.setItem('mutation-mayhem-active', acct);
+  }
+  const canSwitch = () => typeof location !== 'undefined' && typeof location.reload === 'function' && typeof sessionStorage !== 'undefined';
   let banned = [];                                       // names an admin banned (lower case), kept on this device
   try { banned = (JSON.parse(localStorage.getItem('mutation-mayhem-banned') || '[]') || []).filter((n) => typeof n === 'string'); } catch (e) { /* none */ }
   function saveBans() { try { localStorage.setItem('mutation-mayhem-banned', JSON.stringify(banned)); } catch (e) { /* not saved */ } }
@@ -3026,6 +3045,7 @@ const World = (function () {
 
   /* Your plot. Points on it are measured in the plot's own frame: lz points away from the middle of town. */
   let myPlot = -1;
+  let switchingAccount = false;                          // set while the page reloads for another name: nothing more gets saved
   let riding = null, flying = false, tapT = 0, jumpWas = false, jumpTapped = false;   // riding (below); jumpTapped: a tap is kept even if it falls between two frames
   const ownDragons = [], dragonUpgrades = [], dragonPlaced = [], dragonSpeed = [], dragonOutfit = [], dragonNames = [], dragonMutation = [], plotPets = [], flyers = [];   // dragonMutation: 'lightning' or ''   // dragonNames: from a name collar, '' for none   // dragonOutfit: which outfit it wears, -1 none   // dragonSpeed: % faster, from every upgrader it was given
   const upgradersOwned = [0, 0, 0, 0, 0];                // upgraders bought but not used yet, waiting in the inventory
@@ -3112,7 +3132,7 @@ const World = (function () {
     setTimeout(() => { if (pop.parentNode) pop.parentNode.removeChild(pop); }, 1200);
   }
   let realCoins = null;                                  // an admin's own coins, put away while they have unlimited ones
-  function saveCoins() { if (coins === Infinity) return; try { localStorage.setItem('mutation-mayhem-coins', String(Math.floor(coins))); } catch (e) { /* not saved, still playable */ } }
+  function saveCoins() { if (coins === Infinity || switchingAccount) return; try { localStorage.setItem('mutation-mayhem-coins', String(Math.floor(coins))); } catch (e) { /* not saved, still playable */ } }
   window.addEventListener('pagehide', saveCoins);        // closing the tab keeps the last few seconds too
   function earn(dt) {                                   // dt here is real time, so slow computers earn as fast as quick ones
     if (started) {
@@ -3153,6 +3173,7 @@ const World = (function () {
   }
   function nameMyPlot() { if (myPlot >= 0) paintSign(myPlot, playerName + '\'s Plot'); }   // the sign says whose plot it is
   function saveProgress() {
+    if (switchingAccount) return;
     try {
       localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons));
       localStorage.setItem('mutation-mayhem-upgrades', JSON.stringify(dragonUpgrades)); localStorage.setItem('mutation-mayhem-speed', JSON.stringify(dragonSpeed)); localStorage.setItem('mutation-mayhem-dragon-outfits', JSON.stringify(dragonOutfit)); localStorage.setItem('mutation-mayhem-dragon-names', JSON.stringify(ownDragons.map((k, i) => dragonNames[i] || ''))); localStorage.setItem('mutation-mayhem-mutations', JSON.stringify(ownDragons.map((k, i) => dragonMutation[i] || ''))); localStorage.setItem('mutation-mayhem-slots', String(plotSlots));
@@ -5253,14 +5274,21 @@ const World = (function () {
     if (started || (!confirmEl.hidden && !sure)) return;   // still waiting for an answer to "are you sure?"
     if (TESTING) { lockedName = ''; sure = true; }        // testing: any name, no "are you sure", nothing locked
     const typed = typedName();
+    try {                                                 // a different name: switch to that name's own save
+      const acct = accountKey(typed), act = activeAccount();
+      try { localStorage.setItem('mutation-mayhem-last', typed); } catch (e) { /* not saved */ }
+      if (!act) localStorage.setItem('mutation-mayhem-active', acct);   // the old save becomes this account's
+      else if (act !== acct && canSwitch()) {
+        switchingAccount = true;
+        switchAccount(acct);
+        sessionStorage.setItem('dk-autostart', JSON.stringify({ name: typed, code: codeEl.value, touch: !!fromTouch, sure: !!sure }));
+        location.reload();
+        return;
+      }
+    } catch (e) { /* no storage: one save for everyone, as before */ }
     if (!isAdminName()) {
       const nm = (lockedName || typed).toLowerCase();
       if (nm && banned.includes(nm)) { codeMsg.textContent = 'The name ' + (lockedName || typed) + ' has been banned by an admin.'; codeMsg.hidden = false; return; }
-      if (lockedName && typed.toLowerCase() !== lockedName.toLowerCase()) {
-        nameEl.value = lockedName;
-        codeMsg.textContent = 'Your name is ' + lockedName + '. Names can\'t be changed.'; codeMsg.hidden = false;
-        return;
-      }
       if (!lockedName && typed && !sure) {                 // the first time: ask before it sticks
         $('confirmName').textContent = typed; confirmTouch = fromTouch;
         confirmEl.hidden = false; codeMsg.hidden = true;
@@ -5303,6 +5331,14 @@ const World = (function () {
     canvas.focus();
   }
   $('start').addEventListener('click', (e) => start(e.pointerType === 'touch' || document.body.classList.contains('touch')));
+  try {                                                  // just switched account: carry on starting
+    const a = typeof sessionStorage !== 'undefined' && JSON.parse(sessionStorage.getItem('dk-autostart') || 'null');
+    if (a) {
+      sessionStorage.removeItem('dk-autostart');
+      nameEl.value = a.name; if (a.code) { codeEl.value = a.code; codeEl.hidden = false; }
+      setTimeout(() => start(a.touch, a.sure), 0);
+    }
+  } catch (e) { /* nothing to carry on */ }
   $('confirmSure').addEventListener('click', () => start(confirmTouch, true));
   $('confirmBack').addEventListener('click', () => { confirmEl.hidden = true; nameEl.focus(); });
   /* Leave: back to the front cover. The next Play starts fresh on the beach, and an admin has to sign in again. */
@@ -6152,7 +6188,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

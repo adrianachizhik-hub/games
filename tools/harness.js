@@ -95,7 +95,7 @@ const window = { THREE, matchMedia: () => ({ matches: false }), addEventListener
 // SAVED=1: a device that has played before, with a claimed plot and some dragons already saved.
 // Without it the device starts fresh, and at the very end the harness runs itself again with SAVED=1.
 const store = process.env.SAVED !== '1' ? {} : { 'mutation-mayhem-plot': '2', 'mutation-mayhem-dragons': JSON.stringify(['green', 'ruby', 'blue']), 'mutation-mayhem-coins': '500', 'mutation-mayhem-upgrades': '[-1,2,-1]' };
-const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; }, get length() { return Object.keys(store).length; }, key: (i) => Object.keys(store)[i] };
 const sandbox = { localStorage, setTimeout: () => 0, window, document, THREE, performance: { now: () => 0 }, requestAnimationFrame: (f) => { raf = f; }, console, Math, Float32Array, Uint8Array, Uint16Array, Uint8ClampedArray, Map, Set, Infinity };
 vm.createContext(sandbox);
 vm.runInContext(worldSrc + '\nthis.World = World;', sandbox);
@@ -244,10 +244,11 @@ console.log('before leaving :', S());
 els.leave.fire('click', ev({ detail: 1 })); console.log('after Leave    :', S(), '| keys held', I.keys.size, '| panel open', els.admin.classList.contains('open'));
 const x0 = I.p.x; raf(5000); raf(5016); console.log('on the cover the player stays put:', (I.p.x === x0), '| camera looks at', JSON.stringify(allCams[0].lookedAt));
 els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('Play again     :', S(), '| asked again', !els.confirm.hidden);
-els.leave.fire('click', ev({ detail: 1 })); els.name.value = 'Somebody Else'; els.name.fire('input', ev({})); els.start.fire('click', ev({ pointerType: 'mouse' }));
-console.log('try another name: started', document.body.classList.contains('playing'), '| name box put back to', JSON.stringify(els.name.value), '| message', JSON.stringify(els.codeMsg.hidden ? '' : els.codeMsg.textContent), '| asked', !els.confirm.hidden);
-if (document.body.classList.contains('playing')) throw new Error('a locked name was changed');
-els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('Play with own name again:', S());
+{ const own = store['mutation-mayhem-name'], ownLock = store['mutation-mayhem-name-locked'];
+  els.leave.fire('click', ev({ detail: 1 })); els.name.value = 'Somebody Else'; els.name.fire('input', ev({})); els.start.fire('click', ev({ pointerType: 'mouse' }));
+  console.log('another name: plays as its own account (in a real browser the page reloads with that name\'s own save): started', document.body.classList.contains('playing'), '| remembered as last name', JSON.stringify(store['mutation-mayhem-last']));
+  els.leave.fire('click', ev({ detail: 1 })); store['mutation-mayhem-name'] = own; if (ownLock) store['mutation-mayhem-name-locked'] = ownLock; els.name.value = MODE === 'admin' ? AN : own; els.name.fire('input', ev({})); if (MODE === 'admin') els.code.value = AC;
+  els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('Play with own name again:', S()); }
 if (!document.body.classList.contains('playing')) { document.getElementById('confirmBack').fire('click', ev({})); els.name.value = AN || ''; els.name.fire('input', ev({})); els.code.value = AC; els.start.fire('click', ev({ pointerType: 'mouse' })); console.log('admin mode, sign in again:', S()); }   // admins have no locked name
 
 // ---- third-person camera and the avatar ----
@@ -1173,6 +1174,19 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   I.p.yaw = Math.PI / 2; I.keys.add('KeyW'); I.keys.add('ShiftLeft'); let k = 0; while (I.zoneName() === 'Mud cavern' && k++ < 60 * 20) { I.p.yaw = Math.abs(I.p.z - I.MUD.z) > 0.5 && I.p.x > I.MUD.x - I.MUD.hx ? Math.atan2(-(I.MUD.x - I.MUD.hx - 2 - I.p.x), -(I.MUD.z - I.p.z)) : Math.PI / 2; fr(); } I.keys.clear();
   console.log('walk west along the tunnel: out after', (k / 60).toFixed(1), 's | zone', I.zoneName(), '| at', I.p.x.toFixed(0), I.p.z.toFixed(0), '|', said());
   if (I.zoneName() !== 'Desert') throw new Error('the tunnel should come out in the desert');
+}
+
+// ---- accounts: each name has its own save ----
+{
+  const mine = store['mutation-mayhem-active'], dragons0 = store['mutation-mayhem-dragons'], banned0 = store['mutation-mayhem-banned'];
+  console.log('account in use:', JSON.stringify(mine), '| its dragons saved', JSON.parse(dragons0 || '[]').length);
+  I.switchAccount('brand new kid');
+  console.log('switch to a new name: dragons', store['mutation-mayhem-dragons'] || 'none', '| avatar', store['mutation-mayhem-avatar'] || 'default', '| coins', store['mutation-mayhem-coins'] || 'none', '| played before', store['mutation-mayhem-played'] || 'no', '| bans kept', store['mutation-mayhem-banned'] === banned0, '| old save put away', !!store['dk-acct:' + mine]);
+  if (store['mutation-mayhem-dragons'] || store['mutation-mayhem-avatar'] || store['mutation-mayhem-played'] || !store['dk-acct:' + mine]) throw new Error('a new name should start fresh');
+  store['mutation-mayhem-coins'] = '77';
+  I.switchAccount(mine);
+  console.log('switch back: dragons', JSON.parse(store['mutation-mayhem-dragons'] || '[]').length, '| same as before', store['mutation-mayhem-dragons'] === dragons0, '| the new kid\'s save kept', JSON.parse(store['dk-acct:brand new kid'])['mutation-mayhem-coins']);
+  if (store['mutation-mayhem-dragons'] !== dragons0) throw new Error('switching back should bring the old save back');
 }
 
 // ---- and once more, as a device with saved progress ----

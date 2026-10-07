@@ -92,6 +92,8 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 
 **Day and night** (7 October 2026, Adriana's request; `dayNightStep`): a 20-minute day on the clock, the same for everyone: 13 minutes of day, a minute of sunset, 5 minutes of night (moon, stars, dark blue sky, dim light and clouds; glowing things keep glowing), a minute of sunrise. "🌙 Night" shows under the coins. The 👻 Ghost night event makes it night while it lasts.
 
+**Accounts: one save per name** (bug fix, 7 October 2026: a new name on the same device got the old name's dragons, avatar and coins, and no tutorial). Each name now has its own save (`switchAccount`, `accountKey`): the normal `mutation-mayhem-*` keys hold the save of the name in use (`mutation-mayhem-active`), others are put away as `dk-acct:<name>`. Pressing Play with a different name swaps the saves and reloads the page, which starts by itself (`dk-autostart` in sessionStorage); nothing is saved during the swap (`switchingAccount`). Shared by the whole device: bans, admin storm dragons and admin decorations, the last name typed. The save from before this change belongs to whichever name plays first. The old "names can't be changed" rule is gone: another name simply is another account.
+
 **Admins control day and night** (7 October 2026): "Day and night" buttons ☀️ Day, 🌙 Night, 🔄 Normal (`setTimeMode`); for everyone online, and the server remembers it for people who join later (`timeMode`, sent in `welcome`). Stays until Normal.
 
 **Testing names** (her request): anywhere but the real Render site (the preview in Claude, a local file), names never lock and there's no "are you sure", so she can try different names (`TESTING`). Adding ?test to the Render address does the same there.
