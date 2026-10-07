@@ -20,7 +20,7 @@ function scramble(str) {
 const isAdmin = (name, code) => { const n = String(name || '').toLowerCase(); return ADMINS.some((a) => a[0] === scramble(n) && a[1] === scramble(n + '#' + String(code || '').trim())); };
 
 const rooms = Array.from({ length: ROOMS }, (_, i) => ({ id: i + 1, players: new Map(), plots: new Array(PLOTS).fill(null) }));
-let nextId = 1;
+let nextId = 1, timeMode = 'auto';                    // timeMode: an admin made it 'day' or 'night' for everyone, until 'auto' again
 
 /* ---------- A tiny WebSocket: just enough for text messages ---------- */
 function sendRaw(sock, text) {
@@ -67,7 +67,7 @@ function join(sock, hello) {
   const pl = { id: nextId++, sock, room, name: clean(hello.name, 16) || 'Player', admin: isAdmin(hello.name, hello.code), look: hello.look && typeof hello.look === 'object' ? hello.look : {}, plot: -1, pets: [], s: null };
   if (JSON.stringify(pl.look).length > 600) pl.look = {};
   room.players.set(pl.id, pl);
-  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
+  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
   broadcast(room, { t: 'join', p: card(pl) }, pl);
   return pl;
 }
@@ -105,6 +105,8 @@ function handle(pl, m) {
     if (text && pl.admin) rooms.forEach((r) => broadcast(r, { t: 'announce', name: pl.name, text }, pl));   // admins speak to every server
   } else if (m.t === 'event') {                       // an admin starts an event (one per mutation) for everyone, on every server
     if (pl.admin && /^[a-z]{2,12}$/.test(String(m.kind))) rooms.forEach((r) => broadcast(r, { t: 'event', kind: m.kind, by: pl.name }, pl));
+  } else if (m.t === 'time') {                        // an admin makes it day or night (or back to normal) for everyone
+    if (pl.admin && ['day', 'night', 'auto'].includes(m.mode)) { timeMode = m.mode; rooms.forEach((r) => broadcast(r, { t: 'time', mode: m.mode, by: pl.name }, pl)); }
   } else if (m.t === 'firestorm') {                   // an admin starts a fire storm for everyone, on every server
     if (pl.admin) rooms.forEach((r) => broadcast(r, { t: 'firestorm', by: pl.name }, pl));
   } else if (m.t === 'zap') {                          // a storm dragon's lightning hit another player: they get bounced back

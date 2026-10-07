@@ -41,6 +41,9 @@ function player(name, code) {
     const ad = await player(adminName, adminCode);
     check(ad.welcome.admin === true, 'an admin with the right code is an admin on the server');
     ad.send({ t: 'announce', text: 'Hello all servers' }); await wait(80);
+    ad.send({ t: 'time', mode: 'night' }); await wait(80);
+    check(b.got.some((m) => m.t === 'time' && m.mode === 'night'), 'an admin can make it night for everyone');
+    const late2 = await player('LateNight'); check(late2.welcome.time === 'night', 'someone joining later gets the same night'); late2.ws.close();
     ad.send({ t: 'firestorm' }); await wait(80);
     check(b.got.some((m) => m.t === 'firestorm'), 'an admin can start a fire storm for everyone');
     check(b.got.some((m) => m.t === 'announce' && m.text === 'Hello all servers'), 'an admin announcement reaches everyone');

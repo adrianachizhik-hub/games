@@ -1116,6 +1116,18 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     console.log('night now (by the clock)', n0.toFixed(2), '| ghost night: night', I.nightness(), '| sky darkened to', I.nightShown().toFixed(2), '| effects', JSON.stringify((raf(700000), raf(700016), els.effect.textContent)));
     if (I.nightness() !== 1 || I.nightShown() < 0.9) throw new Error('the ghost event should make it night');
   }
+  { // admins make it day or night
+    const btn = (txt) => els.adminCommands.children.find((c) => c.children && c.children.find && c.children.find((b) => b.textContent === txt));
+    const row = btn('☀️ Day');
+    console.log('admin day/night buttons:', !!row, '(admin ' + I.admin() + ')');
+    if (I.admin()) {
+      for (let k = 0; k < 70 * 60; k++) I.fireStormStep(1 / 60);   // let the ghost night end
+      const press = (txt) => row.children.find((b) => b.textContent === txt).fire('click', ev({ detail: 1 }));
+      press('☀️ Day'); console.log('  Day: night', I.nightness(), '| mode', I.timeMode()); if (I.nightness() !== 0 && !I.eventOn('phantom')) throw new Error('Day should make it day');
+      press('🌙 Night'); console.log('  Night: night', I.nightness()); if (I.nightness() !== 1) throw new Error('Night should make it night');
+      press('🔄 Normal'); console.log('  Normal: mode', I.timeMode());
+    }
+  }
   { // the volcano: magma rocks
     const d = pickWithout('magma'); d.wait = 999; I.startEvent('magma');
     I.spawnFireball(d.root.position.x, d.root.position.z, 'magma', I.crater); let k = 0; while (k++ < 400 && !I.hasMut(d.index, 'magma')) I.fireStormStep(1 / 60);

@@ -280,28 +280,28 @@
     transform: translateX(-50%);
     display: flex;
     align-items: center;
-    gap: 8px;
-    max-width: min(600px, calc(100% - 32px));
-    padding: 6px 10px 6px 12px;
-    border: 3px solid #0d2f37;
-    border-radius: 16px;
+    gap: 6px;
+    max-width: min(440px, calc(100% - 32px));   /* smaller since 7 October 2026 (Adriana: it took up too much space) */
+    padding: 3px 7px 3px 8px;
+    border: 2px solid #0d2f37;
+    border-radius: 12px;
     background: var(--panel);
     color: var(--panel-ink);
   }
   #inv[hidden], body:not(.playing) #inv, body.shopping #inv { display: none; }
-  #inv .invlabel { font-size: 0.8rem; font-weight: 600; writing-mode: vertical-rl; transform: rotate(180deg); opacity: 0.8; }
-  #invItems { display: flex; gap: 6px; overflow-x: auto; padding: 7px 4px 2px; }
+  #inv .invlabel { font-size: 0.66rem; font-weight: 600; writing-mode: vertical-rl; transform: rotate(180deg); opacity: 0.8; }
+  #invItems { display: flex; gap: 5px; overflow-x: auto; padding: 6px 3px 1px; }
   .invitem {
     position: relative;
     flex: none;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
-    width: 76px;
-    padding: 5px 4px 4px;
+    gap: 1px;
+    width: 56px;
+    padding: 3px 2px 2px;
     font: inherit;
-    font-size: 0.72rem;
+    font-size: 0.6rem;
     font-weight: 600;
     line-height: 1.15;
     text-align: center;
@@ -311,13 +311,13 @@
     border-radius: 10px;
     cursor: pointer;
   }
-  .invitem small { font-size: 0.65rem; font-weight: 500; opacity: 0.8; }
-  .invicon { width: 26px; height: 20px; border-radius: 6px; border: 3px solid #0d2f37; }
-  .invcount { position: absolute; top: -7px; right: -6px; padding: 0 6px; border-radius: 999px; background: #0d2f37; color: #ffd23f; font-size: 0.72rem; }
+  .invitem small { display: none; }
+  .invicon { width: 20px; height: 14px; border-radius: 5px; border: 2px solid #0d2f37; }
+  .invcount { position: absolute; top: -6px; right: -5px; padding: 0 4px; border-radius: 999px; background: #0d2f37; color: #ffd23f; font-size: 0.62rem; }
   .invitem:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
-  body.hasinv #carry, body.hasinv #shopOpen, body.hasinv #talkBtn, body.hasinv #talk { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }   /* sit above the bar */
-  body.hasinv #toast { bottom: calc(168px + env(safe-area-inset-bottom, 0px)); }
-  body.hasinv .keys { max-width: calc(50% - 320px); }
+  body.hasinv #carry, body.hasinv #shopOpen, body.hasinv #talkBtn, body.hasinv #talk { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }   /* sit above the bar */
+  body.hasinv #toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
+  body.hasinv .keys { max-width: calc(50% - 240px); }
   @media (max-width: 1100px) { body.hasinv .keys { display: none; } }
   /* Touch screens: the bar sits along the very bottom, in the gap between the walking circle and Jump/Leave,
      with smaller items (swipe it sideways when there are more than fit), so it never covers your character. */
@@ -332,9 +332,9 @@
   }
   body.touch #inv .invlabel { display: none; }
   body.touch #invItems { padding: 6px 2px 0; gap: 5px; }
-  body.touch .invitem { width: 62px; padding: 3px 2px; font-size: 0.6rem; }
+  body.touch .invitem { width: 48px; padding: 2px 1px; font-size: 0.52rem; }
   body.touch .invitem small { display: none; }
-  body.touch .invicon { width: 20px; height: 15px; border-width: 2px; }
+  body.touch .invicon { width: 16px; height: 11px; border-width: 2px; }
   body.touch.hasinv #carry, body.touch.hasinv #shopOpen, body.touch.hasinv #talkBtn, body.touch.hasinv #talk { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }
   body.touch.hasinv #toast { bottom: calc(254px + env(safe-area-inset-bottom, 0px)); }
   body.touch #carry { bottom: calc(196px + env(safe-area-inset-bottom, 0px)); }   /* above the walking circle and Jump */
@@ -1138,7 +1138,8 @@ const World = (function () {
     let dth = Math.abs(th - TH0); if (dth > Math.PI) dth = 2 * Math.PI - dth;
     const R = 150 + 44 * (fbm(Math.cos(th) * 1.2 + 3.1, Math.sin(th) * 1.2 + 7.7, 3) - 0.5)
       + 14 * Math.exp(-dth * dth / 1.3)                  // extra land under the mountains
-      + 58 * Math.exp(-angD(th, SWAMP_TH) * angD(th, SWAMP_TH) / 0.045);   // and a new stretch of land east of the desert, for the swamp
+      + 58 * Math.exp(-angD(th, SWAMP_TH) * angD(th, SWAMP_TH) / 0.045)    // and a new stretch of land east of the desert, for the swamp
+      + 62 * Math.exp(-angD(th, VOLC_TH) * angD(th, VOLC_TH) / 0.06);       // and one north-east of town, for the volcano
     return 1 - r / R;
   }
   function angD(a, b) { let d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; }
@@ -1152,6 +1153,7 @@ const World = (function () {
   const HUB = { x: 26, z: -26, r: 33, h: 6.3 };
   const BUNKER = { x: 84, z: 84, r: 10, h: 3.4 };          // the nuke bunker, on the far north-east corner
   const SWAMP = { x: 174, z: 36, r: 34 }, SWAMP_TH = Math.atan2(36, 174);   // the swamp, on new land east of the desert
+  const VOLC = { x: 150, z: -88, r: 26 }, VOLC_TH = Math.atan2(-88, 150);     // the volcano, on new land north-east of town
   function mountainAt(x, z) {                            // the peaks blended into one range
     let s = 0;
     for (const pk of PEAKS) {
@@ -1287,7 +1289,7 @@ const World = (function () {
     return smoothstep(0, 9, Math.min(a.t - tA, tB - a.t));
   }
   return {
-    vnoise, fbm, smoothstep, lerp, rng, C, U, P, B, CH_T, POOL, HUB, BUNKER, SWAMP, swampF, PEAKS, axisPoint, axisCoords, coastS, mountainAt,
+    vnoise, fbm, smoothstep, lerp, rng, C, U, P, B, CH_T, POOL, HUB, BUNKER, SWAMP, swampF, VOLC, PEAKS, axisPoint, axisCoords, coastS, mountainAt,
     riverLat, southF, jungleF, desertF,
     caveOffset, caveWidth, caveDepth, RB_AXIS, SIZE, N, CELL, V, HALF, HT, H, CE, lid, bil, lidAt,
     get tA() { return tA; }, get tB() { return tB; }
@@ -1392,6 +1394,8 @@ const World = (function () {
       }
       const gk = smoothstep(1.5 + n * 0.5, 2.3 + n * 0.5, h);
       r = lerp(r, gr, gk); g = lerp(g, gg, gk); b = lerp(b, gb, gk);
+      const vk = (1 - smoothstep(W.VOLC.r * 0.6, W.VOLC.r * 1.1, Math.hypot(x - W.VOLC.x, z - W.VOLC.z))) * smoothstep(-0.3, 0.3, h);   // black volcanic rock round the volcano
+      if (vk > 0) { const vn = 0.18 + 0.1 * n; r = lerp(r, vn + 0.04, vk); g = lerp(g, vn, vk); b = lerp(b, vn - 0.01, vk); }
       const swf = W.swampF(x, z) * smoothstep(-0.3, 0.1, h);   // the swamp: dark mossy mud
       if (swf > 0) { const mn = W.vnoise(x * 0.12 + 5, z * 0.12 + 9); r = lerp(r, lerp(0.30, 0.24, mn), swf); g = lerp(g, lerp(0.34, 0.25, mn), swf); b = lerp(b, lerp(0.17, 0.13, mn), swf); }
       const rk = Math.max(smoothstep(0.80, 0.62, ny), smoothstep(25, 31, h + n * 3)) * smoothstep(0.6, 1.6, h);
@@ -1442,6 +1446,7 @@ const World = (function () {
     if (Math.hypot(x - W.HUB.x, z - W.HUB.z) < W.HUB.r + 3) return null;      // keep the town circle clear
     if (Math.hypot(x - W.BUNKER.x, z - W.BUNKER.z) < W.BUNKER.r + 4) return null;   // and the nuke bunker
     if (W.swampF(x, z) > 0.15) return null;                                        // the swamp has its own plants
+    if (Math.hypot(x - W.VOLC.x, z - W.VOLC.z) < W.VOLC.r) return null;            // nothing grows on the volcano's black rock
     const h = W.bil(H, x, z);
     if (W.bil(HT, x, z) - h > 0.1) return null;
     const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL);
@@ -5240,8 +5245,13 @@ const World = (function () {
   function tutorialStep() { if (tutAt >= 0 && started) { const st = TUTORIAL[tutAt]; if (st && st.done && st.done()) tutNext(); } }
   $('tutNext').addEventListener('click', (e) => { tutNext(); if (e.detail > 0) $('tutNext').blur(); });
   $('tutSkip').addEventListener('click', (e) => { tutAt = -1; tutShow(); if (e.detail > 0) $('tutSkip').blur(); });
+  /* Testing (Adriana's request): anywhere but the real game on Render (like the preview in Claude), names don't lock, so
+     she can try different names. ?test in the address does it on Render too. */
+  const TESTING = (() => { try { return typeof location !== 'undefined' && !!location.protocol && (!/onrender\.com$/.test(location.hostname || '') || /[?&]test\b/.test(location.search || '')); } catch (e) { return false; } })();
+  if (TESTING) { lockedName = ''; }
   function start(fromTouch, sure) {
     if (started || (!confirmEl.hidden && !sure)) return;   // still waiting for an answer to "are you sure?"
+    if (TESTING) { lockedName = ''; sure = true; }        // testing: any name, no "are you sure", nothing locked
     const typed = typedName();
     if (!isAdminName()) {
       const nm = (lockedName || typed).toLowerCase();
@@ -5283,8 +5293,8 @@ const World = (function () {
     if (isAdmin) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Admin'; who.appendChild(badge); }
     try {
       if (!(isAdmin && lockedName)) localStorage.setItem('mutation-mayhem-name', playerName === 'Player' ? '' : playerName);   // an admin never replaces a locked name
-      if (!isAdmin && sure && playerName !== 'Player') { localStorage.setItem('mutation-mayhem-name-locked', '1'); lockedName = playerName; }
-    } catch (e) { if (!isAdmin && sure && playerName !== 'Player') lockedName = playerName; }
+      if (!isAdmin && sure && playerName !== 'Player' && !TESTING) { localStorage.setItem('mutation-mayhem-name-locked', '1'); lockedName = playerName; }
+    } catch (e) { if (!isAdmin && sure && playerName !== 'Player' && !TESTING) lockedName = playerName; }
     nameEl.blur();
     intro.hidden = true;
     blink();                                              // fade from the cover's flying view down to the beach
@@ -5626,9 +5636,11 @@ const World = (function () {
      sunset, 5 minutes of night with a moon and stars, and a minute of sunrise. The ghost event makes it night while it
      lasts. Things that glow (torches, fairy lights, lava, crystals) keep glowing in the dark. */
   const DAY_LEN = 1200, NIGHT_STARTS = 840, NIGHT_ENDS = 1140, FADE = 60;
-  let nightShown = 0, nightWas = false;
+  let nightShown = 0, nightWas = false, timeMode = 'auto';   // timeMode: an admin can make it 'day' or 'night' until set back to 'auto'
   function nightness() {                                // 0 day, 1 night
     if (started && eventOn('phantom')) return 1;        // the ghost event: night
+    if (timeMode === 'day') return 0;
+    if (timeMode === 'night') return 1;
     const t = (Date.now() / 1000) % DAY_LEN;
     if (t < NIGHT_STARTS - FADE) return 0;
     if (t < NIGHT_STARTS) return (t - (NIGHT_STARTS - FADE)) / FADE;
@@ -5852,7 +5864,7 @@ const World = (function () {
     }
   }
   /* The volcano, east of town. During its eruption it shoots magma rocks that arc down all over (some on the plots). */
-  const VOLCANO = { x: 105, z: -50, r: 15, h: 24 };
+  const VOLCANO = { x: W.VOLC.x, z: W.VOLC.z, r: 15, h: 24 };   // moved to its own new land on 7 October 2026
   const volY = W.bil(H, VOLCANO.x, VOLCANO.z) - 1;
   const crater = { x: VOLCANO.x, y: volY + VOLCANO.h, z: VOLCANO.z };
   (function buildVolcano() {
@@ -5926,6 +5938,14 @@ const World = (function () {
   EVENT_LIST.forEach((e) => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.name; evPick.appendChild(o); });
   evPick.setAttribute('aria-label', 'Event to start'); evBtn.type = 'button'; evBtn.className = 'small'; evBtn.textContent = 'Start';
   evRow.appendChild(evPick); evRow.appendChild(evBtn);
+  /* Admin command: make it day or night (for everyone online), or back to the normal clock. */
+  const timeRow = adminSection('Day and night');
+  [['day', '☀️ Day'], ['night', '🌙 Night'], ['auto', '🔄 Normal']].forEach(([mode, label]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'small'; b.textContent = label;
+    b.addEventListener('click', (e) => { setTimeMode(mode); netSend({ t: 'time', mode }); toast(mode === 'auto' ? 'Day and night follow the clock again.' : 'It\'s ' + mode + ' now' + (netOnline ? ' for everyone' : '') + ', until you press Normal.', 3); if (e.detail > 0) b.blur(); });
+    timeRow.appendChild(b);
+  });
+  function setTimeMode(mode, by) { if (!['day', 'night', 'auto'].includes(mode)) return; timeMode = mode; if (by) toast(by + (mode === 'auto' ? ' set day and night back to normal.' : ' made it ' + mode + '!'), 3); }
   evBtn.addEventListener('click', (e) => { startEvent(evPick.value); toast(EVENTS[evPick.value].name + ' started' + (netOnline ? ' for everyone!' : '!'), 3); if (e.detail > 0) evBtn.blur(); });
 
   /* ---------- Multiplayer ---------- */
@@ -5993,7 +6013,7 @@ const World = (function () {
   function netClose() { if (sock) { const s0 = sock; netGone(); try { s0.close(); } catch (e) { /* gone */ } } }
   function netMessage(m) {
     if (m.t === 'welcome') {
-      netOnline = true; netId = m.id; netRoom = m.room;
+      netOnline = true; netId = m.id; netRoom = m.room; if (m.time) setTimeMode(m.time);
       m.players.forEach(addOther);
       m.plots.forEach((o, i) => { if (o && o.id !== netId) setOwner(i, o); });
       addChat('', 'You\'re on Server ' + m.room + (m.players.length ? ' with ' + m.players.length + ' other player' + (m.players.length === 1 ? '' : 's') : ', and nobody else is here yet') + '. Chat goes to everyone on this server.', true);
@@ -6012,6 +6032,7 @@ const World = (function () {
     else if (m.t === 'announce') showAnnouncement(m.name, m.text);
     else if (m.t === 'firestorm') startFireStorm(m.name || m.by || 'An admin');
     else if (m.t === 'event') startEvent(m.kind, m.by || 'An admin');
+    else if (m.t === 'time') setTimeMode(m.mode, m.by || 'An admin');
     else if (m.t === 'zapped') {                          // an admin's storm dragon hit you with lightning: bounced backwards
       toast('⚡ ZAP! ' + m.by + '\'s storm dragon bounced you backwards!', 3);
       for (let k = 0; k < 12; k++) if (!p.dungeon) tryMove(m.dx * 0.8, m.dz * 0.8);
@@ -6131,7 +6152,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, nightness, nightShown: () => nightShown, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

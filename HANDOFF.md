@@ -92,11 +92,19 @@ Ruby, diamond and jade are "gem" dragons: brighter, with sparkles on their scale
 
 **Day and night** (7 October 2026, Adriana's request; `dayNightStep`): a 20-minute day on the clock, the same for everyone: 13 minutes of day, a minute of sunset, 5 minutes of night (moon, stars, dark blue sky, dim light and clouds; glowing things keep glowing), a minute of sunrise. "🌙 Night" shows under the coins. The 👻 Ghost night event makes it night while it lasts.
 
+**Admins control day and night** (7 October 2026): "Day and night" buttons ☀️ Day, 🌙 Night, 🔄 Normal (`setTimeMode`); for everyone online, and the server remembers it for people who join later (`timeMode`, sent in `welcome`). Stays until Normal.
+
+**Testing names** (her request): anywhere but the real Render site (the preview in Claude, a local file), names never lock and there's no "are you sure", so she can try different names (`TESTING`). Adding ?test to the Render address does the same there.
+
+**The volcano moved** to its own new stretch of land north-east of town (`W.VOLC`, 150, -88; another bump in `coastS`), on black volcanic rock where nothing grows.
+
+**Smaller inventory bar** (her request): narrower, smaller items, no second line of text.
+
 **Tutorial** (her request): 7 tips at the top of the screen, only for a first-time player on that device (no saved dragons, no name yet, never played; `mutation-mayhem-played`), never for admins or after the first time. Walking and claiming a plot move it on by themselves; Next and Skip tutorial buttons.
 
 **Mutations** (6 October 2026, Adriana's list of 26 plus UFO, Angel, Devil, Dirt and Giant; table `MUTATIONS`): each changes the look (`buildMutFx`, `mutStep`: colour wash, see-through, glow, rainbow, glitch flicker, and little effects: rising flames/bubbles, falling snow, dripping goo, orbiting clouds/metal/stars/dirt, crystals and gems stuck on, auras, rings, halo, horns, disco beams, a tiny UFO) and multiplies coins (Claude's amounts, by rarity: common ×1.5, uncommon ×2, rare ×3, legendary ×5; UFO ×4, Electric/Fire/Dirt/Giant ×2). Fire also gives 3× riding speed; Giant makes the dragon twice as big. Mutations stack and their coin bonuses multiply. Lists show them like "🌌 Cosmic ×5 Ruby dragon".
 - **Every mutation comes from its own event** (Adriana, 6 October 2026: no handing them out; `EVENT_LIST`, 32 events). Every 30 minutes on the clock an event picked at random starts and lasts 5 minutes, the same for everyone (`slotEvents`, a dice roll from the half-hour number); about 1 in 8 times two events play at once (`EV_DOUBLE`). Kinds: 'fall' (fireballs, rocks, hail, lightning, candy, raindrops, crystals, goo, shooting stars, solar flares, moon rocks, flowers, disco balls, radioactive meteors, bubbles, golden meteors, eclipse rings, diamonds), 'fly' (UFOs, angels, devils, storm clouds, ghosts that stop and shine a beam down), 'spot' (air jets, black holes, rainbow beams, glitch zones, fire tornadoes, magnet storms, crimson mist, portals on the ground for a few seconds) and the volcano. Everything lands at random all over the island (her request: not just the plots). A dragon of yours caught in it gets that mutation. The eclipse darkens the screen; the fire storm makes its edges glow. Electric also still comes from an admin's storm lightning. The random mutations and the admin "Give a mutation" button were removed at her request.
-- **The volcano** (`VOLCANO`, 105, -50, east of town; ring of colliders round it): smokes a little all the time; during "🌋 Volcano eruption" its crater glows and it shoots magma rocks in arcs all over the island (Magma mutation).
+- **The volcano** (`VOLCANO`, on its own land north-east of town since 7 October; ring of colliders round it): smokes a little all the time; during "🌋 Volcano eruption" its crater glows and it shoots magma rocks in arcs all over the island (Magma mutation).
 - Admins: "Start an event" (pick any of the 32; for everyone online).
 - Not shared online yet: other players see your dragons, but not their mutations.
 
