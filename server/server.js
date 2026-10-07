@@ -123,6 +123,8 @@ function handle(pl, m) {
     if (text && pl.admin) rooms.forEach((r) => broadcast(r, { t: 'announce', name: pl.name, text }, pl));   // admins speak to every server
   } else if (m.t === 'event') {                       // an admin starts an event (one per mutation) for everyone, on every server
     if (pl.admin && /^[a-z]{2,12}$/.test(String(m.kind))) rooms.forEach((r) => broadcast(r, { t: 'event', kind: m.kind, by: pl.name }, pl));
+  } else if (m.t === 'eventoff') {                    // an admin turns an event (or 'all') off for everyone
+    if (pl.admin && /^[a-z]{2,12}$/.test(String(m.kind))) rooms.forEach((r) => broadcast(r, { t: 'eventoff', kind: m.kind, by: pl.name }, pl));
   } else if (m.t === 'time') {                        // an admin makes it day or night (or back to normal) for everyone
     if (pl.admin && ['day', 'night', 'auto'].includes(m.mode)) { timeMode = m.mode; rooms.forEach((r) => broadcast(r, { t: 'time', mode: m.mode, by: pl.name }, pl)); }
   } else if (m.t === 'firestorm') {                   // an admin starts a fire storm for everyone, on every server

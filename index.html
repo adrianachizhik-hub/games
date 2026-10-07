@@ -3487,14 +3487,16 @@ const World = (function () {
     if (!started || shopping || riding || myPlot < 0) return;
     const { dx, dy, dz, len, o } = rayAt(cx, cy);
     let best = null, bt = Infinity;
-    for (const d of plotPets) {
+    for (const d of plotPets) {                          // anywhere on its body counts: the target grows with the dragon (storm dragons are huge)
       if (d.homing) continue;
-      const ox = d.root.position.x - o.x, oy = d.root.position.y + 0.6 - o.y, oz = d.root.position.z - o.z;
+      const sz = petSize(d), storm = DRAGON_KINDS[d.kind].storm, r = (storm ? 1.5 : 1.2) * sz;
+      const ox = d.root.position.x - o.x, oy = d.root.position.y + 1.0 * sz - o.y, oz = d.root.position.z - o.z;
       const along = (ox * dx + oy * dy + oz * dz) / len, miss = ox * ox + oy * oy + oz * oz - along * along;
-      if (along > 0 && miss < 0.9 * 0.9 && along < bt) { bt = along; best = d; }
+      if (along > 0 && miss < r * r && along < bt) { bt = along; best = d; }
     }
     if (!best) return;
-    if (Math.hypot(best.root.position.x - p.x, best.root.position.z - p.z) > RIDE_REACH) { toast('Walk closer to your dragon to ride it.', 3); return; }
+    const far = Math.hypot(best.root.position.x - p.x, best.root.position.z - p.z) > RIDE_REACH;
+    if (far && !DRAGON_KINDS[best.kind].storm) { toast('Walk closer to your dragon to ride it.', 3); return; }   // an admin's storm dragon: click it from anywhere (Adriana)
     mount(best);
   }
   function rayAt(cx, cy) {                               // the direction from the camera through a point on the screen
@@ -6050,14 +6052,25 @@ const World = (function () {
   }
   const slotNow = () => { const t = Date.now() / 1000; return { k: Math.floor(t / EV_EVERY), phase: t % EV_EVERY }; };
   let clockEventsOff = false;                            // tests only: no events from the clock
-  const eventOn = (id) => { if (!EVENTS[id]) return false; if (Date.now() < (evUntil[id] || 0)) return true; if (clockEventsOff) return false; const { k, phase } = slotNow(); return phase < EV_LEN && slotEvents(k).includes(EVENTS[id]); };
-  const eventLeft = (id) => { const { k, phase } = slotNow(); return Math.max(phase < EV_LEN && slotEvents(k).includes(EVENTS[id]) ? EV_LEN - phase : 0, ((evUntil[id] || 0) - Date.now()) / 1000, 0); };
+  const evStopped = {};                                  // an admin turned this event off: it stays off until then (the rest of its 5 minutes)
+  const eventOn = (id) => { if (!EVENTS[id]) return false; if (Date.now() < (evStopped[id] || 0)) return false; if (Date.now() < (evUntil[id] || 0)) return true; if (clockEventsOff) return false; const { k, phase } = slotNow(); return phase < EV_LEN && slotEvents(k).includes(EVENTS[id]); };
+  const eventLeft = (id) => { if (Date.now() < (evStopped[id] || 0)) return 0; const { k, phase } = slotNow(); return Math.max(phase < EV_LEN && slotEvents(k).includes(EVENTS[id]) ? EV_LEN - phase : 0, ((evUntil[id] || 0) - Date.now()) / 1000, 0); };
   const nextEvent = () => { const t = Date.now() / 1000, k = Math.floor(t / EV_EVERY) + 1; return { e: slotEvents(k)[0], both: slotEvents(k), inS: k * EV_EVERY - t }; };
   function startEvent(id, by) {
     if (!EVENTS[id]) return;
-    evUntil[id] = Date.now() + EV_LEN * 1000;
+    evUntil[id] = Date.now() + EV_LEN * 1000; evStopped[id] = 0;
     if (by === undefined && isAdmin) netSend({ t: 'event', kind: id });
     if (by) toast(by + ' started: ' + EVENTS[id].name + '!', 3);
+  }
+  function stopEvent(id, by) {                           // Adriana: admins can turn events off too (for everyone online)
+    if (!EVENTS[id]) return;
+    evUntil[id] = 0; evStopped[id] = Date.now() + EV_LEN * 1000;
+    if (by === undefined && isAdmin) netSend({ t: 'eventoff', kind: id });
+  }
+  function stopAllEvents(by) {
+    EVENT_LIST.forEach((e) => { evUntil[e.id] = 0; evStopped[e.id] = Date.now() + EV_LEN * 1000; });
+    if (by === undefined && isAdmin) netSend({ t: 'eventoff', kind: 'all' });
+    if (by) toast(by + ' turned off all the mutation events.', 3);
   }
   function startFireStorm(by) { startEvent('fire', by); }
   const fireStormOn = () => eventOn('fire'), fsLeft = () => eventLeft('fire');
@@ -6285,10 +6298,12 @@ const World = (function () {
   }
 
   /* Admin command: start any event. (Admins can't hand out mutations: they only come from events.) */
-  const evRow = adminSection('Start an event (5 minutes)'), evPick = document.createElement('select'), evBtn = document.createElement('button');
+  const evRow = adminSection('Start or stop an event (5 minutes)'), evPick = document.createElement('select'), evBtn = document.createElement('button');
   EVENT_LIST.forEach((e) => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.name; evPick.appendChild(o); });
   evPick.setAttribute('aria-label', 'Event to start'); evBtn.type = 'button'; evBtn.className = 'small'; evBtn.textContent = 'Start';
-  evRow.appendChild(evPick); evRow.appendChild(evBtn);
+  const evStop = document.createElement('button'); evStop.type = 'button'; evStop.className = 'small'; evStop.textContent = 'Stop';
+  evStop.addEventListener('click', (e) => { stopEvent(evPick.value); toast(EVENTS[evPick.value].name + ' turned off' + (netOnline ? ' for everyone.' : '.'), 3); if (e.detail > 0) evStop.blur(); });
+  evRow.appendChild(evPick); evRow.appendChild(evBtn); evRow.appendChild(evStop);
   /* Admin command: make it day or night (for everyone online), or back to the normal clock. */
   const timeRow = adminSection('Day and night');
   [['day', '☀️ Day'], ['night', '🌙 Night'], ['auto', '🔄 Normal']].forEach(([mode, label]) => {
@@ -6302,6 +6317,10 @@ const World = (function () {
   allEvBtn.type = 'button'; allEvBtn.className = 'storm'; allEvBtn.textContent = '🌈 Turn on all mutations';
   allEvBtn.addEventListener('click', (e) => { if (!isAdmin) return; EVENT_LIST.forEach((ev) => startEvent(ev.id)); toast('Every mutation event is on' + (netOnline ? ' for everyone' : '') + ' for 5 minutes!', 4); if (e.detail > 0) allEvBtn.blur(); });
   $('adminCommands').appendChild(allEvBtn);
+  const offEvBtn = document.createElement('button');   // and one that turns them all off
+  offEvBtn.type = 'button'; offEvBtn.className = 'storm'; offEvBtn.textContent = '⛔ Turn off all mutations';
+  offEvBtn.addEventListener('click', (e) => { if (!isAdmin) return; stopAllEvents(); toast('All mutation events are off' + (netOnline ? ' for everyone' : '') + '.', 4); if (e.detail > 0) offEvBtn.blur(); });
+  $('adminCommands').appendChild(offEvBtn);
   evBtn.addEventListener('click', (e) => { startEvent(evPick.value); toast(EVENTS[evPick.value].name + ' started' + (netOnline ? ' for everyone!' : '!'), 3); if (e.detail > 0) evBtn.blur(); });
 
   /* ---------- Multiplayer ---------- */
@@ -6392,6 +6411,7 @@ const World = (function () {
     else if (m.t === 'announce') showAnnouncement(m.name, m.text);
     else if (m.t === 'firestorm') startFireStorm(m.name || m.by || 'An admin');
     else if (m.t === 'event') startEvent(m.kind, m.by || 'An admin');
+    else if (m.t === 'eventoff') { if (m.kind === 'all') stopAllEvents(m.by || 'An admin'); else { stopEvent(m.kind, m.by || 'An admin'); if (EVENTS[m.kind]) toast((m.by || 'An admin') + ' turned off ' + EVENTS[m.kind].name + '.', 3); } }
     else if (m.t === 'time') setTimeMode(m.mode, m.by || 'An admin');
     else if (/^(gift|trade)/.test(m.t)) tradeMessage(m);
     else if (m.t === 'zapped') {                          // an admin's storm dragon hit you with lightning: bounced backwards
@@ -6696,7 +6716,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, stopEvent, stopAllEvents, clickAt, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

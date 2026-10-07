@@ -1158,6 +1158,22 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   }
   { const b = els.adminCommands.children.find((c) => c.textContent === '🌈 Turn on all mutations');
     if (b) { b.fire('click', ev({})); const on = I.EVENT_LIST.filter((e) => I.eventOn(e.id)).length; console.log('admin "Turn on all mutations": events on', on, 'of', I.EVENT_LIST.length); if (on !== I.EVENT_LIST.length) throw new Error('all events should be on'); for (let k = 0; k < 60 * 2; k++) I.fireStormStep(1 / 60); } }
+  { const off = els.adminCommands.children.find((c) => c.textContent === '⛔ Turn off all mutations');
+    if (off && process.env.MODE !== 'admin') { off.fire('click', ev({})); const on = I.EVENT_LIST.filter((e) => I.eventOn(e.id)).length; console.log('a player pressing "Turn off all mutations": still on', on); if (!on) throw new Error('only admins can turn events off'); I.stopAllEvents('Test'); }
+    else if (off) { off.fire('click', ev({})); for (let k = 0; k < 10; k++) I.fireStormStep(1 / 60); const on = I.EVENT_LIST.filter((e) => I.eventOn(e.id)).length; console.log('admin "Turn off all mutations": events on', on, '| UFOs left', I.ufos.length, '|', said()); if (on || I.ufos.length) throw new Error('all events should be off');
+      I.startEvent('taco'); const was = I.eventOn('taco'); I.stopEvent('taco'); console.log('start then stop one event (tacos): on', was, '-> off', !I.eventOn('taco')); if (!was || I.eventOn('taco')) throw new Error('an admin should be able to stop one event'); } }
+  if (I.MODE_ADMIN !== false) {                          // admins: click your storm dragon from far away, anywhere on it, and you get on
+    const st = I.plotPets.find((d) => I.DRAGON_KINDS[d.kind].storm && !d.ridden && !d.homing);
+    if (st) {
+      if (I.riding()) I.dismount(true);
+      const sz = I.petSize(st), c = { x: st.root.position.x, y: st.root.position.y + 1.6 * sz, z: st.root.position.z };   // aim high on its back, not at the middle
+      const cam = { x: c.x + 30, y: c.y + 6, z: c.z + 20 }; I.p.x = cam.x; I.p.z = cam.z; I.camera.position.set(cam.x, cam.y, cam.z);
+      const dx = c.x - cam.x, dy = c.y - cam.y, dz = c.z - cam.z; I.p.yaw = Math.atan2(-dx, -dz); I.p.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+      I.clickAt(640, 360);
+      console.log('click a storm dragon', Math.hypot(dx, dz).toFixed(0), 'away, on its back: riding', I.riding() && I.riding().kind, '|', said());
+      if (!I.riding() || !I.DRAGON_KINDS[I.riding().kind].storm) throw new Error('clicking a storm dragon anywhere should get you on'); I.dismount(true); I.p.pitch = 0;
+    }
+  }
   console.log('admin commands now:', els.adminCommands.children.filter((c) => c.className === 'adminhead').map((c) => c.textContent).join(' | '));
   for (let k = 0; k < 60 * 310; k++) I.fireStormStep(1 / 60);
 }

@@ -34,6 +34,8 @@ function player(name, code) {
   check(ps.slice(1, 7).every((q) => q.got.some((m) => m.t === 'chat' && m.text === 'hi everyone!' && m.name === 'Kid1')), 'chat reaches everyone on Server 1');
   check(!ps[7].got.some((m) => m.t === 'chat'), 'but not players on Server 2');
   a.send({ t: 'announce', text: 'I am not an admin' }); await wait(80);
+  a.send({ t: 'eventoff', kind: 'all' }); await wait(80);
+  check(!b.got.some((m) => m.t === 'eventoff'), 'a non-admin can\'t turn events off');
   check(!b.got.some((m) => m.t === 'announce'), 'a non-admin can\'t announce');
   // gifts and trades
   const [c, d, e] = [ps[2], ps[3], ps[4]], ruby = { k: 'ruby', m: 'taco', u: 1, s: 4, n: 'Rex', o: -1 };
@@ -92,6 +94,8 @@ function player(name, code) {
     ad.send({ t: 'time', mode: 'night' }); await wait(80);
     check(b.got.some((m) => m.t === 'time' && m.mode === 'night'), 'an admin can make it night for everyone');
     const late2 = await player('LateNight'); check(late2.welcome.time === 'night', 'someone joining later gets the same night'); late2.ws.close();
+    ad.send({ t: 'eventoff', kind: 'all' }); await wait(80);
+    check(b.got.some((m) => m.t === 'eventoff' && m.kind === 'all'), 'an admin can turn off all the events for everyone');
     ad.send({ t: 'firestorm' }); await wait(80);
     check(b.got.some((m) => m.t === 'firestorm'), 'an admin can start a fire storm for everyone');
     check(b.got.some((m) => m.t === 'announce' && m.text === 'Hello all servers'), 'an admin announcement reaches everyone');
