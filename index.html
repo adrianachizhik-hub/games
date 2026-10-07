@@ -4800,7 +4800,7 @@ const World = (function () {
     if (fireResLeft() > 0) parts.push('Fire resistance ' + clock(fireResLeft()));
     if (radResLeft() > 0) parts.push('Radiation resistance ' + clock(radResLeft()));
     Object.keys(EVENTS).forEach((id) => { if (eventOn(id)) parts.push(EVENTS[id].name + ' ' + clock(eventLeft(id))); });
-    if (started && !activeEvents().length) { const n = nextEvent(); if (n.inS < 120) parts.push('Next: ' + n.e.name + ' in ' + clock(n.inS)); }
+    if (started && !activeEvents().length) { const n = nextEvent(); if (n.inS < 120) parts.push('Next event in ' + clock(n.inS)); }
     TREATS.forEach((t) => { if (treatLeft(t.id) > 0) parts.push(t.name + ' ' + clock(treatLeft(t.id))); });
     const txt = parts.join(' · ');
     if (txt !== effectShown) { effectShown = txt; effectEl.textContent = txt; effectEl.hidden = !txt; }
@@ -5563,13 +5563,13 @@ const World = (function () {
   }
 
   /* ---------- Mutation events ---------- */
-  /* Adriana: every mutation comes from its own event. Every EV_EVERY seconds on the clock (the same for everyone) the next
-     event in EVENT_LIST starts and lasts EV_LEN seconds; admins can start any of them whenever they like (for everyone,
+  /* Adriana: every mutation comes from its own event. Every EV_EVERY seconds (30 minutes) on the clock an event picked at random
+     (the same for everyone) starts and lasts EV_LEN seconds (5 minutes), and now and then (EV_DOUBLE) two play at once; admins can start any of them whenever they like (for everyone,
      online). Four kinds: 'fall' (things drop from the sky; a dragon of yours hit by one gets the mutation), 'fly'
      (things fly about, stop, and shine a beam down), 'spot' (something happens on the ground for a few seconds), and
-     'volcano' (the volcano shoots magma rocks). About a third of everything aims at the plots in town. Electric also
+     'volcano' (the volcano shoots magma rocks). Everything lands at random all over the island. Electric also
      still comes from an admin's storm lightning. */
-  const EV_EVERY = 600, EV_LEN = 300;
+  const EV_EVERY = 1800, EV_LEN = 300, EV_DOUBLE = 0.12;   // an event every 30 minutes for 5 minutes; now and then (12%) two at once
   const EVENT_LIST = [
     { id: 'fire', name: '🔥 Fire storm', kind: 'fall', look: 'fireball', say: 'Fireballs are falling' },
     { id: 'magma', name: '🌋 Volcano eruption', kind: 'volcano', say: 'The volcano is shooting magma rocks' },
@@ -5604,14 +5604,21 @@ const World = (function () {
     { id: 'eclipse', name: '🌑 Eclipse', kind: 'fall', look: 'ring', dark: true, say: 'The sun went dark and glowing rings are falling' },
     { id: 'diamond', name: '💠 Diamond rain', kind: 'fall', look: 'diamond', say: 'Diamonds are raining down' }
   ];
-  const EVENTS = Object.fromEntries(EVENT_LIST.map((e, i) => [e.id, Object.assign(e, { at: i * EV_EVERY })]));
-  const EV_CYCLE = EVENT_LIST.length * EV_EVERY;
-  const FS_LEN = EV_LEN, FS_PERIOD = EV_CYCLE;
-  const evUntil = {}, evWas = {};
-  const evPhase = (id) => ((Date.now() / 1000 - EVENTS[id].at) % EV_CYCLE + EV_CYCLE) % EV_CYCLE;
-  const eventOn = (id) => !!EVENTS[id] && (evPhase(id) < EV_LEN || Date.now() < (evUntil[id] || 0));
-  const eventLeft = (id) => Math.max(EV_LEN - evPhase(id), ((evUntil[id] || 0) - Date.now()) / 1000, 0);
-  const nextEvent = () => { const t = Date.now() / 1000, k = Math.floor(t / EV_EVERY) + 1; return { e: EVENT_LIST[((k % EVENT_LIST.length) + EVENT_LIST.length) % EVENT_LIST.length], inS: k * EV_EVERY - t }; };
+  const EVENTS = Object.fromEntries(EVENT_LIST.map((e) => [e.id, e]));
+  const FS_LEN = EV_LEN, FS_PERIOD = EV_EVERY;
+  const evUntil = {}, evWas = {}, slotCache = new Map();
+  function slotEvents(k) {                               // which event(s) play in half hour number k: picked by a dice roll everyone shares
+    if (slotCache.has(k)) return slotCache.get(k);
+    const r = W.rng(k * 7919 + 13), first = EVENT_LIST[Math.floor(r() * EVENT_LIST.length)], list = [first];
+    if (r() < EV_DOUBLE) { let second; do second = EVENT_LIST[Math.floor(r() * EVENT_LIST.length)]; while (second === first); list.push(second); }
+    if (slotCache.size > 50) slotCache.clear();
+    slotCache.set(k, list); return list;
+  }
+  const slotNow = () => { const t = Date.now() / 1000; return { k: Math.floor(t / EV_EVERY), phase: t % EV_EVERY }; };
+  let clockEventsOff = false;                            // tests only: no events from the clock
+  const eventOn = (id) => { if (!EVENTS[id]) return false; if (Date.now() < (evUntil[id] || 0)) return true; if (clockEventsOff) return false; const { k, phase } = slotNow(); return phase < EV_LEN && slotEvents(k).includes(EVENTS[id]); };
+  const eventLeft = (id) => { const { k, phase } = slotNow(); return Math.max(phase < EV_LEN && slotEvents(k).includes(EVENTS[id]) ? EV_LEN - phase : 0, ((evUntil[id] || 0) - Date.now()) / 1000, 0); };
+  const nextEvent = () => { const t = Date.now() / 1000, k = Math.floor(t / EV_EVERY) + 1; return { e: slotEvents(k)[0], both: slotEvents(k), inS: k * EV_EVERY - t }; };
   function startEvent(id, by) {
     if (!EVENTS[id]) return;
     evUntil[id] = Date.now() + EV_LEN * 1000;
@@ -5623,7 +5630,7 @@ const World = (function () {
   const activeEvents = () => (started ? EVENT_LIST.filter((e) => eventOn(e.id)) : []);
   const randomLand = (r) => { let x = 0, z = 0; for (let n = 0; n < 10; n++) { const a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * (r || 200); x = Math.cos(a) * d; z = Math.sin(a) * d; if (W.bil(H, x, z) > 0) break; } return { x, z }; };
   const randomPlotSpot = (spread) => plotWorld(Math.floor(Math.random() * 7), (Math.random() - 0.5) * spread, (Math.random() - 0.5) * spread);
-  const aimSpot = () => (Math.random() < 0.35 ? randomPlotSpot(9) : randomLand());   // about a third land on the plots
+  const aimSpot = () => randomLand();                    // anywhere on the island (Adriana: random areas, not just plots)
   const petsNear = (x, z, r) => plotPets.filter((d) => !d.ridden && !d.loose && !d.homing && Math.hypot(d.root.position.x - x, d.root.position.z - z) < r);
 
   /* What falls: a little model per look, with a tail, and the colour of its splash. */
@@ -5653,7 +5660,7 @@ const World = (function () {
   const fireballs = [];                                  // everything falling or flying through the air (name kept from the fire storm)
   function spawnFireball(x, z, kind, from) {             // kind: an event id ('fire', 'giant'...) or 'rock'; from: a volcano's crater
     const ev = EVENTS[kind === 'rock' ? 'giant' : kind || 'fire'] || EVENTS.fire, look = from ? 'magma' : ev.look, F = FALLS[look] || FALLS.fireball;
-    if (x === undefined) ({ x, z } = from ? (Math.random() < 0.4 ? randomPlotSpot(9) : randomLand(260)) : aimSpot());
+    if (x === undefined) ({ x, z } = from ? randomLand(220) : aimSpot());
     const g = new THREE.Group(), mat = (c) => (F.glow ? new THREE.MeshBasicMaterial({ color: c, transparent: !!F.see, opacity: F.see || 1 }) : F.see ? fxMat(c, F.see) : L_(c));
     const ball = new THREE.Mesh(F.geo, mat(F.mat[0])); g.add(ball);
     if (F.stretch) ball.scale.set(0.8, 1.4, 0.8);
@@ -5688,7 +5695,7 @@ const World = (function () {
     const st = randomLand(150);
     return { g, beam, ev, x: st.x, z: st.z, tx: 0, tz: 0, beamT: 0, h: look === 'ghost' ? 7 : 30 };
   }
-  function flyerTarget(u) { const w = Math.random() < 0.4 ? randomPlotSpot(6) : randomLand(190); u.tx = w.x; u.tz = w.z; }
+  function flyerTarget(u) { const w = randomLand(190); u.tx = w.x; u.tz = w.z; }
   const ufoMade = {};
   function flyersStep(dt, time) {
     const want = activeEvents().filter((e) => e.kind === 'fly');
@@ -6031,7 +6038,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

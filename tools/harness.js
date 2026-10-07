@@ -101,6 +101,7 @@ vm.createContext(sandbox);
 vm.runInContext(worldSrc + '\nthis.World = World;', sandbox);
 vm.runInContext(renderSrc, sandbox);
 const W = sandbox.World, I = window.__island;
+I.clockEventsOff(true);   // events from the real clock would change dragons in the middle of other checks; tests start them by hand
 
 // one frame of the real loop, then walk about
 raf(16); raf(32);
@@ -1070,6 +1071,9 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     if (I.dragonValue(i) !== base * 15) throw new Error('mutations should multiply the coins');
     I.dragonMutation[i] = was; I.buildMutFx(d);
     console.log('events:', I.EVENT_LIST.length, '| every mutation has its own event:', I.MUTATIONS.every((m) => I.EVENTS[m.id]), '| next up:', I.nextEvent().e.name, 'in', I.nextEvent().inS.toFixed(0), 's');
+    { let two = 0, seen = new Set(); for (let k = 0; k < 4000; k++) { const l = I.slotEvents(100000 + k); if (l.length === 2) two++; l.forEach((e) => seen.add(e.id)); }
+      console.log('events every 30 minutes for 5 minutes | over 4000 half hours: two at once', (two / 40).toFixed(1) + '% | different events seen', seen.size);
+      if (two / 4000 < 0.05 || two / 4000 > 0.2 || seen.size !== I.EVENT_LIST.length) throw new Error('events should be random, sometimes two at once'); }
     if (!I.MUTATIONS.every((m) => I.EVENTS[m.id])) throw new Error('every mutation needs an event');
   }
   { // the rock fall: a rock on a dragon makes it a Giant
