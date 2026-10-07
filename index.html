@@ -1049,6 +1049,7 @@
   <p class="restock" id="secretRes"></p>
   <div class="uprow"><div class="what"><b>Fire resistance</b><small>Reach into the fire village's bonfire. Lasts 5 minutes; buying more adds time.</small></div><button id="secretBuy" type="button"></button></div>
   <div class="uprow"><div class="what"><b>Radioactive resistant upgrader</b><small>Lets you into the nuke bunker without the radiation bouncing you back. Lasts 5 minutes; buying more adds time.</small></div><button id="secretBuyRad" type="button"></button></div>
+  <div class="uprow"><div class="what"><b>Breathe underwater upgrader</b><small>Swim underwater as long as you like, and get into Atlantis. Lasts 5 minutes; buying more adds time.</small></div><button id="secretBuyWater" type="button"></button></div>
   <div class="foot"><button id="secretDone" type="button">Done</button></div>
 </div>
 <div id="tutorial" role="dialog" aria-labelledby="tutTitle" hidden>
@@ -1190,6 +1191,7 @@ const World = (function () {
   const BUNKER = { x: 84, z: 84, r: 10, h: 3.4 };          // the nuke bunker, on the far north-east corner
   const SWAMP = { x: 174, z: 36, r: 34 }, SWAMP_TH = Math.atan2(36, 174);   // the swamp, on new land east of the desert
   const VOLC = { x: 150, z: -88, r: 26 }, VOLC_TH = Math.atan2(-88, 150);     // the volcano, on new land north-east of town
+  const ATL = { x: -109, z: 156, r: 30, floor: -26 };     // Atlantis: a deep bowl in the sea, about 45 out from the south-west coast
   function mountainAt(x, z) {                            // the peaks blended into one range
     let s = 0;
     for (const pk of PEAKS) {
@@ -1219,6 +1221,7 @@ const World = (function () {
     let h;
     if (s <= 0) {
       h = -14 * smoothstep(0, 0.45, -s);
+      h = lerp(h, ATL.floor, 1 - smoothstep(ATL.r * 0.75, ATL.r * 1.25, Math.hypot(x - ATL.x, z - ATL.z)));   // sinking down to Atlantis
     } else {
       h = 1.7 * smoothstep(0, 0.13, s) + 4.2 * smoothstep(0.1, 0.5, s);
       h += (fbm(x * 0.022 + 11, z * 0.022 + 5, 4) - 0.5) * 9 * smoothstep(0.1, 0.35, s);
@@ -1325,7 +1328,7 @@ const World = (function () {
     return smoothstep(0, 9, Math.min(a.t - tA, tB - a.t));
   }
   return {
-    vnoise, fbm, smoothstep, lerp, rng, C, U, P, B, CH_T, POOL, HUB, BUNKER, SWAMP, swampF, VOLC, PEAKS, axisPoint, axisCoords, coastS, mountainAt,
+    vnoise, fbm, smoothstep, lerp, rng, C, U, P, B, CH_T, POOL, HUB, BUNKER, SWAMP, swampF, VOLC, ATL, PEAKS, axisPoint, axisCoords, coastS, mountainAt,
     riverLat, southF, jungleF, desertF,
     caveOffset, caveWidth, caveDepth, RB_AXIS, SIZE, N, CELL, V, HALF, HT, H, CE, lid, bil, lidAt,
     get tA() { return tA; }, get tB() { return tB; }
@@ -1987,7 +1990,7 @@ const World = (function () {
   const waterGeo = new THREE.PlaneGeometry(1500, 1500, 150, 150);
   waterGeo.rotateX(-Math.PI / 2);
   const water = new THREE.Mesh(waterGeo, new THREE.MeshPhongMaterial({
-    color: 0x2aa7c6, specular: 0x8fd0e0, shininess: 60, transparent: true, opacity: 0.76, flatShading: true, depthWrite: false
+    color: 0x2aa7c6, specular: 0x8fd0e0, shininess: 60, transparent: true, opacity: 0.76, flatShading: true, depthWrite: false, side: THREE.DoubleSide   // seen from underneath too, when you swim under
   }));
   water.renderOrder = 1;
   scene.add(water);
@@ -2451,7 +2454,7 @@ const World = (function () {
 
   /* ---------- Player ---------- */
   const EYE = 1.65, SWIM = -1.05, MAX_SLOPE = 1.6;
-  const p = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: 0, onGround: true, inLid: false, inCave: false, dungeon: false, mud: false };
+  const p = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: 0, onGround: true, inLid: false, inCave: false, dungeon: false, mud: false, under: false };   // under: swimming underwater
   const CAM_BACK = 5.2;                                  // how far behind the avatar the camera sits outdoors
   let shopping = false, walking = false, running = false, camD = CAM_BACK, stride = 0, stepT = 0;
   function caveMode(x, z) {                              // would the player be inside the cave here?
@@ -2471,6 +2474,10 @@ const World = (function () {
     if (len < 1e-6) return true;
     const nx = p.x + dx, nz = p.z + dz;
     if (Math.hypot(nx, nz) > 225) return false;
+    if (p.under) {                                       // swimming underwater: the sea floor and Atlantis's walls are in the way
+      if (ground(nx, nz) > p.y + 0.6 || atlantisBlocks(nx, nz, p.y)) return false;
+      p.x = nx; p.z = nz; return true;
+    }
     if (p.onGround) {
       const g0 = standing(p.x, p.z), gp = standing(p.x + dx / len * 0.7, p.z + dz / len * 0.7);
       if ((gp - g0) / 0.7 > MAX_SLOPE) return false;
@@ -2714,6 +2721,11 @@ const World = (function () {
        eyelashes and a hazard-yellow bow. */
     nukeboy:   { name: 'Nuke (boy)',  body: 0x39ff14, dark: 0x1a7a10, belly: 0xd8ff8a, spike: 0x1d1f22, wing: 0x7dff4a, wing2: 0x2bd60a, gem: 0xeaff7a, nuke: 'boy' },
     nukegirl:  { name: 'Nuke (girl)', body: 0x7dff5a, dark: 0x2a9a20, belly: 0xffd6f0, spike: 0x1d1f22, wing: 0xb0ff8a, wing2: 0x5fe03a, gem: 0xeaff7a, nuke: 'girl' },
+    /* Aqua dragons, from the egg in Atlantis (Adriana, 7 October 2026): deep ocean blue with white-and-aqua whirlpool
+       swirls on each side and fins down the back; they hatch with the Water mutation already. The boy has a fin crest
+       and dark trident horns, the girl eyelashes and a pink shell bow. */
+    aquaboy:   { name: 'Aqua (boy)',  body: 0x1560d8, dark: 0x0a3a8a, belly: 0x8fe8ff, spike: 0x5bf0e0, wing: 0x2aa7e6, wing2: 0x1a7ac8, gem: 0xbff6ff, aqua: 'boy' },
+    aquagirl:  { name: 'Aqua (girl)', body: 0x23a8d8, dark: 0x1a6aa8, belly: 0xd8f6ff, spike: 0xffd6f5, wing: 0x6fd8f0, wing2: 0x3fa0e0, gem: 0xffd6f5, aqua: 'girl' },
     stormboy:  { name: 'Storm (boy)',  body: 0x1f5fff, dark: 0x0a2f8a, belly: 0x9fe8ff, spike: 0xe8fbff, wing: 0x3fa0ff, wing2: 0x1a66d6, gem: 0xbff6ff, storm: 'boy', big: 2.3 },
     stormgirl: { name: 'Storm (girl)', body: 0x5aa8ff, dark: 0x3a5fd0, belly: 0xeadcff, spike: 0xffd6f5, wing: 0xa8d4ff, wing2: 0xb08cff, gem: 0xffd6f5, storm: 'girl', big: 2.3 }
   };
@@ -2725,8 +2737,10 @@ const World = (function () {
     { name: 'Mythic',    shell: 0xc8901e, spot: 0xffe9a0, base: 17, count: 2, hatch: [['gold', 1], ['ruby', 1]], shiny: true },
     { name: 'Prismatic', swirl: [0xef6fae, 0xf08a2c, 0xf6c93b, 0x4fd1c5, 0x3f7fd6, 0x8a5ad6], base: 15, count: 1, hatch: [['diamond', 3], ['jade', 2]], shiny: true },
     { name: 'Fire', shell: 0xd8241a, spot: 0xffb020, base: 15, count: 0, hatch: [['fireboy', 1], ['firegirl', 1]], shiny: true },
-    { name: 'Nuke', shell: 0x39ff14, spot: 0x1d1f22, base: 13, count: 0, hatch: [['nukeboy', 1], ['nukegirl', 1]], shiny: true }   // only from the nuke bunker   // only from the fire village's bonfire
+    { name: 'Nuke', shell: 0x39ff14, spot: 0x1d1f22, base: 13, count: 0, hatch: [['nukeboy', 1], ['nukegirl', 1]], shiny: true },   // only from the nuke bunker
+    { name: 'Aqua', swirl: [0x0a4fa8, 0x1fb6d6, 0x8fe8ff, 0x0e7a9a, 0xd8f6ff, 0x3f7fd6], base: 60, count: 0, hatch: [['aquaboy', 1], ['aquagirl', 1]], shiny: true }   // only from Atlantis
   ];
+  const AQUA_TIER = EGG_TIERS.length - 1;
   const EXTRA_PER_UNIT = 1 / 7;                          // seconds of extra time for each unit the egg is from your plot
   const metalMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60, specular: 0x8a8a8a });
   const gemMat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x383838 });   // gems glow a little
@@ -2789,6 +2803,7 @@ const World = (function () {
   EGG_TIERS[4].spots.push(...[[-8, -6], [9, 6], [7, -7]].map(([lx, lz]) => ({ x: MUD.x + lx, y: MUD.floor, z: MUD.z + lz, dungeon: true, mud: true })));   // and in the mud cavern
   EGG_TIERS[5].spots = [];                              // the fire egg only ever appears in the village bonfire
   EGG_TIERS[6].spots = [];                              // and the nuke egg only in the nuke bunker
+  EGG_TIERS[AQUA_TIER].spots = [];                      // and the aqua egg only in Atlantis
   /* Every hiding place, from beaches to the mine, goes into one list, and any egg can turn up at any of them, at random
      (Adriana: "the prismatic doesn't just spawn in the secret mine"). Rare eggs stay rare because fewer are out at once. */
   const eggSpots = [].concat(...EGG_TIERS.map((t) => t.spots));
@@ -2892,6 +2907,19 @@ const World = (function () {
       } else {
         [-1, 1].forEach((s) => { const hr = J(head, s * 0.22, 0.34, 0.1, 0.75, 0, s * -0.4); B(body, hr, 0.11, 0.36, 0.11, 0x1d1f22, 0, 0.14, 0); B(body, hr, 0.08, 0.24, 0.08, 0xb6ff3d, 0, 0.36, 0.07, 0.7, 0, 0); });
         B(body, head, 0.07, 0.2, 0.07, 0x1d1f22, 0, -0.3, -0.44, -0.4, 0, 0);
+      }
+    }
+    if (c.aqua) {                                                            // aqua dragons: whirlpool swirls on each side, fins down the back
+      [-1, 1].forEach((sd) => { for (let k = 0; k < 14; k++) { const a = k * 0.62, r = 0.04 + k * 0.017; B(body, O, 0.03, 0.06, 0.06, k % 2 ? 0xffffff : 0x8fe8ff, sd * 0.365, 0.78 + Math.sin(a) * r, 0.02 + Math.cos(a) * r, a, 0, 0); } });
+      [-0.32, -0.08, 0.16, 0.38].forEach((z, k) => B(body, O, 0.05, 0.22 - k * 0.03, 0.2, k % 2 ? 0x5bf0e0 : 0x8fe8ff, 0, 1.12, z, 0.3, 0, 0));   // back fins
+      [-1, 1].forEach((sd) => B(body, head, 0.03, 0.16, 0.18, 0x5bf0e0, sd * 0.3, 0.12, 0.05, 0, 0, sd * 0.4));   // ear fins
+      if (c.aqua === 'girl') {
+        [-0.17, 0.17].forEach((x) => { for (let k = -1; k <= 1; k++) B(body, head, 0.03, 0.09, 0.02, 0x0a1a3a, x + k * 0.05, 0.26, -0.29, 0, 0, k * 0.4); });
+        const bow = J(head, 0.16, 0.4, -0.02, 0, 0, -0.3);
+        B(body, bow, 0.2, 0.17, 0.08, 0xff8fc7, -0.12, 0, 0, 0, 0, 0.5); B(body, bow, 0.2, 0.17, 0.08, 0xff8fc7, 0.12, 0, 0, 0, 0, -0.5); B(body, bow, 0.1, 0.1, 0.1, 0xfff4d6, 0, 0, 0);   // a pink shell bow
+      } else {
+        [-1, 1].forEach((s) => { const hr = J(head, s * 0.2, 0.34, 0.1, 0.6, 0, s * -0.3); B(body, hr, 0.08, 0.36, 0.08, 0x0a2a5a, 0, 0.14, 0); B(body, hr, 0.2, 0.05, 0.05, 0x0a2a5a, 0, 0.3, 0); B(body, hr, 0.05, 0.12, 0.05, 0x0a2a5a, s * 0.09, 0.36, 0); });   // trident horns
+        [-0.08, 0.06, 0.2].forEach((z, k) => B(body, head, 0.04, 0.24 - k * 0.04, 0.12, k % 2 ? 0x5bf0e0 : 0x8fe8ff, 0, 0.42, z));   // fin crest
       }
     }
     if (c.storm) {
@@ -3133,7 +3161,7 @@ const World = (function () {
   /* Coins. Every PAYOUT_SECONDS, the dragons on your plot pay out together: each gives its DRAGON_COINS, more for
      rarer ones (jade a little more than diamond, being the rarer of the two), times any upgrader. Stored dragons
      don't earn. Only while you play. Kept on this device. */
-  const DRAGON_COINS = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60, fireboy: 500000, firegirl: 500000, nukeboy: 750000, nukegirl: 750000, stormboy: 30000000000, stormgirl: 30000000000 };   // storm: 10 billion a second   // each dragon, every payout
+  const DRAGON_COINS = { green: 1, red: 1, blue: 3, purple: 3, bronze: 8, silver: 8, gold: 20, ruby: 20, diamond: 50, jade: 60, fireboy: 500000, firegirl: 500000, nukeboy: 750000, nukegirl: 750000, aquaboy: 1000000, aquagirl: 1000000, stormboy: 30000000000, stormgirl: 30000000000 };   // storm: 10 billion a second   // each dragon, every payout
   const PAYOUT_SECONDS = 3;                              // all your dragons' coins are added up and paid together this often
   /* Upgraders, sold at the red stall. Each one boosts one dragon's coins; any upgrader fits any dragon, better ones
      boost more. A dragon holds one upgrader, and only a better one can replace it. dragonUpgrades[i] goes with
@@ -3209,7 +3237,7 @@ const World = (function () {
   }
   function releasePlot() {                               // leaving: anything hatching finishes, then the plot is empty again
     if (myPlot < 0) return;
-    if (hatching) { scene.remove(hatching.mesh); const kind = pickDragon(hatching.tier); ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(placedCount() < slotLimit()); saveProgress(); hatching = null; }
+    if (hatching) { scene.remove(hatching.mesh); const kind = pickDragon(hatching.tier); if (hatching.tier === AQUA_TIER) dragonMutation[ownDragons.length] = 'water'; ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(placedCount() < slotLimit()); saveProgress(); hatching = null; }
     plotPets.forEach((d) => scene.remove(d.root)); plotPets.length = 0;
     clearDecor();
     const was = myPlot; myPlot = -1;
@@ -3267,9 +3295,9 @@ const World = (function () {
   function dropCarried() {                               // put the egg down where you are, to pick up again later
     if (!carrying) return;
     const egg = stopCarrying();
-    if (egg.fire || egg.nuke) {                           // a fire egg goes back to the fire (a nuke egg to the bunker), and the chasers go home
-      villagersHome(); monsterHome(); if (egg.spawned) respawnEgg(egg);
-      toast(egg.fire ? 'You dropped the fire egg. It went back to the fire.' : 'You dropped the nuke egg. It went back to the bunker.', 3); return;
+    if (egg.fire || egg.nuke || egg.aqua) {               // a fire egg goes back to the fire (a nuke egg to the bunker, an aqua egg to Atlantis), and the chasers go home
+      villagersHome(); monsterHome(); guardHome(); if (egg.spawned) respawnEgg(egg);
+      toast(egg.fire ? 'You dropped the fire egg. It went back to the fire.' : egg.aqua ? 'You dropped the aqua egg. It went back to Atlantis.' : 'You dropped the nuke egg. It went back to the bunker.', 3); return;
     }
     const spot = { x: p.x, y: p.dungeon ? (p.mud ? MUD.floor : DG.floor) : p.inCave ? W.bil(H, p.x, p.z) : standing(p.x, p.z), z: p.z, dungeon: p.dungeon, cave: p.inCave, mud: !!p.mud };
     placeEgg(egg, spot); egg.waitAway = true;            // not picked straight back up: walk away from it first
@@ -3321,6 +3349,7 @@ const World = (function () {
     nagT -= dt;
     villagePlay(dt);
     bunkerPlay(dt);
+    atlantisPlay(dt);
     luckyPlay();
     if (carryingBlock) { blockStep(dt); return; }        // hands full: no eggs until the block is open
     if (!carrying) {
@@ -3333,8 +3362,8 @@ const World = (function () {
       return;
     }
     carrying.left -= dt;
-    if (!p.dungeon && plotAt(p.x, p.z) === myPlot) { if (carrying.egg.fire) { if (carrying.egg.spawned) villagersHome(); else fireHatched(); } if (carrying.egg.nuke) { if (!carrying.egg.spawned) nukeHatched(); monsterHome(); } hatchAtHome(); return; }
-    if (carrying.left <= 0) { if (carrying.egg.fire) sendHome('Too slow! The fire egg went back to the fire, and you\'re back at your plot.'); else if (carrying.egg.nuke) sendHome('Too slow! The nuke egg went back to the bunker, and you\'re back at your plot.'); else hatchTooSoon(); return; }
+    if (!p.dungeon && plotAt(p.x, p.z) === myPlot) { if (carrying.egg.fire) { if (carrying.egg.spawned) villagersHome(); else fireHatched(); } if (carrying.egg.nuke) { if (!carrying.egg.spawned) nukeHatched(); monsterHome(); } if (carrying.egg.aqua) { aquaHatched(); guardHome(); } hatchAtHome(); return; }
+    if (carrying.left <= 0) { if (carrying.egg.fire) sendHome('Too slow! The fire egg went back to the fire, and you\'re back at your plot.'); else if (carrying.egg.nuke) sendHome('Too slow! The nuke egg went back to the bunker, and you\'re back at your plot.'); else if (carrying.egg.aqua) sendHome('Too slow! The aqua egg went back to Atlantis, and you\'re back at your plot.'); else hatchTooSoon(); return; }
     const s = Math.ceil(carrying.left);
     if (s !== carrying.shown) {
       carrying.shown = s;
@@ -3349,6 +3378,7 @@ const World = (function () {
     announceStep(dt);
     villageAnimate(dt, time);
     bunkerAnimate(dt, time);
+    atlantisAnimate(dt, time);
     const tw = (s, k) => { const v = reduced ? 1 : 0.55 + 0.45 * Math.sin(time * 4 + k); s.scale.set(v, v, v); };
     for (const egg of eggs) {
       if (!egg.g.visible) continue;
@@ -3363,7 +3393,9 @@ const World = (function () {
         scene.remove(hatching.mesh);
         const kind = pickDragon(hatching.tier);
         const room = placedCount() < slotLimit(), i = ownDragons.length;
-        ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(room); saveProgress();
+        ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(room);
+        if (hatching.tier === AQUA_TIER) dragonMutation[i] = 'water';   // aqua dragons hatch with the Water mutation
+        saveProgress();
         if (room) addPet(kind, true, i); else renderInventory();
         toast('You hatched a ' + DRAGON_KINDS[kind].name + ' dragon! (' + EGG_TIERS[hatching.tier].name + ') It makes ' + DRAGON_COINS[kind] + ' coin' + (DRAGON_COINS[kind] === 1 ? '' : 's') + ' every ' + PAYOUT_SECONDS + ' seconds.'
           + (room ? '' : ' Your plot is full, so it went into your inventory.'), room ? 5 : 7);
@@ -4477,7 +4509,7 @@ const World = (function () {
      FIRE_SECONDS to get it to your plot, while the villagers, who are very fast, chase you with axes. If one reaches you,
      or time runs out, you are sent back to your plot without the egg (it goes back into the fire). Home in time, and it
      hatches a fire dragon, boy or girl. One fire egg per fire. */
-  const FIRE_PERIOD = 600, FIRE_LIT = 120, FIRE_SECONDS = 15, VILLAGER_SPEED = 150, CATCH_RANGE = 2.5, HEAT_RANGE = 3.4;
+  const FIRE_PERIOD = 600, FIRE_LIT = 120, FIRE_SECONDS = 15, VILLAGER_SPEED = 122, CATCH_RANGE = 2.5, HEAT_RANGE = 3.4;
   const vY = W.bil(H, VILLAGE.x, VILLAGE.z);
   let fireOverride = null, fireTakenRound = -1;            // fireOverride: tests only (seconds into the cycle)
   try { fireTakenRound = +localStorage.getItem('mutation-mayhem-fire-taken') || -1; } catch (e) { /* none */ }
@@ -4522,12 +4554,12 @@ const World = (function () {
   let chase = null;                                      // { wait } while the villagers are after you
   function villagersHome() { chase = null; villagers.forEach((v) => { v.x = v.home.x; v.z = v.home.z; v.stun = 0; v.hop = 0; v.spin = 0; }); }
   function sendHome(msg) {                               // caught, or too slow: back to your plot without the egg
-    const lost = stopCarrying(); villagersHome(); monsterHome();
+    const lost = stopCarrying(); villagersHome(); monsterHome(); guardHome(); breath = BREATH;
     if (lost && lost.spawned) respawnEgg(lost);          // an admin's spawned fire egg is gone
     if (riding) dismount(true);
     flying = false;
     const w = plotWorld(myPlot, 0, -2);
-    p.x = w.x; p.z = w.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true; p.dungeon = false; p.mud = false; sinkT = -1; p.inCave = false; p.inLid = false;
+    p.x = w.x; p.z = w.z; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true; p.dungeon = false; p.mud = false; sinkT = -1; p.inCave = false; p.inLid = false; p.under = false;
     camY = p.y + EYE; blink();
     toast(msg, 6);
   }
@@ -4590,8 +4622,10 @@ const World = (function () {
   /* ---------- The secret shop, deep in the jungle ---------- */
   /* A hidden stall with a hooded keeper. It only serves players who own a diamond dragon. For now it sells fire
      resistance, which lasts FIRE_RES_MINUTES (bought time adds up) and lets you reach into the bonfire. */
-  const FIRE_RES_PRICE = 250000, FIRE_RES_MINUTES = 5, RAD_RES_PRICE = 1000000, RAD_RES_MINUTES = 5;
-  let fireResUntil = 0, radResUntil = 0;
+  const FIRE_RES_PRICE = 250000, FIRE_RES_MINUTES = 5, RAD_RES_PRICE = 1000000, RAD_RES_MINUTES = 5, WATER_RES_PRICE = 2000000, WATER_RES_MINUTES = 5;   // breathe underwater: Claude's price
+  let fireResUntil = 0, radResUntil = 0, waterResUntil = 0;
+  try { waterResUntil = +localStorage.getItem('mutation-mayhem-waterres') || 0; } catch (e) { /* none */ }
+  const waterResLeft = () => Math.max(0, waterResUntil - Date.now()) / 1000;
   try { fireResUntil = +localStorage.getItem('mutation-mayhem-fireres') || 0; radResUntil = +localStorage.getItem('mutation-mayhem-radres') || 0; } catch (e) { /* none */ }
   const secretFace = Math.atan2(HUB.x - SECRET.x, HUB.z - SECRET.z), secretY = W.bil(H, SECRET.x, SECRET.z);
   const secretOut = { x: Math.sin(secretFace), z: Math.cos(secretFace) };
@@ -4621,7 +4655,7 @@ const World = (function () {
   const fireResLeft = () => Math.max(0, fireResUntil - Date.now()) / 1000, radResLeft = () => Math.max(0, radResUntil - Date.now()) / 1000;
   function refreshSecret() {
     $('secretCoins').textContent = fmt(coins);
-    $('secretRes').textContent = [fireResLeft() > 0 ? 'Fire resistance left: ' + clock(fireResLeft()) : '', radResLeft() > 0 ? 'Radiation resistance left: ' + clock(radResLeft()) : ''].filter(Boolean).join(' · ');
+    $('secretRes').textContent = [fireResLeft() > 0 ? 'Fire resistance left: ' + clock(fireResLeft()) : '', radResLeft() > 0 ? 'Radiation resistance left: ' + clock(radResLeft()) : '', waterResLeft() > 0 ? 'Breathe underwater left: ' + clock(waterResLeft()) : ''].filter(Boolean).join(' · ');
   }
   function openSecret() {
     if (menuOpen() || shopping || !started) return;
@@ -4659,6 +4693,16 @@ const World = (function () {
     refreshSecret();
   }
   $('secretBuyRad').addEventListener('click', buyRadRes);
+  function buyWaterRes() {
+    if (coins < WATER_RES_PRICE) { toast('You don\'t have enough money.', 3); return; }
+    coins -= WATER_RES_PRICE; saveCoins();
+    waterResUntil = Math.max(Date.now(), waterResUntil) + WATER_RES_MINUTES * 60000;
+    try { localStorage.setItem('mutation-mayhem-waterres', String(waterResUntil)); } catch (e) { /* not saved */ }
+    toast('You can breathe underwater for ' + clock(waterResLeft()) + '!', 4);
+    refreshSecret();
+  }
+  $('secretBuyWater').addEventListener('click', buyWaterRes);
+  $('secretBuyWater').textContent = fmt(WATER_RES_PRICE) + ' coins';
   $('secretBuyRad').textContent = fmt(RAD_RES_PRICE) + ' coins';
   /* ---------- The swamp, the quicksand and the secret mud cavern ---------- */
   /* Adriana's idea: a swamp on new land east of the desert (W.SWAMP), with dead trees hung with moss, reeds, lily pads
@@ -4758,10 +4802,10 @@ const World = (function () {
      Getting in also needs a radioactive resistant upgrader from the secret shop, or the radiation bounces you back.
      Inside, a nuke egg glows on a stand. Grab it and you have NUKE_SECONDS to get it home, while the nuclear monster
      climbs out of its toxic pit behind the bunker and chases you. Its speed and start (MONSTER_SPEED, MONSTER_RING)
-     were worked out so a fire dragon needs 9 Prismatic upgraders to get away from every plot. Home in time: a nuke
+     were worked out so a fire dragon needs 6 Prismatic upgraders to get away from every plot (Adriana, 7 October 2026; was 9). Home in time: a nuke
      dragon, boy or girl. One nuke egg every NUKE_PERIOD seconds. */
   const BK = W.BUNKER, bkFace = Math.atan2(HUB.x - BK.x, HUB.z - BK.z), BY = W.bil(H, BK.x, BK.z), NUKE_TIER = 6;
-  const NUKE_SECONDS = 13, NUKE_PERIOD = 600, NUKE_CODE = '5367', MONSTER_SPEED = 165, MONSTER_CATCH = 3;
+  const NUKE_SECONDS = 13, NUKE_PERIOD = 600, NUKE_CODE = '5367', MONSTER_SPEED = 139, MONSTER_CATCH = 3;
   const bkC = Math.cos(bkFace), bkS = Math.sin(bkFace);
   const bkWorld = (lx, lz) => ({ x: BK.x + lx * bkC + lz * bkS, z: BK.z - lx * bkS + lz * bkC });   // the bunker's own frame: +z is the door side, toward town
   const bkLocal = (x, z) => { const dx = x - BK.x, dz = z - BK.z; return { lx: dx * bkC - dz * bkS, lz: dx * bkS + dz * bkC }; };
@@ -4798,10 +4842,12 @@ const World = (function () {
     const pit = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.08, 16), new THREE.MeshBasicMaterial({ color: 0x5aff2a }));
     pit.position.set(pitW.x, BY + 0.2, pitW.z); scene.add(pit);
     const dune = [], RR = W.rng(8484);                   // hidden: sand heaped over the roof and against the walls, so it looks like a dune with a door
-    const heap = (lx, lz, r, sy, y) => { const w = bkWorld(lx, lz); dune.push({ g: new THREE.DodecahedronGeometry(r, 1), color: [0xe0b070, 0xd8a868, 0xe8bc7c][Math.floor(RR() * 3)], m: xf(w.x, BY + y, w.z, 1, sy, 1, RR(), RR(), RR()), jitter: 0.15 }); };
-    heap(0, -1, 8.4, 0.42, 4.8); heap(-3.5, 2, 5.5, 0.45, 5); heap(3.5, -3, 5.5, 0.45, 5);   // over the roof
-    for (let k = -6; k <= 6; k += 3) { heap(k, -7.2, 3.4, 0.9, 1.4); heap(-7.2, k, 3.4, 0.9, 1.4); heap(7.2, k, 3.4, 0.9, 1.4); }   // banked up the back and sides
-    [-4.6, 4.6].forEach((x) => heap(x, 7.2, 2.9, 0.9, 1.2));   // and the front, either side of the door
+    const heap = (lx, lz, r, sy, y) => { const w = bkWorld(lx, lz); dune.push({ g: new THREE.DodecahedronGeometry(r, 1), color: [0xe0b070, 0xd8a868, 0xe8bc7c][Math.floor(RR() * 3)], m: xf(w.x, BY + y, w.z, 1, sy, 1, 0, RR() * 3, 0), jitter: 0.15 }); };   // turned but never tipped, so no edge dips into the bunker
+    /* Adriana: the sand covered the egg and the keypad. Now it all stays outside: on top of the roof (bottom at 4.4) and
+       outside the walls (at 5.7 to 6.0), and the front heaps leave the keypad and the door clear. */
+    heap(0, -1, 7, 0.22, 6.9); heap(-3, 2, 4.5, 0.3, 6.6); heap(3, -3, 4.5, 0.3, 6.6);   // over the roof (high enough that the bumps don't poke through the ceiling)
+    for (let k = -6; k <= 6; k += 3) { heap(k, -8.8, 2.7, 0.9, 1.2); heap(-8.8, k, 2.7, 0.9, 1.2); heap(8.8, k, 2.7, 0.9, 1.2); }   // banked up the back and sides
+    [-5.2, 5.2].forEach((x) => heap(x, 8.2, 2.0, 0.9, 1.0));   // and the front, away from the door and the keypad
     scene.add(new THREE.Mesh(merge(dune), plantMat));
     [[-9, 6], [9.5, 4], [-8, -9], [10, -8], [0, 11.5]].forEach(([lx, lz], k) => {   // a few dry bushes and rocks to break up the shape
       const w = bkWorld(lx, lz), g = new THREE.Mesh(new THREE.DodecahedronGeometry(0.9 + (k % 2) * 0.5, 0), new THREE.MeshLambertMaterial({ color: k % 2 ? 0x8a7a4a : 0xa8643a }));
@@ -4890,6 +4936,148 @@ const World = (function () {
     if (Date.now() >= radResUntil) return 'The door is open, but the radiation will bounce you back without radioactive resistance.';
     return nukeEggThere() ? 'The nuke egg is inside. Grab it and FLY!' : 'The nuke egg is gone. Another one comes in ' + clock(NUKE_PERIOD - (Date.now() / 1000) % NUKE_PERIOD) + '.';
   }
+  /* ---------- Atlantis, under the sea ---------- */
+  /* Adriana's idea (7 October 2026): swim out from the south-west coast (W.ATL, about 45 out to sea) and dive down to
+     Atlantis: a sunken castle with a wall and towers, a palace with a golden dome, coral and kelp. You can hold your
+     breath for BREATH seconds; with the breathe underwater upgrader (secret shop, 5 minutes) you can stay under as long
+     as you like, and only then can you get into Atlantis (without it you're sent back to your plot). In front of the
+     palace the aqua egg glows on a stand, watched by the guardian of Atlantis, a giant merman with a trident. Grab it and
+     he chases you until you're out of Atlantis (GUARD_LEASH); you have AQUA_SECONDS to get it home. It hatches an aqua
+     dragon, boy or girl, with the Water mutation already. One aqua egg every AQUA_PERIOD seconds. Numbers are Claude's. */
+  const ATL = W.ATL, AF = ATL.floor, BREATH = 10, AQUA_SECONDS = 90, AQUA_PERIOD = 600, GUARD_SPEED = 8.5, GUARD_CATCH = 3.2, GUARD_LEASH = 46;
+  const WALL_R = 17, WALL_H = 9, GATE = Math.atan2(HUB.z - ATL.z, HUB.x - ATL.x), GATE_W = 0.2;   // the gate faces the island
+  const PAL = 5.2, PAL_H = 6.5;                          // the palace: a square block in the middle, half width and height
+  const TOWERS = [0, 1, 2, 3, 4, 5].map((k) => { const a = GATE + Math.PI / 6 + k * Math.PI / 3; return { x: ATL.x + Math.cos(a) * WALL_R, z: ATL.z + Math.sin(a) * WALL_R }; });
+  const AQUA_AT = { x: ATL.x + Math.cos(GATE) * 9, z: ATL.z + Math.sin(GATE) * 9 };   // the egg's stand, between the gate and the palace
+  let breath = BREATH, aquaTakenRound = -1, gchase = null;
+  try { aquaTakenRound = +localStorage.getItem('mutation-mayhem-aqua-taken') || -1; } catch (e) { /* none */ }
+  const aquaRound = () => Math.floor(Date.now() / 1000 / AQUA_PERIOD);
+  const aquaEggThere = () => aquaTakenRound !== aquaRound() && !(carrying && carrying.egg.aqua);
+  const angGap = (a, b) => { let d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
+  function atlantisBlocks(x, z, y) {                     // would standing here, at height y, be inside a wall, a tower or the palace?
+    const dx = x - ATL.x, dz = z - ATL.z, d = Math.hypot(dx, dz);
+    if (d > WALL_R + 4) return false;
+    if (y < AF + WALL_H && Math.abs(d - WALL_R) < 1 && angGap(Math.atan2(dz, dx), GATE) > GATE_W) return true;
+    if (y < AF + WALL_H + 3 && TOWERS.some((t) => Math.hypot(x - t.x, z - t.z) < 2.3)) return true;
+    if (y < AF + PAL_H + 0.4 && Math.abs(dx) < PAL + 0.4 && Math.abs(dz) < PAL + 0.4) return true;
+    return false;
+  }
+  (function buildAtlantis() {
+    const parts = [], R = W.rng(9191), STONE = [0xd8e6e8, 0xc4d8dc, 0xb0ccd2], TEAL = 0x2fb6b0, GOLDC = 0xffc21f;
+    const at = (lx, lz) => [ATL.x + lx, ATL.z + lz];
+    const B = (w, h, d, c, x, y, z, ry) => parts.push(bx(w, h, d, c, x, y, z, 0, ry || 0, 0));
+    const C = (rt, rb, h, n, c, x, y, z) => parts.push(rod(rt, rb, h, n, c, x, y, z));
+    for (let r = 2; r <= WALL_R + 2; r += 2.4) for (let k = 0; k < Math.round(r * 1.6); k++) {   // a tiled stone plaza
+      const a = k / Math.round(r * 1.6) * Math.PI * 2, [x, z] = at(Math.cos(a) * r, Math.sin(a) * r);
+      B(2.3, 0.3, 2.3, STONE[(k + Math.round(r)) % 3], x, AF + 0.1, z, -a);
+    }
+    const n = 64;                                         // the outer wall, with battlements, and a gap for the gate
+    for (let k = 0; k < n; k++) {
+      const a = k / n * Math.PI * 2;
+      if (angGap(a, GATE) < GATE_W + 0.03) continue;
+      const [x, z] = at(Math.cos(a) * WALL_R, Math.sin(a) * WALL_R);
+      B(1.8, WALL_H, 1.6, STONE[k % 3], x, AF + WALL_H / 2, z, -a + Math.PI / 2);
+      if (k % 2) B(1, 1, 1.7, STONE[(k + 1) % 3], x, AF + WALL_H + 0.5, z, -a + Math.PI / 2);
+      if (k % 4 === 0) B(0.4, 0.6, 1.7, TEAL, x, AF + WALL_H - 1.5, z, -a + Math.PI / 2);   // a band of sea-green
+    }
+    [-1, 1].forEach((sd) => { const a = GATE + sd * (GATE_W + 0.05), [x, z] = at(Math.cos(a) * WALL_R, Math.sin(a) * WALL_R); C(1, 1.1, WALL_H + 4, 10, STONE[0], x, AF + (WALL_H + 4) / 2, z); C(0.2, 1.3, 2.2, 10, GOLDC, x, AF + WALL_H + 5.1, z); });   // gate pillars
+    { const [x, z] = at(Math.cos(GATE) * WALL_R, Math.sin(GATE) * WALL_R); B(8, 1.2, 1.8, TEAL, x, AF + WALL_H + 2, z, -GATE + Math.PI / 2); }   // the arch over the gate
+    TOWERS.forEach((t, k) => { C(2.1, 2.3, WALL_H + 5, 12, STONE[k % 3], t.x, AF + (WALL_H + 5) / 2, t.z); C(2.5, 2.5, 0.6, 12, TEAL, t.x, AF + WALL_H + 5.3, t.z); parts.push({ g: new THREE.ConeGeometry(2.4, 4, 12), color: k % 2 ? TEAL : 0x3f7fd6, m: xf(t.x, AF + WALL_H + 7.6, t.z, 1, 1, 1), jitter: 0.04 }); C(0.15, 0.15, 1.2, 6, GOLDC, t.x, AF + WALL_H + 10.2, t.z); });
+    B(PAL * 2, PAL_H, PAL * 2, STONE[1], ATL.x, AF + PAL_H / 2, ATL.z);   // the palace, with columns round it and a golden dome
+    B(PAL * 2 + 1.4, 0.6, PAL * 2 + 1.4, TEAL, ATL.x, AF + PAL_H + 0.3, ATL.z);
+    for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, [x, z] = at(Math.cos(a) * (PAL + 1.6), Math.sin(a) * (PAL + 1.6)); C(0.35, 0.4, PAL_H, 8, 0xf2f6f8, x, AF + PAL_H / 2, z); }
+    parts.push({ g: new THREE.SphereGeometry(4.2, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), color: GOLDC, m: xf(ATL.x, AF + PAL_H + 0.6, ATL.z, 1, 1, 1), jitter: 0.02 });
+    C(0.3, 0.3, 4, 8, GOLDC, ATL.x, AF + PAL_H + 6.6, ATL.z); parts.push({ g: new THREE.OctahedronGeometry(0.9, 0), color: 0x8fe8ff, m: xf(ATL.x, AF + PAL_H + 9.2, ATL.z, 1, 1, 1), jitter: 0.02 });
+    { const dx = Math.cos(GATE), dz = Math.sin(GATE); B(3, 4, 0.3, 0x1a3a4a, ATL.x + dx * (PAL + 0.05), AF + 2, ATL.z + dz * (PAL + 0.05), -GATE + Math.PI / 2); B(3.6, 0.5, 0.4, GOLDC, ATL.x + dx * (PAL + 0.1), AF + 4.2, ATL.z + dz * (PAL + 0.1), -GATE + Math.PI / 2); }   // the palace door
+    C(1.3, 1.6, 1.4, 12, STONE[0], AQUA_AT.x, AF + 0.7, AQUA_AT.z); C(1.1, 1.1, 0.15, 12, 0x5bf0e0, AQUA_AT.x, AF + 1.45, AQUA_AT.z);   // the egg's stand
+    const CORAL = [0xff6f91, 0xff9a3d, 0xb27bff, 0xffd23f, 0xff4fa8, 0x5bf0e0];
+    for (let k = 0; k < 70; k++) {                        // coral and kelp all round
+      const a = R() * Math.PI * 2, r = 4 + R() * (ATL.r + 6), [x, z] = at(Math.cos(a) * r, Math.sin(a) * r);
+      if (Math.abs(r - WALL_R) < 2.2 || (Math.abs(x - ATL.x) < PAL + 2 && Math.abs(z - ATL.z) < PAL + 2) || Math.hypot(x - AQUA_AT.x, z - AQUA_AT.z) < 3) continue;
+      const y = W.bil(H, x, z);
+      if (k % 3 === 0) { const h = 3 + R() * 6; for (let j = 0; j < h; j += 1.2) B(0.25, 1.3, 0.12, j % 2.4 < 1.2 ? 0x2f8a3a : 0x3fa04a, x + Math.sin(j) * 0.2, y + j + 0.6, z, R() * 3); }   // kelp
+      else { const c = CORAL[k % CORAL.length]; for (let j = 0; j < 4; j++) parts.push({ g: new THREE.DodecahedronGeometry(0.4 + R() * 0.4, 0), color: c, m: xf(x + (R() - 0.5) * 1.2, y + 0.3 + j * 0.45, z + (R() - 0.5) * 1.2, 1, 1.4, 1, R(), R(), R()), jitter: 0.1 }); }
+    }
+    scene.add(new THREE.Mesh(merge(parts), plantMat));
+  })();
+  const atlLight = new THREE.PointLight(0x5bf0e0, 1.6, 40, 2); atlLight.position.set(ATL.x, AF + 10, ATL.z); scene.add(atlLight);
+  const aquaEggMesh = new THREE.Mesh(eggGeo[AQUA_TIER], eggMat(AQUA_TIER)); aquaEggMesh.position.set(AQUA_AT.x, AF + 1.6, AQUA_AT.z); aquaEggMesh.scale.set(1.3, 1.3, 1.3); scene.add(aquaEggMesh);
+  const bubbles = [];                                    // little bubbles rising from Atlantis
+  for (let k = 0; k < 30; k++) { const m = new THREE.Mesh(fxGeo.bubble, fxMat(0xd8f6ff, 0.5)); m.position.set(ATL.x + (Math.random() - 0.5) * 34, AF + Math.random() * 24, ATL.z + (Math.random() - 0.5) * 34); scene.add(m); bubbles.push(m); }
+  /* The guardian of Atlantis: a giant merman with a fish tail, a golden crown and a trident. */
+  const guardian = { f: figure({ skin: lam('#4fb8a8'), shirt: lam('#1f6a8a'), pants: lam('#2fb6b0'), face: lam(0x0a2a3a) }), x: 0, y: 0, z: 0, a: 0 };
+  guardian.f.legL.visible = false; guardian.f.legR.visible = false;
+  block(guardian.f.root, lam('#2fb6b0'), 0.5, 0.9, 0.4, 0, 0.5, 0.05); block(guardian.f.root, lam('#23a090'), 0.4, 0.5, 0.3, 0, -0.1, 0.25, 0.6, 0, 0);   // the tail
+  block(guardian.f.root, lam('#5bf0e0'), 0.9, 0.12, 0.4, 0, -0.35, 0.5, 0.6, 0, 0);   // tail fin
+  [-0.16, 0, 0.16].forEach((x, k) => block(guardian.f.head, lam('#ffc21f'), 0.1, k === 1 ? 0.3 : 0.22, 0.1, x, 0.68, 0));   // crown
+  block(guardian.f.head, lam('#ffc21f'), 0.56, 0.1, 0.56, 0, 0.56, 0);
+  block(guardian.f.armR, lam('#ffc21f'), 0.06, 2.4, 0.06, 0, -0.6, -0.15);   // the trident
+  [-0.14, 0, 0.14].forEach((x) => block(guardian.f.armR, lam('#ffe9a0'), 0.05, 0.35, 0.05, x, 0.72, -0.15)); block(guardian.f.armR, lam('#ffc21f'), 0.34, 0.05, 0.05, 0, 0.55, -0.15);
+  guardian.f.root.scale.set(2.8, 2.8, 2.8);
+  guardian.x = AQUA_AT.x + 5; guardian.y = AF + 2.5; guardian.z = AQUA_AT.z;
+  function guardHome() { gchase = null; }
+  function aquaHatched() { aquaTakenRound = aquaRound(); try { localStorage.setItem('mutation-mayhem-aqua-taken', String(aquaTakenRound)); } catch (e) { /* not saved */ } }
+  function toBase(msg) {                                 // back to your plot (or town, if you haven't got one)
+    if (myPlot >= 0) { sendHome(msg); return; }
+    if (carrying) stopCarrying(); guardHome(); breath = BREATH; p.under = false; spawnInTown(); blink(); toast(msg, 6);
+  }
+  function grabAquaEgg() {
+    const egg = { tier: AQUA_TIER, aqua: true, lucky: true, taken: false, g: { visible: false }, spot: { x: AQUA_AT.x, y: AF, z: AQUA_AT.z } };
+    pickUp(egg);
+    carrying.left = carrying.total = AQUA_SECONDS;
+    gchase = { wait: 0.8 };
+    toast('You grabbed the AQUA EGG! The guardian of Atlantis is coming. Swim out of Atlantis, then get it home in ' + AQUA_SECONDS + ' seconds!', 6);
+  }
+  function atlantisPlay(dt) {                            // from eggsPlay: breath, the way into Atlantis, the egg and the guardian
+    const d = Math.hypot(p.x - ATL.x, p.z - ATL.z), canBreathe = Date.now() < waterResUntil;
+    if (p.under && !canBreathe) {
+      if (d < ATL.r + 4) { toBase('Atlantis is too deep to hold your breath! You need the breathe underwater upgrader from the secret shop.'); return; }
+      breath -= dt;
+      if (breath <= 0) { toBase('You ran out of air! Buy the breathe underwater upgrader at the secret shop to stay under longer.'); return; }
+    } else if (!p.under) breath = Math.min(BREATH, breath + dt * 4);
+    if (aquaEggThere() && !carrying && !carryingBlock && p.under && Math.hypot(p.x - AQUA_AT.x, p.z - AQUA_AT.z) < 2 && p.y < AF + 4) {
+      if (myPlot < 0) { if (nagT <= 0) { toast('Claim a plot first, so you have somewhere to take the aqua egg!', 5); nagT = 6; } }
+      else grabAquaEgg();
+    }
+    if (!gchase) return;
+    if (!carrying || !carrying.egg.aqua) { guardHome(); return; }
+    if (d > GUARD_LEASH) { guardHome(); toast('You got away from the guardian! Now get the aqua egg home!', 4); return; }
+    if (gchase.wait > 0) { gchase.wait -= dt; return; }
+    const vx = p.x - guardian.x, vy = p.y + 1 - guardian.y, vz = p.z - guardian.z, dist = Math.hypot(vx, vy, vz), st = Math.min(dist, GUARD_SPEED * dt);
+    if (dist > 0) { guardian.x += vx / dist * st; guardian.y += vy / dist * st; guardian.z += vz / dist * st; }
+    if (Math.hypot(p.x - guardian.x, p.y + 1 - guardian.y, p.z - guardian.z) < GUARD_CATCH) toBase('The guardian of Atlantis caught you! You\'re back at your plot, without the aqua egg.');
+  }
+  function atlantisAnimate(dt, time) {
+    aquaEggMesh.visible = aquaEggThere();
+    aquaEggMesh.rotation.y = reduced ? 0 : time * 0.8; aquaEggMesh.position.y = AF + 1.6 + (reduced ? 0 : Math.sin(time * 1.5) * 0.15);
+    if (!gchase) {                                        // guarding: circling the egg's stand, back to it if he chased you
+      const a = time * 0.35, hx = AQUA_AT.x + Math.cos(a) * 5, hz = AQUA_AT.z + Math.sin(a) * 5, hy = AF + 2.5 + Math.sin(time) * 0.5;
+      const k = Math.min(1, dt * 1.5); guardian.x += (hx - guardian.x) * k; guardian.y += (hy - guardian.y) * k; guardian.z += (hz - guardian.z) * k;
+      guardian.a = a + Math.PI;
+    } else guardian.a = Math.atan2(-(p.x - guardian.x), -(p.z - guardian.z));
+    guardian.f.root.position.set(guardian.x, guardian.y, guardian.z);
+    guardian.f.root.rotation.y = guardian.a;
+    guardian.f.root.rotation.z = reduced ? 0 : Math.sin(time * 2) * 0.06;   // swaying as he swims
+    guardian.f.armR.rotation.x = gchase ? -2.2 : -0.4; guardian.f.armL.rotation.x = reduced ? 0 : Math.sin(time * 2) * 0.4;
+    if (!reduced) bubbles.forEach((m, k) => { m.position.y += dt * (1.5 + (k % 4) * 0.5); if (m.position.y > -1.2) m.position.y = AF + 1; });
+    atlLight.intensity = 1.4 + (reduced ? 0 : Math.sin(time * 1.7) * 0.3);
+  }
+  function atlantisHint() {
+    if (gchase) return 'SWIM! Get out of Atlantis before the guardian catches you!';
+    const d = Math.hypot(p.x - ATL.x, p.z - ATL.z);
+    if (d > ATL.r + 25) return '';
+    if (!p.under) return Date.now() < waterResUntil ? 'Atlantis is down below! Hold C (or the Down button) to dive.' : 'Atlantis is down below, but you need the breathe underwater upgrader to get in.';
+    return aquaEggThere() ? 'The aqua egg is on the stand in front of the palace. Watch out for the guardian!' : 'The aqua egg is gone. Another one comes in ' + clock(AQUA_PERIOD - (Date.now() / 1000) % AQUA_PERIOD) + '.';
+  }
+  /* Underwater, everything turns blue and misty. */
+  const deepBlue = new THREE.Color(0x0d5a7a);
+  let wasUnder = false;
+  function underwaterLook() {
+    const under = started && camera.position.y < -0.15 && !p.inCave && !p.dungeon && !p.mud;
+    if (under) { if (scene.fog) { scene.fog.color.copy(deepBlue); scene.fog.near = 2; scene.fog.far = 70; } if (scene.background && scene.background.copy) scene.background.copy(deepBlue); skyGroup.visible = false; }
+    else if (wasUnder) { if (scene.fog) { scene.fog.near = 140; scene.fog.far = 720; } skyGroup.visible = true; }
+    wasUnder = under;
+  }
   /* The keypad by the door. */
   const kpEl = $('keypad'), kpScreen = $('kpScreen');
   function kpShow() { kpScreen.textContent = (keypadTyped + '----').slice(0, 4); }
@@ -4922,6 +5110,8 @@ const World = (function () {
     const parts = [];
     if (fireResLeft() > 0) parts.push('Fire resistance ' + clock(fireResLeft()));
     if (radResLeft() > 0) parts.push('Radiation resistance ' + clock(radResLeft()));
+    if (waterResLeft() > 0) parts.push('🫧 Breathe underwater ' + clock(waterResLeft()));
+    else if (p.under) parts.push('🫧 Air ' + Math.ceil(breath) + ' s');
     Object.keys(EVENTS).forEach((id) => { if (eventOn(id)) parts.push(EVENTS[id].name + ' ' + clock(eventLeft(id))); });
     if (started && nightShown > 0.6) parts.push('🌙 Night');
     if (started && !activeEvents().length) { const n = nextEvent(); if (n.inS < 120) parts.push('Next event in ' + clock(n.inS)); }
@@ -5574,7 +5764,7 @@ const World = (function () {
     if (mag > 0.05) {
       const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.93;
       running = run;
-      const sp = (riding ? rideSpeed(run) : run ? 17 : 9.5) * (swimming ? 0.6 : 1) * Math.min(1, mag) * dt / mag;
+      const sp = (riding ? rideSpeed(run) : run ? 17 : 9.5) * (swimming ? (p.under ? 0.75 : 0.6) : 1) * Math.min(1, mag) * dt / mag;
       const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
       const dx = (fx * f + rx * s) * sp, dz = (fz * f + rz * s) * sp;
       if (p.mud) { mudMove(dx, dz); moving = true; }
@@ -5582,7 +5772,7 @@ const World = (function () {
       else {
         if (tryMove(dx, dz)) moving = true;
         else { const a = tryMove(dx, 0), b = tryMove(0, dz); moving = a || b; }
-        if (!p.inCave) { if (!(flying && p.y - standing(p.x, p.z) > 2.5)) pushOut(); settle(); }   // high up on a dragon, trees can't reach you
+        if (!p.inCave && !p.under) { if (!(flying && p.y - standing(p.x, p.z) > 2.5)) pushOut(); settle(); }   // high up on a dragon, trees can't reach you
       }
     }
     if (!p.dungeon && p.inCave && Math.hypot(p.x - DG.x, p.z - DG.z) < 1.9) enterDungeon();   // into the pond, and through it
@@ -5590,11 +5780,26 @@ const World = (function () {
     if (riding && (p.inCave || p.dungeon)) { dismount(false); toast('Dragons are too big for the cave! Yours went into your inventory.', 4); }
     const jumpDown = keys.has('Space') || touchJump, jumpPress = jumpTapped || (jumpDown && !jumpWas);
     jumpWas = jumpDown; jumpTapped = false;
+    /* Swimming (Adriana, 7 October 2026): in the sea, hold C (or the Down button) to dive, Space to swim up; let go and
+       you float slowly back up. Without the breathe underwater upgrader you can hold your breath for BREATH seconds. */
+    const diveHeld = keys.has('KeyC') || keys.has('ControlLeft') || touchDive, canSwim = swimming && !riding && !p.mud && !p.dungeon && !p.inCave;
+    const underSwim = canSwim && (p.under || (diveHeld && p.onGround));
     if (riding) rideJump(dt, jumpDown, jumpPress);
-    else if ((jumpDown || jumpPress) && p.onGround) { p.vy = 10; p.onGround = false; }
+    else if ((jumpDown || jumpPress) && p.onGround && !p.under) { p.vy = 10; p.onGround = false; }
     const g = p.mud ? MUD.floor : p.dungeon ? DG.floor : standing(p.x, p.z);
-    if (diveBtn.hidden === flying) { diveBtn.hidden = !flying; if (!flying) touchDive = false; }
-    if (flying) flyStep(dt, jumpDown);
+    const showDive = flying || canSwim;
+    if (diveBtn.hidden === showDive) { diveBtn.hidden = !showDive; if (!showDive) touchDive = false; }
+    if (underSwim) {                                     // underwater: dive, rise, or float up
+      const floor = ground(p.x, p.z), want = diveHeld ? -7 : jumpDown ? 7 : 1.5;
+      if (!p.under) { p.under = true; p.vy = 0; }
+      p.vy += (want - p.vy) * Math.min(1, dt * 4);
+      p.y += p.vy * dt; p.onGround = true;
+      if (p.y < floor) { p.y = floor; p.vy = Math.max(0, p.vy); }
+      if (atlantisBlocks(p.x, p.z, p.y)) { p.y -= p.vy * dt; p.vy = 0; }   // bump into the roofs from below
+      if (p.y >= SWIM - 0.02 && !diveHeld) { p.y = SWIM; p.vy = 0; p.under = false; }   // back at the top
+    } else if (p.under) p.under = false;
+    if (underSwim) { /* moved above */ }
+    else if (flying) flyStep(dt, jumpDown);
     else if (climbing) {                                       // up the ladder
       p.vy = 0; p.onGround = false; p.y += 5.5 * dt;
       if (p.y > DG.top - 1.9) leaveDungeon();
@@ -5626,9 +5831,10 @@ const World = (function () {
     const cp = Math.cos(p.pitch), vx = -Math.sin(p.yaw) * cp, vy = Math.sin(p.pitch), vz = -Math.cos(p.yaw) * cp;   // the way the view points
     const cx = p.x - vx * camD, cz = p.z - vz * camD;
     let cy = camY + 0.45 - vy * camD;
-    if (!p.inCave && !p.dungeon) {                        // keep the camera out of the ground and the sea
-      const floor = Math.max(W.bil(HT, cx, cz), W.bil(HT, (cx + p.x) / 2, (cz + p.z) / 2) - 0.5, 0) + 0.7;
+    if (!p.inCave && !p.dungeon) {                        // keep the camera out of the ground and the sea (unless you're swimming under it)
+      const floor = Math.max(W.bil(HT, cx, cz), W.bil(HT, (cx + p.x) / 2, (cz + p.z) / 2) - 0.5, p.under ? -999 : 0) + 0.7;
       if (cy < floor) cy = floor;
+      if (p.under && cy > -0.4) cy = -0.4;              // stay under the waves while you're under
     }
     camera.position.set(cx, cy, cz);
   }
@@ -5654,6 +5860,7 @@ const World = (function () {
     if (Math.hypot(p.x - HUB.x, p.z - HUB.z) < HUB.r) return 'Town';
     if (Math.hypot(p.x - VILLAGE.x, p.z - VILLAGE.z) < VILLAGE.r + 6) return 'Fire village';
     if (a.dB < 19 || (a.dB < 27 && p.y < 10)) return 'Waterfall lagoon';
+    if (Math.hypot(p.x - W.ATL.x, p.z - W.ATL.z) < W.ATL.r + 4 && h < -10) return 'Atlantis';
     if (h < -0.6) return s > 0.06 ? 'River' : 'Ocean';
     if (p.y > 36) return 'Snowy peak';
     if (h < 1.9 && s < 0.22) return 'Beach';
@@ -5666,7 +5873,7 @@ const World = (function () {
   const hintEl = $('hint');
   let hint = '';
   function showZone() {
-    const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : started ? villageHint() || bunkerHint() || rideHint() : '';
+    const tip = p.dungeon && Math.hypot(p.x - DG.x, p.z - DG.z - DG.z1) < 5 ? 'Walk into the ladder to climb back up' : started ? villageHint() || bunkerHint() || atlantisHint() || rideHint() : '';
     if (tip !== hint) { hint = tip; hintEl.textContent = tip; }
     const free = started && !shopping && !menuOpen() && !talking && !carrying && !riding && !p.dungeon && !p.inCave;
     const onPlot = free && myPlot >= 0 && plotAt(p.x, p.z) === myPlot;
@@ -6390,7 +6597,9 @@ const World = (function () {
   function buildOther(o) {                               // a blocky person like yours, in their colours, with a name tag
     const f = figure({ skin: lam(okColour(o.look.skin, '#e0ac69')), shirt: lam(okColour(o.look.shirt, '#d8433a')), pants: lam(okColour(o.look.pants, '#6b4a2b')), face: paint.face });
     const hc = lam(okColour(o.look.hairColor, '#5a3a20'));
-    if (o.look.hair !== 'none') { block(f.head, hc, 0.57, 0.16, 0.57, 0, 0.5, 0.01); block(f.head, hc, 0.57, o.look.hair === 'long' || o.look.hair === 'ponytail' ? 0.7 : 0.34, 0.12, 0, o.look.hair === 'long' ? 0.12 : 0.3, 0.24); }
+    const shape = HAIR_SHAPES[o.look.hair] || HAIR_SHAPES.short;   // the same hairstyle shapes as your own (bug fix: a ponytail looked like a wide flat slab)
+    [...(shape.on || []), ...(shape.up || [])].forEach((q) => block(f.head, hc, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
+    (shape.tie || []).forEach((q) => block(f.head, paint[shape.tieColor || 'tie'], q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));
     f.root.add(nameTag(o.name + (o.admin ? ' ★' : '')));
     o.f = f;
   }
@@ -6482,11 +6691,12 @@ const World = (function () {
     if (frame % 3 === 0) drawMap();
     if (frame % 10 === 0) showZone();
     frame++;
+    underwaterLook();
     renderer.render(scene, camera);
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

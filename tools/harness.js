@@ -970,19 +970,19 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   // on a dragon: too slow, then fast enough
   const flyHome = (speedUp) => {
     const hp = I.plotWorld(I.myPlot(), 0, 2); stand(hp.x, hp.z, 6.3); fr(2);
-    const pet = I.plotPets.find((d) => !d.homing); I.dragonSpeed[pet.index] = speedUp; I.mount(pet);
+    const pet = I.plotPets.find((d) => !d.homing && !I.DRAGON_KINDS[d.kind].storm), kind0 = pet.kind; pet.kind = 'jade'; I.dragonSpeed[pet.index] = speedUp; I.mount(pet);   // a jade dragon, the best you can hatch
     const tj = () => { window.fire('keydown', ev({ code: 'Space' })); fr(1); window.fire('keyup', ev({ code: 'Space' })); fr(1); };
     tj(); fr(6); tj(); window.fire('keydown', ev({ code: 'Space' })); fr(30); window.fire('keyup', ev({ code: 'Space' }));
     I.p.x = V.x + 0.3; I.p.z = V.z; I.p.y = vy + 2; fr(1);
     const got = !!I.carrying(); I.keys.add('KeyW'); I.keys.add('ShiftLeft'); let k = 0;
     while (I.carrying() && k++ < 60 * 16) { I.p.yaw = face(hp.x, hp.z); if (I.p.y < W.bil(W.HT, I.p.x, I.p.z) + 12) I.keys.add('Space'); else I.keys.delete('Space'); fr(); } I.keys.clear();
     const out = { kind: pet.kind, speed: I.rideSpeed ? (I.riding() ? I.rideSpeed(true).toFixed(0) : '-') : '-', got, secs: (k / 60).toFixed(1), msg: said(), dragons: I.ownDragons.slice(-1)[0] };
-    if (I.riding()) I.dismount(true); return out;
+    if (I.riding()) I.dismount(true); pet.kind = kind0; I.dragonSpeed[pet.index] = 0; return out;
   };
-  const slow = flyHome(0); console.log('fly it home on a', slow.kind, 'dragon with no speed upgrades: grabbed', slow.got, '| after', slow.secs, 's:', slow.msg);
-  if (!/caught/.test(slow.msg)) throw new Error('an unupgraded dragon should be caught');
-  const before = I.ownDragons.length, fast = flyHome(400); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
-  console.log('fly it home on a', fast.kind, 'dragon at +400% speed: grabbed', fast.got, '| home after', fast.secs, 's | dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], '| it earns', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], 'every 3 s | fire egg there now', I.fireEggThere());
+  const slow = flyHome(40); console.log('fly it home on a', slow.kind, 'dragon with 4 Prismatic upgraders: grabbed', slow.got, '| after', slow.secs, 's:', slow.msg);
+  if (!/caught/.test(slow.msg)) throw new Error('4 upgraders should be caught');
+  const before = I.ownDragons.length, fast = flyHome(50); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
+  console.log('fly it home on a', fast.kind, 'dragon with 5 Prismatic upgraders: grabbed', fast.got, '| home after', fast.secs, 's | dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], '| it earns', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], 'every 3 s | fire egg there now', I.fireEggThere());
   if (I.ownDragons.length !== before + 1 || !/^fire(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.fireEggThere()) throw new Error('a fast dragon should get the fire egg home and hatch a fire dragon');
   const n50 = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(5); n50[d] = (n50[d] || 0) + 1; } console.log('fire egg hatches:', Object.keys(n50).map((k) => k + ' ' + (n50[k] / 200).toFixed(0) + '%').join(', '));
   I.setFireClock(null);
@@ -1023,7 +1023,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   let n = 0; while (I.carrying() && n++ < 600) fr();
   console.log('stand still: caught after', (n / 60).toFixed(2), 's | home', I.plotAt(I.p.x, I.p.z) === I.myPlot(), '| egg back', I.nukeEggThere(), '|', said());
   if (I.carrying() || !/nuclear monster caught/.test(said())) throw new Error('the monster should catch you');
-  // fly it home on a fire dragon with 8, then 9 Prismatic upgraders (each +10% speed)
+  // fly it home on a fire dragon with 5, then 6 Prismatic upgraders (each +10% speed)
   const flyHome = (ups) => {
     const hp = I.plotWorld(I.myPlot(), 0, 2); stand(hp, 6.3); fr(2);
     const pet = I.plotPets.find((d) => !d.homing && !I.DRAGON_KINDS[d.kind].storm), kind0 = pet.kind; pet.kind = 'fireboy'; I.dragonSpeed[pet.index] = ups * 10; I.mount(pet); const spd = I.rideSpeed(true).toFixed(0);
@@ -1036,11 +1036,11 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     const out = { speed: spd, got, secs: (k / 60).toFixed(1), msg: said(), last: I.ownDragons.slice(-1)[0] };
     if (I.riding()) I.dismount(true); pet.kind = kind0; I.dragonSpeed[pet.index] = 0; return out;
   };
-  const r8 = flyHome(8); console.log('fire dragon + 8 Prismatic (speed', r8.speed + '): grabbed', r8.got, '| after', r8.secs, 's:', r8.msg);
-  if (!/caught/.test(r8.msg)) throw new Error('8 upgraders should not be enough');
-  const before = I.ownDragons.length, r9 = flyHome(9); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
-  console.log('fire dragon + 9 Prismatic (speed', r9.speed + '): grabbed', r9.got, '| home after', r9.secs, 's |', r9.msg, '| dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], 'earning', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], '| egg gone till next time', !I.nukeEggThere());
-  if (I.ownDragons.length !== before + 1 || !/^nuke(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.nukeEggThere()) throw new Error('9 upgraders should get the nuke egg home');
+  const r8 = flyHome(5); console.log('fire dragon + 5 Prismatic (speed', r8.speed + '): grabbed', r8.got, '| after', r8.secs, 's:', r8.msg);
+  if (!/caught/.test(r8.msg)) throw new Error('5 upgraders should not be enough');
+  const before = I.ownDragons.length, r9 = flyHome(6); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
+  console.log('fire dragon + 6 Prismatic (speed', r9.speed + '): grabbed', r9.got, '| home after', r9.secs, 's |', r9.msg, '| dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], 'earning', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], '| egg gone till next time', !I.nukeEggThere());
+  if (I.ownDragons.length !== before + 1 || !/^nuke(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.nukeEggThere()) throw new Error('6 upgraders should get the nuke egg home');
   const n50 = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(I.NUKE_TIER); n50[d] = (n50[d] || 0) + 1; } console.log('nuke egg hatches:', Object.keys(n50).map((k) => k + ' ' + (n50[k] / 200).toFixed(0) + '%').join(', '));
 }
 
@@ -1203,6 +1203,58 @@ if (process.env.MODE !== 'admin') {
   console.log('they stop a trade:', !I.trading(), '|', said()); I.closeTrade();
   if (I.trading() || I.tradeOpen()) throw new Error('a stopped trade should close');
   I.setCoins(c0);
+}
+
+// ---- swimming and Atlantis ----
+{
+  let T = 400000; const hud = (n = 12) => { for (let k = 0; k < n; k++) raf(T += 16); };
+  const fr = (n = 1) => { for (let k = 0; k < n; k++) { I.update(1 / 60, 0); I.eggsAnimate(1 / 60, 0); } };
+  if (I.riding()) I.dismount(true);
+  if (I.myPlot() < 0) reclaim();
+  if (I.carrying()) I.sendHome('test');
+  I.setWaterRes(0); I.setAquaTaken(-1);
+  const a = 300 * Math.PI / 180, sea = { x: Math.cos(a) * 172, z: Math.sin(a) * 172 };
+  stand({ x: sea.x, z: sea.z, y: -1.05 }); fr(2);
+  const top = I.p.y; I.keys.add('KeyC'); fr(60); I.keys.delete('KeyC');
+  console.log('swim out to sea and hold C: from', top.toFixed(2), 'down to', I.p.y.toFixed(1), '| under', I.p.under, '| floor', W.bil(W.H, I.p.x, I.p.z).toFixed(1), '| air', I.breath().toFixed(1));
+  if (!I.p.under || I.p.y > top - 3) throw new Error('holding C in the sea should dive');
+  fr(60 * 2); console.log('let go: floats up to', I.p.y.toFixed(1));
+  I.keys.add('KeyC'); fr(60); I.keys.delete('KeyC'); let k = 0; while (I.p.under && k++ < 60 * 12) { I.keys.add('KeyC'); fr(); }
+  I.keys.clear();
+  console.log('stay under with no upgrader: sent home after', (k / 60).toFixed(1), 's | on my plot', I.plotAt(I.p.x, I.p.z) === I.myPlot(), '|', said());
+  if (I.plotAt(I.p.x, I.p.z) !== I.myPlot() || !/ran out of air/.test(said())) throw new Error('running out of air should send you home');
+  const ab = { x: I.ATL.x + 25, z: I.ATL.z };
+  stand({ x: ab.x, z: ab.z, y: -1.05 }); I.keys.add('KeyC'); fr(30); I.keys.clear();
+  console.log('dive into Atlantis with no upgrader: home', I.plotAt(I.p.x, I.p.z) === I.myPlot(), '|', said());
+  if (I.plotAt(I.p.x, I.p.z) !== I.myPlot() || !/too deep/.test(said())) throw new Error('Atlantis needs the breathe underwater upgrader');
+  stand(I.secretFront); hud(); window.fire('keydown', ev({ code: 'Enter', key: 'Enter' })); hud(2);
+  I.setCoins(5e6); els.secretBuyWater.fire('click', ev({})); console.log('secret shop: buy a breathe underwater upgrader:', said(), '| left', I.waterResLeft().toFixed(0), 's | effects', JSON.stringify(els.effect.textContent));
+  if (I.waterResLeft() < 290) throw new Error('breathe underwater should last 5 minutes'); window.fire('keydown', ev({ code: 'Escape' }));
+  stand({ x: ab.x, z: ab.z, y: -1.05 }); I.keys.add('KeyC'); fr(60 * 4); I.keys.clear();
+  console.log('dive into Atlantis with it: zone', I.zoneName(), '| depth', I.p.y.toFixed(1), '| air never runs out', I.breath() === 10, '| hint', JSON.stringify((hud(), els.hint.textContent)));
+  if (I.zoneName() !== 'Atlantis' || I.p.y > -15) throw new Error('should be down in Atlantis');
+  const inWall = I.atlantisBlocks(I.ATL.x + 17, I.ATL.z + 0.2, I.ATL.floor + 2), inGate = I.atlantisBlocks(I.ATL.x + Math.cos(Math.atan2(26 - I.ATL.z, 26 - I.ATL.x)) * 17, I.ATL.z + Math.sin(Math.atan2(26 - I.ATL.z, 26 - I.ATL.x)) * 17, I.ATL.floor + 2);
+  console.log('walls: solid', inWall, '| the gate is open', !I.atlantisBlocks(I.ATL.x + Math.cos(Math.atan2(-26 - I.ATL.z, 26 - I.ATL.x)) * 17, I.ATL.z + Math.sin(Math.atan2(-26 - I.ATL.z, 26 - I.ATL.x)) * 17, I.ATL.floor + 2), '| over the wall is open', !I.atlantisBlocks(I.ATL.x + 17, I.ATL.z, I.ATL.floor + 12));
+  const grab = () => { I.p.x = I.AQUA_AT.x; I.p.z = I.AQUA_AT.z; I.p.y = I.ATL.floor + 1; I.p.under = true; fr(2); };
+  grab();
+  console.log('swim onto the stand: carrying', I.carrying() && I.EGG_TIERS[I.carrying().egg.tier].name, 'egg,', I.carrying() && I.carrying().total, 's | guardian chasing', !!I.gchase(), '|', said());
+  if (!I.carrying() || !I.carrying().egg.aqua || !I.gchase()) throw new Error('grabbing the aqua egg should start the guardian');
+  k = 0; while (I.carrying() && k++ < 60 * 10) fr();
+  console.log('stay put: caught after', (k / 60).toFixed(1), 's | home', I.plotAt(I.p.x, I.p.z) === I.myPlot(), '| egg back', I.aquaEggThere(), '|', said());
+  if (I.carrying() || !/guardian of Atlantis caught/.test(said()) || !I.aquaEggThere()) throw new Error('the guardian should catch you');
+  grab(); const out = Math.atan2(I.AQUA_AT.z - I.ATL.z, I.AQUA_AT.x - I.ATL.x);
+  I.keys.add('KeyW'); I.keys.add('ShiftLeft'); k = 0;
+  while (I.gchase() && I.carrying() && k++ < 60 * 12) { I.p.yaw = Math.atan2(-Math.cos(out), -Math.sin(out)); I.keys[I.p.y < I.ATL.floor + 12 ? 'add' : 'delete']('Space'); fr(); }
+  I.keys.clear();
+  console.log('swim out through the gate and up: got away', !!I.carrying() && !I.gchase(), 'after', (k / 60).toFixed(1), 's, at', Math.hypot(I.p.x - I.ATL.x, I.p.z - I.ATL.z).toFixed(0), 'from the middle |', said());
+  if (!I.carrying() || I.gchase()) throw new Error('swimming fast out of Atlantis should get away from the guardian');
+  const before = I.ownDragons.length, hp = I.plotWorld(I.myPlot(), 0, 0); I.p.under = false; stand({ x: hp.x, z: hp.z, y: 6.3 }); fr(150);
+  const got = I.ownDragons.length - 1;
+  console.log('home with it: dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons[got], 'with', JSON.stringify(I.dragonMutation[got]), '| earns', I.DRAGON_COINS[I.ownDragons[got]], '| egg gone till next time', !I.aquaEggThere());
+  if (I.ownDragons.length !== before + 1 || !/^aqua(boy|girl)$/.test(I.ownDragons[got]) || I.dragonMutation[got] !== 'water' || I.aquaEggThere()) throw new Error('the aqua egg should hatch an aqua dragon with the Water mutation');
+  const n50 = {}; for (let q = 0; q < 20000; q++) { const d = I.pickDragon(I.AQUA_TIER); n50[d] = (n50[d] || 0) + 1; } console.log('aqua egg hatches:', Object.keys(n50).map((q) => q + ' ' + (n50[q] / 200).toFixed(0) + '%').join(', '));
+  I.makeDragon('aquaboy'); I.makeDragon('aquagirl');
+  I.setWaterRes(0); I.setAquaTaken(-1);
 }
 
 // ---- accounts: each name has its own save ----
