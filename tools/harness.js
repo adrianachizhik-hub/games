@@ -1149,9 +1149,15 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
         if (I.hasMut(d.index, ev.id)) got++; else errs.push(ev.id);
       } catch (e) { errs.push(ev.id + ': ' + e.message); }
     });
+    { const before = I.ownDragons.map((k, i) => I.dragonMutation[i]).join('|'); I.startEvent('taco'); I.fireballs.length = 0;
+      for (let k = 0; k < 60 * 3; k++) { I.fireStormStep(1 / 60); I.fireballs.length = 0; }   // only little tacos
+      console.log('taco rain: little tacos falling', I.littleTacos.length, '| little ones gave no mutation', I.ownDragons.map((k, i) => I.dragonMutation[i]).join('|') === before);
+      if (I.littleTacos.length < 80) throw new Error('lots of little tacos should fall'); }
     console.log('all', I.EVENT_LIST.length, 'events ran: gave their mutation', got, '| problems', JSON.stringify(errs));
     if (errs.length) throw new Error('some events did not work: ' + errs.join(', '));
   }
+  { const b = els.adminCommands.children.find((c) => c.textContent === '🌈 Turn on all mutations');
+    if (b) { b.fire('click', ev({})); const on = I.EVENT_LIST.filter((e) => I.eventOn(e.id)).length; console.log('admin "Turn on all mutations": events on', on, 'of', I.EVENT_LIST.length); if (on !== I.EVENT_LIST.length) throw new Error('all events should be on'); for (let k = 0; k < 60 * 2; k++) I.fireStormStep(1 / 60); } }
   console.log('admin commands now:', els.adminCommands.children.filter((c) => c.className === 'adminhead').map((c) => c.textContent).join(' | '));
   for (let k = 0; k < 60 * 310; k++) I.fireStormStep(1 / 60);
 }

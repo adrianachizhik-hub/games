@@ -5788,7 +5788,7 @@ const World = (function () {
     { id: 'golden', name: '🏆 Golden meteors', kind: 'fall', look: 'gold', say: 'Golden meteors are falling' },
     { id: 'eclipse', name: '🌑 Eclipse', kind: 'fall', look: 'ring', dark: true, say: 'The sun went dark and glowing rings are falling' },
     { id: 'diamond', name: '💠 Diamond rain', kind: 'fall', look: 'diamond', say: 'Diamonds are raining down' },
-    { id: 'taco', name: '🌮 Raining tacos', kind: 'fall', look: 'taco', say: 'It\'s raining tacos' }
+    { id: 'taco', name: '🌮 Raining tacos', kind: 'fall', look: 'taco', swarm: true, say: 'It\'s raining LOTS of tacos', hint: 'Only a BIG taco landing on your dragon gives it the' }   // Adriana: lots of little ones, the big ones mutate
   ];
   const EVENTS = Object.fromEntries(EVENT_LIST.map((e) => [e.id, e]));
   const FS_LEN = EV_LEN, FS_PERIOD = EV_EVERY;
@@ -5849,13 +5849,30 @@ const World = (function () {
     const ev = EVENTS[kind === 'rock' ? 'giant' : kind || 'fire'] || EVENTS.fire, look = from ? 'magma' : ev.look, F = FALLS[look] || FALLS.fireball;
     if (x === undefined) ({ x, z } = from ? randomLand(220) : aimSpot());
     const g = new THREE.Group(), mat = (c) => (F.glow ? new THREE.MeshBasicMaterial({ color: c, transparent: !!F.see, opacity: F.see || 1 }) : F.see ? fxMat(c, F.see) : L_(c));
-    const ball = F.taco ? tacoModel(7) : new THREE.Mesh(F.geo, mat(F.mat[0])); g.add(ball);
+    const ball = F.taco ? tacoModel(18) : new THREE.Mesh(F.geo, mat(F.mat[0])); g.add(ball);
     if (F.stretch) ball.scale.set(0.8, 1.4, 0.8);
     if (F.wrap) [-1, 1].forEach((sd) => { const w = new THREE.Mesh(fxGeo.flame, mat(F.mat[1])); w.scale.set(3, 3, 3); w.position.x = sd * 0.9; w.rotation.z = sd * Math.PI / 2; g.add(w); });
     if (look !== 'bolt' && look !== 'bubble' && look !== 'taco') for (let k = 1; k <= 4; k++) { const t = new THREE.Mesh(fbGeo, mat(F.mat[k % 2])); const sc = 0.5 / k + 0.15; t.scale.set(sc, sc, sc); t.position.set(0, k * 1.1, 0); g.add(t); }   // a tail
     const ox = from ? 0 : (Math.random() - 0.5) * 30, oz = from ? 0 : (Math.random() - 0.5) * 30;
     g.position.set(from ? from.x : x + ox, from ? from.y : 90, from ? from.z : z + oz); scene.add(g);
     fireballs.push({ g, x, z, ox, oz, t: 0, boom: null, mut: from ? 'magma' : ev.id, look, F, from, dur: from ? 3.2 : F.fast ? 0.35 : ev.slow ? 7 : 2, rock: look === 'rock' });
+  }
+  /* The taco rain's little tacos (Adriana: "allot of tacos"): they fall all around you and just bounce off; only the big
+     tacos (spawnFireball) give the Taco mutation. */
+  const littleTacos = [];
+  function spawnLittleTaco() {
+    if (littleTacos.length >= 140) return;
+    const ahead = Math.random() < 0.7, a = ahead ? Math.atan2(-Math.cos(p.yaw), -Math.sin(p.yaw)) + (Math.random() - 0.5) * 2 : Math.random() * 6.283, r = 6 + Math.sqrt(Math.random()) * 50, x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r;   // most of them where you're looking
+    const g = tacoModel(5 + Math.random() * 3); g.position.set(x, p.y + 12 + Math.random() * 30, z); g.rotation.set(Math.random() * 6, Math.random() * 6, 0); scene.add(g);
+    littleTacos.push({ g, vy: -(18 + Math.random() * 10), spin: (Math.random() - 0.5) * 8, ground: W.bil(H, x, z), t: 0 });
+  }
+  function littleTacosStep(dt) {
+    for (let i = littleTacos.length - 1; i >= 0; i--) {
+      const q = littleTacos[i];
+      if (q.landed) { q.t += dt; if (q.t > 1.2) { scene.remove(q.g); littleTacos.splice(i, 1); } continue; }   // lies on the ground a moment
+      q.g.position.y += q.vy * dt; q.g.rotation.x += q.spin * dt; q.g.rotation.y += dt * 3;
+      if (q.g.position.y <= q.ground + 0.2) { q.g.position.y = q.ground + 0.2; q.g.rotation.set(0, q.g.rotation.y, 0); q.landed = true; }
+    }
   }
   /* Things that fly about and shine beams down (UFOs, angels, devils, storm clouds, ghosts). */
   const ufos = [];
@@ -5978,7 +5995,9 @@ const World = (function () {
     activeEvents().filter((e) => e.kind === 'fall').forEach((ev) => {
       ev.spawnT = (ev.spawnT || 0) - dt;
       if (ev.spawnT <= 0 && fireballs.length < 34) { ev.spawnT = ev.slow ? 0.5 : 0.22; spawnFireball(undefined, undefined, ev.id); }
+      if (ev.swarm) { ev.swarmT = (ev.swarmT || 0) - dt; while (ev.swarmT <= 0) { ev.swarmT += 0.02; spawnLittleTaco(); } }   // lots of little tacos all around you
     });
+    littleTacosStep(dt);
     volcanoStep(dt, time); flyersStep(dt, time); spotsStep(dt);
     for (let i = fireballs.length - 1; i >= 0; i--) {
       const f = fireballs[i];
@@ -6013,7 +6032,7 @@ const World = (function () {
       evWas[ev.id] = on;
       if (ev.id === 'fire') document.body.classList[on ? 'add' : 'remove']('firestorm');
       if (ev.dark) document.body.classList[on ? 'add' : 'remove']('eclipse');
-      if (on) toast(ev.name.toUpperCase() + '! ' + ev.say + '. A dragon of yours caught in it gets the ' + MUT[ev.id].emoji + ' ' + MUT[ev.id].name + ' mutation (×' + MUT[ev.id].coins + ' coins)!', 6);
+      if (on) toast(ev.name.toUpperCase() + '! ' + ev.say + '. ' + (ev.hint || 'A dragon of yours caught in it gets the') + ' ' + MUT[ev.id].emoji + ' ' + MUT[ev.id].name + ' mutation (×' + MUT[ev.id].coins + ' coins)!', 6);
     });
   }
 
@@ -6030,6 +6049,11 @@ const World = (function () {
     timeRow.appendChild(b);
   });
   function setTimeMode(mode, by) { if (!['day', 'night', 'auto'].includes(mode)) return; timeMode = mode; if (by) toast(by + (mode === 'auto' ? ' set day and night back to normal.' : ' made it ' + mode + '!'), 3); }
+  /* Adriana: an admin button that turns on every mutation's event at once (for everyone online). */
+  const allEvBtn = document.createElement('button');
+  allEvBtn.type = 'button'; allEvBtn.className = 'storm'; allEvBtn.textContent = '🌈 Turn on all mutations';
+  allEvBtn.addEventListener('click', (e) => { if (!isAdmin) return; EVENT_LIST.forEach((ev) => startEvent(ev.id)); toast('Every mutation event is on' + (netOnline ? ' for everyone' : '') + ' for 5 minutes!', 4); if (e.detail > 0) allEvBtn.blur(); });
+  $('adminCommands').appendChild(allEvBtn);
   evBtn.addEventListener('click', (e) => { startEvent(evPick.value); toast(EVENTS[evPick.value].name + ' started' + (netOnline ? ' for everyone!' : '!'), 3); if (e.detail > 0) evBtn.blur(); });
 
   /* ---------- Multiplayer ---------- */
@@ -6416,7 +6440,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
