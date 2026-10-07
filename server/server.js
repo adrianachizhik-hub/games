@@ -65,6 +65,7 @@ function pickRoom(want) {                             // the server the player c
 /* Gifts and trades (Adriana: gift coins or dragons; trade dragons and coins, and both have to say yes). The server only
    checks the offers look right and passes them along; each player's device takes away and adds the dragons and coins. */
 const MAX_COINS = 1e15;
+const DOUBLE_ZAP_MS = 700;                            // two admins' lightning on one player this close together launches them across the map
 const cleanDragon = (d) => (d && typeof d === 'object' ? { k: clean(d.k, 12), m: clean(d.m, 400), u: Number.isInteger(d.u) ? d.u : -1, s: num(d.s), n: clean(d.n, 16), o: Number.isInteger(d.o) ? d.o : -1 } : null);
 const cleanOffer = (m) => ({ coins: Math.max(0, Math.min(MAX_COINS, Math.floor(num(m.coins)))), dragons: (Array.isArray(m.dragons) ? m.dragons : []).slice(0, 30).map(cleanDragon).filter((d) => d && d.k) });
 const send = (pl, msg) => sendRaw(pl.sock, JSON.stringify(msg));
@@ -182,8 +183,11 @@ function handle(pl, m) {
   } else if (m.t === 'tradecancel') {
     endTrade(pl, pl.name + ' stopped the trade.');
   } else if (m.t === 'zap') {                          // a storm dragon's lightning hit another player: they get bounced back
-    const target = room.players.get(m.id | 0);
-    if (target && pl.admin) sendRaw(target.sock, JSON.stringify({ t: 'zapped', by: pl.name, dx: num(m.dx), dz: num(m.dz) }));
+    const target = room.players.get(m.id | 0), now = Date.now();
+    if (!target || !pl.admin) return;
+    const other = target.zappedBy && target.zappedBy.id !== pl.id && now - target.zappedBy.t < DOUBLE_ZAP_MS ? target.zappedBy : null;   // Adriana: both admins' lightning at once
+    target.zappedBy = { id: pl.id, name: pl.name, t: now };
+    sendRaw(target.sock, JSON.stringify({ t: 'zapped', by: other ? other.name + ' and ' + pl.name : pl.name, dx: num(m.dx), dz: num(m.dz), mega: !!other }));
   }
 }
 setInterval(() => {                                    // ten times a second, everyone hears where everyone else is

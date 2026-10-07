@@ -2454,7 +2454,7 @@ const World = (function () {
 
   /* ---------- Player ---------- */
   const EYE = 1.65, SWIM = -1.05, MAX_SLOPE = 1.6;
-  const p = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: 0, onGround: true, inLid: false, inCave: false, dungeon: false, mud: false, under: false };   // under: swimming underwater
+  const p = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: 0, onGround: true, inLid: false, inCave: false, dungeon: false, mud: false, under: false, launch: null };   // under: swimming underwater
   const CAM_BACK = 5.2;                                  // how far behind the avatar the camera sits outdoors
   let shopping = false, walking = false, running = false, camD = CAM_BACK, stride = 0, stepT = 0;
   function caveMode(x, z) {                              // would the player be inside the cave here?
@@ -3120,6 +3120,13 @@ const World = (function () {
   let myPlot = -1;
   let switchingAccount = false;                          // set while the page reloads for another name: nothing more gets saved
   let riding = null, flying = false, tapT = 0, jumpWas = false, jumpTapped = false;   // riding (below); jumpTapped: a tap is kept even if it falls between two frames
+  /* Eggs waiting to hatch on your plot (Adriana, 7 October 2026: "a timer when you get eggs, so it doesn't hatch
+     immediately"). Each one sits on your plot with a countdown over it; rarer eggs take longer (HATCH_SECS, Claude's
+     numbers). Several can wait at once. They only count down while you have a plot, and are saved with your progress. */
+  const HATCH_SECS = [20, 40, 60, 90, 120, 180, 180, 180];
+  let hatchScale = 1;                                    // tests only: 0 hatches straight away
+  const incubating = [];                                 // { tier, left, total, mesh, tag }
+  try { (JSON.parse(localStorage.getItem('mutation-mayhem-incubating') || '[]') || []).forEach((q) => { if (q && Number.isInteger(q.tier) && q.tier >= 0 && q.tier < 8 && q.left >= 0) incubating.push({ tier: q.tier, left: +q.left, total: +q.total || +q.left }); }); } catch (e) { /* none */ }
   const ownDragons = [], dragonUpgrades = [], dragonPlaced = [], dragonSpeed = [], dragonOutfit = [], dragonNames = [], dragonMutation = [], plotPets = [], flyers = [];   // dragonMutation: 'lightning' or ''   // dragonNames: from a name collar, '' for none   // dragonOutfit: which outfit it wears, -1 none   // dragonSpeed: % faster, from every upgrader it was given
   const upgradersOwned = [0, 0, 0, 0, 0];                // upgraders bought but not used yet, waiting in the inventory
   const MAX_SLOTS = 24;
@@ -3232,12 +3239,12 @@ const World = (function () {
   function claimPlot(i) {
     myPlot = i; nameMyPlot(); netSend({ t: 'claim', plot: i }); petsSent = '';
     ownDragons.forEach((k, d) => { if (dragonPlaced[d]) addPet(k, true, d); });
-    buildDecor();
+    buildDecor(); showIncubating();
     toast(ownDragons.length ? 'Welcome back! This is ' + playerName + '\'s Plot, and your dragons are here.' : 'This is now ' + playerName + '\'s Plot! Find eggs around the island and bring them here to hatch.', 6);
   }
-  function releasePlot() {                               // leaving: anything hatching finishes, then the plot is empty again
+  function releasePlot() {                               // leaving: the plot is empty again (eggs waiting to hatch are kept)
     if (myPlot < 0) return;
-    if (hatching) { scene.remove(hatching.mesh); const kind = pickDragon(hatching.tier); if (hatching.tier === AQUA_TIER) dragonMutation[ownDragons.length] = 'water'; ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(placedCount() < slotLimit()); saveProgress(); hatching = null; }
+    incubating.forEach((q) => { if (q.mesh) { scene.remove(q.mesh); q.mesh = null; } }); saveIncubating();   // eggs waiting to hatch are kept for next time
     plotPets.forEach((d) => scene.remove(d.root)); plotPets.length = 0;
     clearDecor();
     const was = myPlot; myPlot = -1;
@@ -3260,7 +3267,7 @@ const World = (function () {
   let toastT = 0, nagT = 0;
   function toast(msg, secs) { toastEl.textContent = msg; toastEl.hidden = false; toastT = secs || 4.5; }
   const carryMeshes = EGG_TIERS.map((t, i) => { const m = new THREE.Mesh(eggGeo[i], eggMat(i)); m.position.set(0, 2.2, -0.05); m.scale.set(0.6, 0.6, 0.6); m.visible = false; avatar.add(m); return m; });
-  let carrying = null, hatching = null;
+  let carrying = null;
   const clock = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
   function pickUp(egg) {
     const t = EGG_TIERS[egg.tier], home = plots[myPlot], total = Math.round(t.base + Math.hypot(egg.spot.x - home.x, egg.spot.z - home.z) * EXTRA_PER_UNIT + (egg.spot.mud ? 20 : 0));   // 20 s more from the mud cavern, to walk out
@@ -3311,12 +3318,64 @@ const World = (function () {
     for (const [kind, w] of list) { r -= w; if (r < 0) return kind; }
     return list[list.length - 1][0];
   }
-  function hatchAtHome() {                                // the egg wobbles on your plot, then out pops a dragon
-    const egg = stopCarrying(), m = new THREE.Mesh(eggGeo[egg.tier], eggMat(egg.tier)), c = plotWorld(myPlot, 0, 0);
-    m.position.set(c.x, HUB.h + 0.1, c.z); scene.add(m);
-    hatching = { mesh: m, tier: egg.tier, t: 0 };
-    toast('Home in time! The egg is hatching...', 2);
+  function hatchAtHome() {                                // the egg goes on your plot, and hatches when its timer runs out
+    const egg = stopCarrying(), q = incubate(egg.tier);
+    toast('Home in time! Your ' + EGG_TIERS[egg.tier].name + ' egg is on your plot. It will hatch in ' + clock(Math.ceil(q.left)) + '.', 4);
     respawnEgg(egg);
+  }
+  function incubate(tier) {
+    const secs = Math.max(1.6, (HATCH_SECS[tier] || 30) * hatchScale), q = { tier, left: secs, total: secs };
+    incubating.push(q); showIncubating(); saveIncubating();
+    return q;
+  }
+  const INC_SPOTS = [[0, 0], [1.8, 0], [-1.8, 0], [0, 1.8], [0, -1.8], [1.8, 1.8], [-1.8, 1.8], [1.8, -1.8], [-1.8, -1.8]];
+  function showIncubating() {                            // the waiting eggs on your plot, each with its countdown
+    incubating.forEach((q, n) => {
+      if (myPlot < 0) { if (q.mesh) { scene.remove(q.mesh); q.mesh = null; } return; }
+      if (!q.mesh) {
+        q.mesh = new THREE.Group(); q.egg = new THREE.Mesh(eggGeo[q.tier], eggMat(q.tier)); q.mesh.add(q.egg);
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+        q.tag = { cv, g: cv.getContext('2d'), tex: new THREE.CanvasTexture(cv) };
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: q.tag.tex, transparent: true })); sp.position.set(0, 1.75, 0); sp.scale.set(1.6, 0.4, 1); q.mesh.add(sp);
+        q.shown = -1; scene.add(q.mesh);
+      }
+      const [lx, lz] = INC_SPOTS[n % INC_SPOTS.length], c = plotWorld(myPlot, lx + Math.floor(n / INC_SPOTS.length) * 0.7, lz);
+      q.mesh.position.set(c.x, HUB.h + 0.1, c.z);
+    });
+  }
+  function saveIncubating() {
+    if (switchingAccount) return;
+    try { localStorage.setItem('mutation-mayhem-incubating', JSON.stringify(incubating.map((q) => ({ tier: q.tier, left: Math.round(q.left * 10) / 10, total: q.total })))); } catch (e) { /* not saved */ }
+  }
+  let incSaveT = 0;
+  function incubateStep(dt) {                            // every frame: count down, wobble near the end, then hatch
+    if (myPlot < 0 || !incubating.length) return;
+    for (let n = incubating.length - 1; n >= 0; n--) {
+      const q = incubating[n];
+      q.left -= dt;
+      if (q.left <= 0) { if (q.mesh) scene.remove(q.mesh); incubating.splice(n, 1); hatchDragon(q.tier); saveIncubating(); showIncubating(); continue; }
+      if (!q.mesh) continue;
+      const shake = Math.max(0, 1 - q.left / 3);         // the last 3 seconds it wobbles harder and harder
+      q.egg.rotation.z = reduced ? 0 : Math.sin(q.left * 22) * 0.14 * shake + Math.sin(q.left * 2) * 0.03;
+      const sec = Math.ceil(q.left);
+      if (sec !== q.shown && q.tag.g) {
+        q.shown = sec; const g = q.tag.g;
+        if (g.clearRect) g.clearRect(0, 0, 256, 64); g.fillStyle = 'rgba(13, 47, 55, 0.85)'; g.fillRect(8, 6, 240, 52);
+        g.fillStyle = sec <= 3 ? '#ff8a3d' : '#ffd23f'; g.font = '700 34px "Trebuchet MS", "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('Hatching ' + clock(sec), 128, 33); q.tag.tex.needsUpdate = true;
+      }
+    }
+    incSaveT -= dt; if (incSaveT <= 0) { incSaveT = 5; saveIncubating(); }
+  }
+  function hatchDragon(tier) {                           // out pops a dragon
+    const kind = pickDragon(tier);
+    const room = placedCount() < slotLimit(), i = ownDragons.length;
+    ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(room);
+    if (tier === AQUA_TIER) dragonMutation[i] = 'water';   // aqua dragons hatch with the Water mutation
+    saveProgress();
+    if (room) addPet(kind, true, i); else renderInventory();
+    toast('You hatched a ' + DRAGON_KINDS[kind].name + ' dragon! (' + EGG_TIERS[tier].name + ') It makes ' + fmt(DRAGON_COINS[kind]) + ' coin' + (DRAGON_COINS[kind] === 1 ? '' : 's') + ' every ' + PAYOUT_SECONDS + ' seconds.'
+      + (room ? '' : ' Your plot is full, so it went into your inventory.'), room ? 5 : 7);
   }
   function hatchTooSoon() {                               // out of time: it hatches where you are, and the baby flies off
     const egg = stopCarrying(), kind = pickDragon(egg.tier), d = makeDragon(kind);
@@ -3386,22 +3445,7 @@ const World = (function () {
       egg.body.position.y = reduced ? 0.05 : 0.1 + Math.sin(time * 2 + egg.phase) * 0.08;
       egg.stars.forEach(tw);
     }
-    if (hatching) {
-      hatching.t += dt;
-      hatching.mesh.rotation.z = reduced ? 0 : Math.sin(hatching.t * 22) * 0.12 * Math.min(1, hatching.t);
-      if (hatching.t > 1.6) {
-        scene.remove(hatching.mesh);
-        const kind = pickDragon(hatching.tier);
-        const room = placedCount() < slotLimit(), i = ownDragons.length;
-        ownDragons.push(kind); dragonUpgrades.push(-1); dragonSpeed.push(0); dragonOutfit.push(-1); dragonPlaced.push(room);
-        if (hatching.tier === AQUA_TIER) dragonMutation[i] = 'water';   // aqua dragons hatch with the Water mutation
-        saveProgress();
-        if (room) addPet(kind, true, i); else renderInventory();
-        toast('You hatched a ' + DRAGON_KINDS[kind].name + ' dragon! (' + EGG_TIERS[hatching.tier].name + ') It makes ' + DRAGON_COINS[kind] + ' coin' + (DRAGON_COINS[kind] === 1 ? '' : 's') + ' every ' + PAYOUT_SECONDS + ' seconds.'
-          + (room ? '' : ' Your plot is full, so it went into your inventory.'), room ? 5 : 7);
-        hatching = null;
-      }
-    }
+    incubateStep(dt);
     for (const d of plotPets) {                          // wander about the plot; rarer dragons walk faster
       if (myPlot < 0) break;
       sparkStep(d, dt); mutStep(d, dt, time);
@@ -4470,15 +4514,13 @@ const World = (function () {
   }
   function openLucky() {                                  // on your plot: what's inside?
     const b = carryingBlock;
-    if (!b || hatching) return;
+    if (!b) return;
     carryingBlock = null; blockCarry.visible = false; carryEl.hidden = true;
     b.wait = 45;                                          // a new block turns up somewhere else in 45 seconds
     const tier = rollLucky();
     if (tier < 0) { coins += LUCKY_COINS; saveCoins(); toast('Lucky block! ' + LUCKY_COINS + ' coins!', 4); return; }
-    const m = new THREE.Mesh(eggGeo[tier], eggMat(tier)), c = plotWorld(myPlot, 0, 0);
-    m.position.set(c.x, HUB.h + 0.1, c.z); scene.add(m);
-    hatching = { mesh: m, tier, t: 0 };                   // it hatches right here, like an egg brought home
-    toast('Lucky block! A ' + EGG_TIERS[tier].name + ' egg! It\'s hatching...', 3);
+    const q = incubate(tier);                             // it waits on your plot, like an egg brought home
+    toast('Lucky block! A ' + EGG_TIERS[tier].name + ' egg! It will hatch in ' + clock(Math.ceil(q.left)) + '.', 4);
   }
   function luckyPlay() {                                  // from eggsPlay: walking into a block
     if (p.dungeon || p.inCave) return;
@@ -5113,6 +5155,7 @@ const World = (function () {
     if (fireResLeft() > 0) parts.push('Fire resistance ' + clock(fireResLeft()));
     if (radResLeft() > 0) parts.push('Radiation resistance ' + clock(radResLeft()));
     if (waterResLeft() > 0) parts.push('🫧 Breathe underwater ' + clock(waterResLeft()));
+    if (incubating.length) parts.push('🥚 ' + (incubating.length === 1 ? 'An egg hatches' : incubating.length + ' eggs hatching, next') + ' in ' + clock(Math.ceil(Math.min(...incubating.map((q) => q.left)))));
     else if (p.under) parts.push('🫧 Air ' + Math.ceil(breath) + ' s');
     Object.keys(EVENTS).forEach((id) => { if (eventOn(id)) parts.push(EVENTS[id].name + ' ' + clock(eventLeft(id))); });
     if (started && nightShown > 0.6) parts.push('🌙 Night');
@@ -5749,9 +5792,30 @@ const World = (function () {
     placeBox.appendChild(b);
   });
 
+  /* Adriana: when both admins' lightning hits someone at the same moment, it's so powerful they're launched all the way
+     to the edge of the map, in a big arc through the sky (the server spots the double hit, DOUBLE_ZAP_MS). */
+  const MAP_EDGE = 215, LAUNCH_SECS = 3.5;
+  function megaLaunch(dx, dz, by) {
+    if (p.dungeon || p.mud || p.inCave) return;
+    if (riding) dismount(false);
+    const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+    const b = p.x * dx + p.z * dz, c = p.x * p.x + p.z * p.z - MAP_EDGE * MAP_EDGE, far = -b + Math.sqrt(Math.max(0, b * b - c));   // how far to the edge that way
+    p.launch = { x0: p.x, z0: p.z, y0: p.y, x1: p.x + dx * far, z1: p.z + dz * far, t: 0 };
+    p.under = false; flying = false; blink();
+    toast('⚡⚡ DOUBLE ZAP! ' + (by || 'Both admins') + ' hit you with lightning at the same time, and you\'re flying to the edge of the map!', 6);
+  }
+  function launchStep(dt) {
+    const L = p.launch; L.t += dt;
+    const k = Math.min(1, L.t / LAUNCH_SECS), x = L.x0 + (L.x1 - L.x0) * k, z = L.z0 + (L.z1 - L.z0) * k;
+    p.x = x; p.z = z; p.y = L.y0 + (standing(x, z) - L.y0) * k + 140 * 4 * k * (1 - k);   // high over the island
+    p.yaw += dt * 6;                                      // spinning through the air
+    if (k >= 1) { p.launch = null; p.y = standing(p.x, p.z); p.vy = 0; p.onGround = true; settle(); }
+  }
+
   /* ---------- Per-frame update ---------- */
   let bobT = 0;
   function update(dt, time) {
+    if (p.launch) { launchStep(dt); walking = false; camY = p.y + EYE; eggsPlay(dt); placeCamera(dt, 0); return; }
     if (keys.has('ArrowLeft') || keys.has('KeyA')) p.yaw += 2.1 * dt;      // left and right turn you
     if (keys.has('ArrowRight') || keys.has('KeyD')) p.yaw -= 2.1 * dt;
     let f = -joy.y, s = joy.x;
@@ -5784,10 +5848,10 @@ const World = (function () {
     jumpWas = jumpDown; jumpTapped = false;
     /* Swimming (Adriana, 7 October 2026): in the sea, hold C (or the Down button) to dive, Space to swim up; let go and
        you float slowly back up. Without the breathe underwater upgrader you can hold your breath for BREATH seconds. */
-    const diveHeld = keys.has('KeyC') || keys.has('ControlLeft') || touchDive, canSwim = swimming && !riding && !p.mud && !p.dungeon && !p.inCave;
+    const diveHeld = keys.has('KeyC') || keys.has('ControlLeft') || touchDive, canSwim = swimming && !flying && !p.mud && !p.dungeon && !p.inCave;   // on foot, or riding your dragon (it swims with you)
     const underSwim = canSwim && (p.under || (diveHeld && p.onGround));
-    if (riding) rideJump(dt, jumpDown, jumpPress);
-    else if ((jumpDown || jumpPress) && p.onGround && !p.under) { p.vy = 10; p.onGround = false; }
+    if (riding && !p.under) rideJump(dt, jumpDown, jumpPress);   // underwater, Space swims up instead
+    else if (!riding && (jumpDown || jumpPress) && p.onGround && !p.under) { p.vy = 10; p.onGround = false; }
     const g = p.mud ? MUD.floor : p.dungeon ? DG.floor : standing(p.x, p.z);
     const showDive = flying || canSwim;
     if (diveBtn.hidden === showDive) { diveBtn.hidden = !showDive; if (!showDive) touchDive = false; }
@@ -6414,6 +6478,7 @@ const World = (function () {
     else if (m.t === 'eventoff') { if (m.kind === 'all') stopAllEvents(m.by || 'An admin'); else { stopEvent(m.kind, m.by || 'An admin'); if (EVENTS[m.kind]) toast((m.by || 'An admin') + ' turned off ' + EVENTS[m.kind].name + '.', 3); } }
     else if (m.t === 'time') setTimeMode(m.mode, m.by || 'An admin');
     else if (/^(gift|trade)/.test(m.t)) tradeMessage(m);
+    else if (m.t === 'zapped' && m.mega) megaLaunch(m.dx, m.dz, m.by);   // both admins' lightning at once
     else if (m.t === 'zapped') {                          // an admin's storm dragon hit you with lightning: bounced backwards
       toast('⚡ ZAP! ' + m.by + '\'s storm dragon bounced you backwards!', 3);
       for (let k = 0; k < 12; k++) if (!p.dungeon) tryMove(m.dx * 0.8, m.dz * 0.8);
@@ -6716,7 +6781,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, stopEvent, stopAllEvents, clickAt, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

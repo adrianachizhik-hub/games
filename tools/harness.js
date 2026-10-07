@@ -101,6 +101,7 @@ vm.createContext(sandbox);
 vm.runInContext(worldSrc + '\nthis.World = World;', sandbox);
 vm.runInContext(renderSrc, sandbox);
 const W = sandbox.World, I = window.__island;
+I.setHatchScale(0);   // eggs hatch straight away in these tests (the hatching timer has its own test)
 I.clockEventsOff(true);   // events from the real clock would change dragons in the middle of other checks; tests start them by hand
 
 // one frame of the real loop, then walk about
@@ -1269,8 +1270,43 @@ if (process.env.MODE !== 'admin') {
   console.log('home with it: dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons[got], 'with', JSON.stringify(I.dragonMutation[got]), '| earns', I.DRAGON_COINS[I.ownDragons[got]], '| egg gone till next time', !I.aquaEggThere());
   if (I.ownDragons.length !== before + 1 || !/^aqua(boy|girl)$/.test(I.ownDragons[got]) || I.dragonMutation[got] !== 'water' || I.aquaEggThere()) throw new Error('the aqua egg should hatch an aqua dragon with the Water mutation');
   const n50 = {}; for (let q = 0; q < 20000; q++) { const d = I.pickDragon(I.AQUA_TIER); n50[d] = (n50[d] || 0) + 1; } console.log('aqua egg hatches:', Object.keys(n50).map((q) => q + ' ' + (n50[q] / 200).toFixed(0) + '%').join(', '));
+  { I.setAquaTaken(-1); const pet = I.plotPets.find((d) => !d.homing && !I.DRAGON_KINDS[d.kind].storm), kind0 = pet.kind; pet.kind = 'green';   // the slowest dragon
+    I.mount(pet); grab(); const t0 = I.riding() && I.carrying(); I.keys.add('KeyW'); k = 0;
+    while (I.gchase() && I.carrying() && k++ < 60 * 12) { I.p.yaw = Math.atan2(-Math.cos(out), -Math.sin(out)); I.keys[I.p.y < I.ATL.floor + 12 ? 'add' : 'delete']('Space'); fr(); }
+    I.keys.clear();
+    console.log('riding a green dragon underwater (no Shift): grabbed it', !!t0, '| still riding', !!I.riding(), '| under', I.p.under, '| got away', !!I.carrying() && !I.gchase(), 'after', (k / 60).toFixed(1), 's |', said());
+    if (!t0 || !I.riding() || !I.carrying() || I.gchase()) throw new Error('your dragon should swim with you and get you away from the guardian');
+    I.sendHome('test'); pet.kind = kind0; if (I.riding()) I.dismount(true); }
   I.makeDragon('aquaboy'); I.makeDragon('aquagirl');
   I.setWaterRes(0); I.setAquaTaken(-1);
+}
+
+// ---- the hatching timer ----
+{
+  if (I.riding()) I.dismount(true);
+  if (I.myPlot() < 0) reclaim();
+  I.setHatchScale(1);
+  const before = I.ownDragons.length, fr = (n) => { for (let k = 0; k < n; k++) { I.update(1 / 60, 0); I.eggsAnimate(1 / 60, 0); } };
+  const egg = I.eggs.find((e) => e.tier === 1 && !e.taken && !e.spot.dungeon && !e.spot.cave); stand(egg.spot); fr(2);
+  const hp = I.plotWorld(I.myPlot(), 0, 3); stand({ x: hp.x, z: hp.z, y: 6.3 }); fr(2);
+  console.log('bring a Rare egg home: waiting to hatch', I.incubating.length, '| time', I.incubating[0] && I.incubating[0].left.toFixed(0), 's |', said(), '| saved', store['mutation-mayhem-incubating']);
+  if (!I.incubating.length || I.ownDragons.length !== before || I.incubating[0].left < 35) throw new Error('an egg should wait on the plot before hatching');
+  fr(60 * 20); console.log('20 s later: still waiting', I.incubating.length, '| dragons', I.ownDragons.length - before);
+  if (I.ownDragons.length !== before) throw new Error('it should not hatch yet');
+  fr(60 * 21); console.log('41 s: hatched', I.ownDragons.length - before, I.ownDragons.slice(-1)[0], '| waiting', I.incubating.length, '|', said());
+  if (I.ownDragons.length !== before + 1 || I.incubating.length) throw new Error('it should hatch when the timer runs out');
+  I.setHatchScale(0);
+}
+
+// ---- double zap: launched to the edge of the map ----
+{
+  if (I.riding()) I.dismount(true);
+  I.goTo(7); I.p.x = 26; I.p.z = -26; I.p.y = 6.3;
+  I.megaLaunch(1, 0.3, 'Ellie and Adriana'); let top = 0, k = 0;
+  while (I.p.launch && k++ < 60 * 6) { I.update(1 / 60, 0); top = Math.max(top, I.p.y); }
+  console.log('double zap: landed', Math.hypot(I.p.x, I.p.z).toFixed(0), 'from the middle after', (k / 60).toFixed(1), 's, flying up to', top.toFixed(0), '|', said());
+  if (Math.hypot(I.p.x, I.p.z) < 205 || top < 100) throw new Error('a double zap should launch you to the edge of the map');
+  I.goTo(7);
 }
 
 // ---- accounts: each name has its own save ----

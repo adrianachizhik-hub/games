@@ -99,6 +99,13 @@ function player(name, code) {
     ad.send({ t: 'firestorm' }); await wait(80);
     check(b.got.some((m) => m.t === 'firestorm'), 'an admin can start a fire storm for everyone');
     check(b.got.some((m) => m.t === 'announce' && m.text === 'Hello all servers'), 'an admin announcement reaches everyone');
+    ad.send({ t: 'zap', id: b.welcome.id, dx: 1, dz: 0 }); await wait(80); ad.send({ t: 'zap', id: b.welcome.id, dx: 1, dz: 0 }); await wait(80);
+    check(b.got.filter((m) => m.t === 'zapped').length === 2 && !b.got.some((m) => m.t === 'zapped' && m.mega), 'one admin zapping twice just bounces you');
+    await wait(800);
+    const ad2 = await player(adminName, adminCode);      // the other admin (the same test name, signed in a second time)
+    ad.send({ t: 'zap', id: b.welcome.id, dx: 0, dz: 1 }); ad2.send({ t: 'zap', id: b.welcome.id, dx: 0, dz: 1 }); await wait(120);
+    check(b.got.some((m) => m.t === 'zapped' && m.mega), 'two admins zapping the same player at the same time is a double zap');
+    ad2.ws.close(); await wait(80);
     const fake = await player(adminName, '0000'); check(fake.welcome.admin === false, 'the admin name with a wrong code is not an admin');
     fake.ws.close(); ad.ws.close(); await wait(80);
     await player('Kid6b'); await player('Kid7b');   // Server 1 full again, for the checks below
