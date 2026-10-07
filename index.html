@@ -596,6 +596,31 @@
   }
   body.shopping #radar { display: none; }
   #allTabs[hidden], #allHave[hidden] { display: none !important; }
+  /* Gift & trade: a button on the left, and a panel like the shops */
+  #tradeBtn { position: fixed; left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); font: inherit; font-weight: 700; padding: 8px 16px; border: 3px solid #0d2f37; border-radius: 999px; background: #8fe8ff; color: #0d2f37; box-shadow: 0 4px 0 #0d2f37; cursor: pointer; z-index: 5; }
+  #tradeBtn[hidden], #tradeMenu[hidden], #tradeAsk[hidden], #tradeOk[hidden] { display: none; }
+  body:not(.playing) #tradeBtn, body.shopping #tradeBtn { display: none; }
+  #tradeMenu { position: fixed; right: calc(14px + env(safe-area-inset-right, 0px)); top: calc(14px + env(safe-area-inset-top, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: min(360px, calc(100vw - 28px)); overflow: auto; padding: 14px 18px 0; border: 4px solid #0d2f37; border-radius: 20px; background: var(--panel-solid); color: var(--panel-ink); box-shadow: 0 6px 0 #0d2f37; z-index: 6; }
+  @media (max-width: 640px) { #tradeMenu { left: 10px; right: 10px; top: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 64vh; } }
+  #tradeMenu h2 { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+  #tradeMenu h3 { margin: 12px 0 4px; font-size: 1rem; font-weight: 600; }
+  #tradeMenu .sub { margin: 4px 0 2px; font-size: 0.92rem; opacity: 0.8; }
+  #tradeMenu .have { display: flex; align-items: center; gap: 7px; margin: 10px 0 2px; font-weight: 500; }
+  #tradeMenu .uprow button, #tradeMenu .coinrow button { font: inherit; font-size: 0.9rem; font-weight: 600; padding: 4px 10px; border: 2px solid #0d2f37; border-radius: 10px; background: #ffd23f; color: #0d2f37; cursor: pointer; white-space: nowrap; }
+  #tradeMenu .uprow button.in { background: #7ed957; }
+  #tradeMenu .uprow button:disabled { opacity: 0.5; cursor: default; }
+  #tradeMenu .coinrow { display: flex; gap: 6px; margin-top: 6px; }
+  #tradeMenu .coinrow input { flex: 1; min-width: 0; font: inherit; font-size: 0.95rem; padding: 5px 9px; border: 2px solid #0d2f37; border-radius: 10px; background: #fff; color: #0d2f37; -webkit-user-select: text; user-select: text; }
+  #tradeMenu .theirs { padding: 8px 12px; border: 3px dashed #0d2f37; border-radius: 14px; background: #fff; color: #0d2f37; font-size: 0.92rem; }
+  #tradeMenu .theirs p { margin: 2px 0; }
+  #tradeMenu .status { margin: 10px 0 0; font-weight: 600; }
+  #tradeMenu .foot { position: sticky; bottom: 0; display: flex; gap: 10px; margin: 12px -18px 0; padding: 10px 18px 16px; background: var(--panel-solid); }
+  #tradeOk, #tradeDone { flex: 1; font: inherit; font-size: 1.05rem; font-weight: 600; color: #0d2f37; background: #ffd23f; border: 4px solid #0d2f37; border-radius: 14px; padding: 8px 12px; box-shadow: 0 4px 0 #0d2f37; cursor: pointer; }
+  #tradeOk { background: #7ed957; }
+  #tradeOk.waiting { background: #d8dde2; }
+  #tradeAsk { position: fixed; left: 50%; top: 30%; transform: translateX(-50%); width: min(340px, calc(100vw - 28px)); padding: 14px 18px; border: 4px solid #0d2f37; border-radius: 20px; background: var(--panel-solid); color: var(--panel-ink); box-shadow: 0 6px 0 #0d2f37; z-index: 7; text-align: center; font-weight: 600; }
+  #tradeAsk .talkrow { display: flex; gap: 10px; justify-content: center; }
+  #tradeAsk button { font: inherit; font-weight: 600; padding: 6px 14px; border: 3px solid #0d2f37; border-radius: 12px; background: #ffd23f; color: #0d2f37; cursor: pointer; }
   #adminShopBtn { display: none; position: fixed; left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); font: inherit; font-weight: 700; padding: 8px 16px; border: 3px solid #0d2f37; border-radius: 999px; background: linear-gradient(90deg, #ffd23f, #ff8fd6, #8fe8ff); color: #0d2f37; box-shadow: 0 4px 0 #0d2f37; cursor: pointer; z-index: 5; }
   body.admin.playing:not(.shopping) #adminShopBtn { display: block; }   /* only admins see it */
   body.touch #adminShopBtn { bottom: auto; top: calc(50% + 40px); }
@@ -1005,6 +1030,17 @@
   <p class="have"><span class="coin" aria-hidden="true"></span>You have <b id="sellCoins">0</b> coins</p>
   <div id="sellList"></div>
   <div class="foot"><button id="sellDone" type="button">Done</button></div>
+</div>
+<button id="tradeBtn" type="button" hidden>🎁 Gift &amp; trade</button>
+<div id="tradeAsk" role="alertdialog" aria-labelledby="tradeAskText" hidden>
+  <p id="tradeAskText"></p>
+  <div class="talkrow"><button id="tradeAskYes" type="button">Yes, trade</button><button id="tradeAskNo" type="button">No thanks</button></div>
+</div>
+<div id="tradeMenu" role="dialog" aria-labelledby="tradeTitle" hidden>
+  <h2 id="tradeTitle">Gift &amp; trade</h2>
+  <p class="have"><span class="coin" aria-hidden="true"></span>You have <b id="tradeCoins">0</b> coins</p>
+  <div id="tradeBody"></div>
+  <div class="foot"><button id="tradeOk" type="button" hidden>Accept the trade</button><button id="tradeDone" type="button">Done</button></div>
 </div>
 <div id="secretShop" role="dialog" aria-label="Secret shop" hidden>
   <h2>Secret shop</h2>
@@ -2941,7 +2977,8 @@ const World = (function () {
     { id: 'devil', name: 'Devil', emoji: '😈', coins: 3, got: 'random', tier: 3, fx: [['aura', [0xff1a1a], 1, 1.8], ['horns', [0xc8102e], 1, 1]] },
     { id: 'ufo', name: 'UFO', emoji: '🛸', coins: 4, got: 'ufo', tint: 0xc8ffc0, fx: [['saucer', [0xc0c4c8, 0x7dff3a], 1, 1], ['spark', [0x7dff3a], 6, 1]] },
     { id: 'dirt', name: 'Dirt', emoji: '🟤', coins: 2, got: 'wind', fx: [['orbit', [0x6b4a2b, 0x8a6a45, 0x4a3320], 16, 1.1, 'clod']] },
-    { id: 'giant', name: 'Giant', emoji: '🪨', coins: 2, got: 'rocks', size: 2, fx: [] }
+    { id: 'giant', name: 'Giant', emoji: '🪨', coins: 2, got: 'rocks', size: 2, fx: [] },
+    { id: 'taco', name: 'Taco', emoji: '🌮', coins: 3, got: 'random', tier: 3, fx: [['orbit', [0xf2c14e], 9, 1.1, 'taco']] }   // Adriana: little tacos fly round it
   ];
   const MUT = Object.fromEntries(MUTATIONS.map((m) => [m.id, m])), MUT_IDS = MUTATIONS.map((m) => m.id);
   const fxMats = {}, fxMat = (c, op) => fxMats[c + ':' + (op || 1)] || (fxMats[c + ':' + (op || 1)] = new THREE.MeshBasicMaterial(op ? { color: c, transparent: true, opacity: op, depthWrite: false } : { color: c }));
@@ -2949,7 +2986,14 @@ const World = (function () {
     shard: new THREE.ConeGeometry(0.06, 0.32, 4), crack: new THREE.BoxGeometry(0.04, 0.03, 0.34), crystal: new THREE.ConeGeometry(0.08, 0.36, 5), cloud: new THREE.DodecahedronGeometry(0.32, 0),
     star: new THREE.OctahedronGeometry(0.08, 0), leaf: new THREE.BoxGeometry(0.16, 0.03, 0.1), flower: new THREE.OctahedronGeometry(0.08, 0), sprinkle: new THREE.BoxGeometry(0.03, 0.03, 0.12),
     wisp: new THREE.SphereGeometry(0.16, 6, 4), metal: new THREE.BoxGeometry(0.14, 0.06, 0.2), gem: new THREE.OctahedronGeometry(0.07, 0), clod: new THREE.DodecahedronGeometry(0.08, 0),
-    aura: new THREE.SphereGeometry(1, 14, 10), ring: new THREE.TorusGeometry(1, 0.07, 6, 28), beam: new THREE.BoxGeometry(0.03, 0.03, 2.2), horn: new THREE.ConeGeometry(0.08, 0.3, 5) };
+    aura: new THREE.SphereGeometry(1, 14, 10), taco: new THREE.CylinderGeometry(0.16, 0.16, 0.07, 10, 1, false, Math.PI / 2, Math.PI), ring: new THREE.TorusGeometry(1, 0.07, 6, 28), beam: new THREE.BoxGeometry(0.03, 0.03, 2.2), horn: new THREE.ConeGeometry(0.08, 0.3, 5) };
+  function tacoModel(size) {                             // a little taco: a folded shell with lettuce and tomato on top
+    const g = new THREE.Group(), shell = new THREE.Mesh(fxGeo.taco, fxMat(0xf2c14e));
+    shell.rotation.x = -Math.PI / 2; g.add(shell);
+    const lettuce = new THREE.Mesh(fxGeo.box, fxMat(0x5fb83a)); lettuce.scale.set(2.4, 0.35, 0.45); lettuce.position.y = 0.01; g.add(lettuce);
+    [-0.07, 0.06].forEach((x) => { const t = new THREE.Mesh(fxGeo.box, fxMat(0xd8433a)); t.scale.set(0.4, 0.4, 0.4); t.position.set(x, 0.03, 0); g.add(t); });
+    g.scale.set(size, size, size); return g;
+  }
   const onBody = () => [(Math.random() - 0.5) * 0.7, 0.55 + Math.random() * 0.6, (Math.random() - 0.5) * 1.1];   // a point on the dragon's body
   function buildMutFx(d) {                               // the effects for every mutation the dragon has, in one group on the dragon
     if (d.fx) d.root.remove(d.fx);
@@ -2977,6 +3021,7 @@ const World = (function () {
         else if (kind === 'core') { mesh = new THREE.Mesh(fxGeo.aura, fxMat(col(k))); mesh.scale.set(0.3, 0.3, 0.3); mesh.position.set(0, 0.8, -0.52); }
         else if (kind === 'saucer') { mesh = new THREE.Group(); const disc = new THREE.Mesh(fxGeo.aura, fxMat(col(0))); disc.scale.set(0.38, 0.08, 0.38); mesh.add(disc); const dome = new THREE.Mesh(fxGeo.aura, fxMat(col(1), 0.7)); dome.scale.set(0.16, 0.12, 0.16); dome.position.y = 0.07; mesh.add(dome); const beam = new THREE.Mesh(fxGeo.flame, fxMat(col(1), 0.25)); beam.scale.set(3, 3, 3); beam.position.y = -0.45; mesh.add(beam); }
         else if (kind === 'beams') { mesh = new THREE.Mesh(fxGeo.beam, fxMat(col(k))); mesh.position.set(0, 1.1, 0); }
+        else if (shape === 'taco') { mesh = tacoModel(size); }
         else { mesh = new THREE.Mesh(fxGeo[shape] || (kind === 'spark' ? sparkGeo : fxGeo.box), fxMat(col(k), shape === 'bubble' || shape === 'wisp' ? 0.5 : 0)); mesh.scale.set(size, size, size); }
         if (kind === 'cover' || kind === 'stars') { const [x, y, z] = onBody(); mesh.position.set(x * 1.05, y, z); mesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3); }
         d.fx.add(mesh);
@@ -3702,7 +3747,8 @@ const World = (function () {
   const plotEl = $('plotMenu'), plotList = $('plotList');
   let plotMenuOpen = false;
   let keypadOpen = false;                                // the nuke bunker's keypad
-  const menuOpen = () => upShopOpen || plotMenuOpen || secretOpen || sellOpen || allOpen || keypadOpen;
+  let tradeOpen = false;                                 // the Gift & trade panel (further down, with the multiplayer)
+  const menuOpen = () => upShopOpen || plotMenuOpen || secretOpen || sellOpen || allOpen || keypadOpen || tradeOpen;
   const spacePrice = () => 500 * Math.pow(2, plotSlots - 5);
   const buyLabel = () => (plotSlots >= MAX_SLOTS ? 'Your plot is as big as it gets' : 'Buy 1 more space · ' + fmt(spacePrice()) + ' coins');
   const signSpot = () => plotWorld(myPlot, 3.1, -PLOT / 2 - 1.9);   // in front of your plot's sign, on the town side
@@ -5399,7 +5445,7 @@ const World = (function () {
       return;
     }
     if (shopping) { if (e.code === 'Escape') closeShop(); return; }           // the shop's own buttons take the keys
-    if (menuOpen()) { if (e.code === 'Escape') { closeUpShop(); closePlotMenu(); closeSecret(); closeSell(); closeAll(); } return; }
+    if (menuOpen()) { if (e.code === 'Escape') { closeUpShop(); closePlotMenu(); closeSecret(); closeSell(); closeAll(); closeTrade(); } return; }
     if (talking && e.code === 'Escape') { closeTalk(); return; }
     if (e.key === '/' || e.code === 'Slash') { e.preventDefault(); setChatOpen(true); keys.clear(); chatInput.focus(); return; }   // jump to the chat box   // the menu's own buttons take the keys
     if ((e.code === 'Enter' || e.key === 'Enter') && !shopBtn.hidden) { openStall(); return; }
@@ -5741,7 +5787,8 @@ const World = (function () {
     { id: 'bubble', name: '🫧 Bubble rain', kind: 'fall', look: 'bubble', slow: true, say: 'Giant bubbles are floating down' },
     { id: 'golden', name: '🏆 Golden meteors', kind: 'fall', look: 'gold', say: 'Golden meteors are falling' },
     { id: 'eclipse', name: '🌑 Eclipse', kind: 'fall', look: 'ring', dark: true, say: 'The sun went dark and glowing rings are falling' },
-    { id: 'diamond', name: '💠 Diamond rain', kind: 'fall', look: 'diamond', say: 'Diamonds are raining down' }
+    { id: 'diamond', name: '💠 Diamond rain', kind: 'fall', look: 'diamond', say: 'Diamonds are raining down' },
+    { id: 'taco', name: '🌮 Raining tacos', kind: 'fall', look: 'taco', say: 'It\'s raining tacos' }
   ];
   const EVENTS = Object.fromEntries(EVENT_LIST.map((e) => [e.id, e]));
   const FS_LEN = EV_LEN, FS_PERIOD = EV_EVERY;
@@ -5793,7 +5840,8 @@ const World = (function () {
     bubble: { geo: new THREE.SphereGeometry(1.4, 12, 8), mat: [0xd8f6ff, 0xffd6f5], boom: 0xd8f6ff, see: 0.45 },
     gold: { geo: new THREE.DodecahedronGeometry(0.9, 0), mat: [0xffc21f, 0xfff4b0], boom: 0xffd23f, glow: true },
     ring: { geo: new THREE.TorusGeometry(0.9, 0.18, 6, 18), mat: [0xffb020, 0xffe14a], boom: 0xffb020, glow: true },
-    diamond: { geo: new THREE.OctahedronGeometry(0.9, 0), mat: [0xbff6ff, 0xffffff], boom: 0x8fe8ff, glow: true }
+    diamond: { geo: new THREE.OctahedronGeometry(0.9, 0), mat: [0xbff6ff, 0xffffff], boom: 0x8fe8ff, glow: true },
+    taco: { taco: true, mat: [0xf2c14e, 0x5fb83a], boom: 0xf2c14e }
   };
   function fbGeo0() { return new THREE.SphereGeometry(0.9, 10, 8); }
   const fireballs = [];                                  // everything falling or flying through the air (name kept from the fire storm)
@@ -5801,10 +5849,10 @@ const World = (function () {
     const ev = EVENTS[kind === 'rock' ? 'giant' : kind || 'fire'] || EVENTS.fire, look = from ? 'magma' : ev.look, F = FALLS[look] || FALLS.fireball;
     if (x === undefined) ({ x, z } = from ? randomLand(220) : aimSpot());
     const g = new THREE.Group(), mat = (c) => (F.glow ? new THREE.MeshBasicMaterial({ color: c, transparent: !!F.see, opacity: F.see || 1 }) : F.see ? fxMat(c, F.see) : L_(c));
-    const ball = new THREE.Mesh(F.geo, mat(F.mat[0])); g.add(ball);
+    const ball = F.taco ? tacoModel(7) : new THREE.Mesh(F.geo, mat(F.mat[0])); g.add(ball);
     if (F.stretch) ball.scale.set(0.8, 1.4, 0.8);
     if (F.wrap) [-1, 1].forEach((sd) => { const w = new THREE.Mesh(fxGeo.flame, mat(F.mat[1])); w.scale.set(3, 3, 3); w.position.x = sd * 0.9; w.rotation.z = sd * Math.PI / 2; g.add(w); });
-    if (look !== 'bolt' && look !== 'bubble') for (let k = 1; k <= 4; k++) { const t = new THREE.Mesh(fbGeo, mat(F.mat[k % 2])); const sc = 0.5 / k + 0.15; t.scale.set(sc, sc, sc); t.position.set(0, k * 1.1, 0); g.add(t); }   // a tail
+    if (look !== 'bolt' && look !== 'bubble' && look !== 'taco') for (let k = 1; k <= 4; k++) { const t = new THREE.Mesh(fbGeo, mat(F.mat[k % 2])); const sc = 0.5 / k + 0.15; t.scale.set(sc, sc, sc); t.position.set(0, k * 1.1, 0); g.add(t); }   // a tail
     const ox = from ? 0 : (Math.random() - 0.5) * 30, oz = from ? 0 : (Math.random() - 0.5) * 30;
     g.position.set(from ? from.x : x + ox, from ? from.y : 90, from ? from.z : z + oz); scene.add(g);
     fireballs.push({ g, x, z, ox, oz, t: 0, boom: null, mut: from ? 'magma' : ev.id, look, F, from, dur: from ? 3.2 : F.fast ? 0.35 : ev.slow ? 7 : 2, rock: look === 'rock' });
@@ -5942,7 +5990,7 @@ const World = (function () {
       f.t += dt;
       const k = Math.min(1, f.t / f.dur), gy = W.bil(H, f.x, f.z);
       if (f.from) { f.g.position.set(lerp(f.from.x, f.x, k), lerp(f.from.y, gy, k) + 45 * 4 * k * (1 - k), lerp(f.from.z, f.z, k)); f.g.rotation.x += dt * 4; }
-      else { f.g.position.set(f.x + f.ox * (1 - k), lerp(90, gy, k), f.z + f.oz * (1 - k)); f.g.rotation.z = Math.atan2(f.ox, 90) * 0.5; if (f.look === 'ring' || f.look === 'disco') f.g.rotation.y += dt * 4; }
+      else { f.g.position.set(f.x + f.ox * (1 - k), lerp(90, gy, k), f.z + f.oz * (1 - k)); f.g.rotation.z = Math.atan2(f.ox, 90) * 0.5; if (f.look === 'ring' || f.look === 'disco' || f.look === 'taco') f.g.rotation.y += dt * 4; }
       if (k < 1) continue;
       scene.remove(f.g);
       const m = new THREE.Mesh(fbGeo, new THREE.MeshBasicMaterial({ color: f.F.boom, transparent: true, opacity: 0.8 })); m.position.copy(f.g.position); scene.add(m); f.boom = { m, t: 0 };
@@ -6069,11 +6117,190 @@ const World = (function () {
     else if (m.t === 'firestorm') startFireStorm(m.name || m.by || 'An admin');
     else if (m.t === 'event') startEvent(m.kind, m.by || 'An admin');
     else if (m.t === 'time') setTimeMode(m.mode, m.by || 'An admin');
+    else if (/^(gift|trade)/.test(m.t)) tradeMessage(m);
     else if (m.t === 'zapped') {                          // an admin's storm dragon hit you with lightning: bounced backwards
       toast('⚡ ZAP! ' + m.by + '\'s storm dragon bounced you backwards!', 3);
       for (let k = 0; k < 12; k++) if (!p.dungeon) tryMove(m.dx * 0.8, m.dz * 0.8);
       p.vy = 9; p.onGround = false;
     }
+  }
+  /* ---------- Gifts and trades ---------- */
+  /* Adriana: players on the same server can gift each other coins or dragons, and trade: both put in dragons and coins,
+     and the trade only happens once both press Accept (changing what you put in means both have to accept again).
+     The 🎁 button shows when someone else is on your server. Claude's choices: admin storm dragons, the dragon you are
+     riding, and an admin's unlimited coins can't be given; a gifted dragon goes on your plot if there's room, else into
+     your inventory. */
+  const tradeEl = $('tradeMenu'), tradeBody = $('tradeBody'), tradeBtnEl = $('tradeBtn'), tradeAskEl = $('tradeAsk'), tradeOkBtn = $('tradeOk');
+  let tradeView = 'list', tradeWho = 0, tradeWhoName = '', tradeAskFrom = 0, tradeAskT = 0;
+  let trading = null;                                    // a trade going on: { id, name, mine: [dragon numbers], coins, theirs, myOk, theirOk }
+  const canGive = (i) => !!ownDragons[i] && !DRAGON_KINDS[ownDragons[i]].storm && !(riding && riding.index === i);
+  const dragonCard = (i) => ({ k: ownDragons[i], m: dragonMutation[i] || '', u: dragonUpgrades[i], s: dragonSpeed[i] || 0, n: dragonNames[i] || '', o: dragonOutfit[i] });
+  function cardLabel(d) {                                 // "Sparky (🌮 Taco Ruby)" for a dragon someone else is offering
+    const kind = DRAGON_KINDS[d.k] ? DRAGON_KINDS[d.k].name : d.k;
+    const muts = String(d.m || '').split(' ').filter((id) => MUT[id]).map((id) => MUT[id].emoji + ' ' + MUT[id].name + ' ').join('');
+    const up = d.u >= 0 && UPGRADERS[d.u] ? ' · ' + UPGRADERS[d.u].name + ' upgrader' : '';
+    return (d.n ? d.n + ' (' + muts + kind + ')' : muts + kind + ' dragon') + up;
+  }
+  function getDragon(d) {                                // a dragon from someone else joins yours
+    if (!d || !DRAGON_KINDS[d.k] || DRAGON_KINDS[d.k].storm) return false;
+    const i = ownDragons.length, place = myPlot >= 0 && placedCount() < slotLimit();
+    ownDragons.push(d.k); dragonUpgrades.push(Number.isInteger(d.u) && d.u >= 0 && d.u < 5 ? d.u : -1);
+    dragonSpeed.push(typeof d.s === 'number' && d.s > 0 ? Math.min(d.s, 10000) : 0); dragonOutfit.push(Number.isInteger(d.o) && d.o >= 0 && d.o < 5 ? d.o : -1);
+    dragonNames[i] = typeof d.n === 'string' ? d.n.slice(0, 16) : '';
+    dragonMutation[i] = String(d.m || '').split(' ').filter((w) => MUT_IDS.includes(w)).join(' ');
+    dragonPlaced.push(place);
+    if (place) addPet(d.k, true, i);
+    return true;
+  }
+  function getStuff(coinsIn, dragons) {                   // coins and dragons arrive
+    if (coinsIn > 0 && coins !== Infinity) { coins += coinsIn; saveCoins(); } else if (coinsIn > 0 && realCoins !== null) realCoins += coinsIn;
+    (dragons || []).forEach(getDragon);
+    saveProgress(); renderInventory();
+  }
+  function giveAway(coinsOut, idxs) {                     // coins and dragons leave (biggest number first, so the rest don't move)
+    if (coinsOut > 0 && coins !== Infinity) { coins = Math.max(0, coins - coinsOut); saveCoins(); }
+    [...idxs].sort((a, b) => b - a).forEach((i) => { if (ownDragons[i]) removeDragon(i); });
+    saveProgress(); renderInventory();
+  }
+  const fmtCoins = (n) => fmt(n) + ' coin' + (n === 1 ? '' : 's');
+  const stuffText = (c, ds) => [c > 0 ? fmtCoins(c) : '', ...(ds || []).filter((d) => DRAGON_KINDS[d.k] && !DRAGON_KINDS[d.k].storm).map(cardLabel)].filter(Boolean).join(', ') || 'nothing';
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  function coinBox(label, onGo, value) {                  // a box to type how many coins, and a button
+    const row = el('div', 'coinrow'), inp = el('input'), b = el('button', '', label);
+    inp.type = 'number'; inp.min = '0'; inp.step = '1'; inp.inputMode = 'numeric'; inp.placeholder = 'How many coins'; inp.setAttribute('aria-label', 'How many coins');
+    if (value) inp.value = String(value);
+    b.type = 'button';
+    const go = () => { const n = Math.floor(+inp.value || 0); onGo(n, inp); };
+    b.addEventListener('click', go);
+    inp.addEventListener('focus', () => keys.clear());
+    inp.addEventListener('keydown', (e) => { if (e.code === 'Enter' || e.key === 'Enter') { e.preventDefault(); go(); } });
+    if (coins === Infinity) { inp.disabled = true; b.disabled = true; inp.placeholder = 'Admin coins can\'t be given'; }
+    row.appendChild(inp); row.appendChild(b); return row;
+  }
+  function okCoins(n) {
+    if (coins === Infinity) { toast('Admins\' unlimited coins can\'t be given.', 3); return false; }
+    if (!(n > 0)) { toast('Type how many coins first.', 3); return false; }
+    if (n > coins) { toast('You only have ' + fmtCoins(Math.floor(coins)) + '.', 3); return false; }
+    return true;
+  }
+  function refreshTrade() {
+    $('tradeCoins').textContent = fmt(coins);
+    while (tradeBody.firstChild) tradeBody.removeChild(tradeBody.firstChild);
+    tradeOkBtn.hidden = tradeView !== 'trade';
+    $('tradeDone').textContent = tradeView === 'trade' ? 'Stop trading' : tradeView === 'gift' ? 'Back' : 'Done';
+    if (tradeView === 'list') {
+      $('tradeTitle').textContent = 'Gift & trade';
+      tradeBody.appendChild(el('p', 'sub', 'Give coins or dragons to someone on this server, or trade with them. A trade only happens when you both press Accept.'));
+      if (!others.size) tradeBody.appendChild(el('p', 'sub', 'Nobody else is on this server right now.'));
+      others.forEach((o) => {
+        const row = el('div', 'uprow'), what = el('div', 'what'), g = el('button', '', '🎁 Gift'), t = el('button', '', '🤝 Trade');
+        what.appendChild(el('b', '', o.name + (o.admin ? ' ★' : '')));
+        g.type = t.type = 'button';
+        g.addEventListener('click', () => { tradeView = 'gift'; tradeWho = o.id; tradeWhoName = o.name; refreshTrade(); });
+        t.addEventListener('click', () => { netSend({ t: 'tradeask', to: o.id }); toast('Asked ' + o.name + ' to trade. Waiting for them...', 4); t.disabled = true; t.textContent = 'Asked'; });
+        row.appendChild(what); row.appendChild(g); row.appendChild(t); tradeBody.appendChild(row);
+      });
+    } else if (tradeView === 'gift') {
+      $('tradeTitle').textContent = '🎁 Gift to ' + tradeWhoName;
+      tradeBody.appendChild(el('h3', '', 'Give coins'));
+      tradeBody.appendChild(coinBox('Give', (n, inp) => {
+        if (!others.has(tradeWho)) { toast(tradeWhoName + ' left the server.', 3); return; }
+        if (!okCoins(n)) return;
+        giveAway(n, []); netSend({ t: 'gift', to: tradeWho, coins: n, dragons: [] }); inp.value = ''; refreshTrade();
+      }));
+      tradeBody.appendChild(el('h3', '', 'Give a dragon'));
+      const list = ownDragons.map((k, i) => i).filter(canGive);
+      if (!list.length) tradeBody.appendChild(el('p', 'sub', 'You have no dragons you can give.'));
+      list.forEach((i) => {
+        const row = el('div', 'uprow'), what = el('div', 'what'), b = el('button', '', 'Give');
+        what.appendChild(el('b', '', dragonLabel(i))); what.appendChild(el('small', '', dragonPlaced[i] ? 'On your plot' : 'In your inventory'));
+        b.type = 'button';
+        b.addEventListener('click', () => {
+          if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Sure?'; return; }
+          if (!others.has(tradeWho)) { toast(tradeWhoName + ' left the server.', 3); return; }
+          const card = dragonCard(i); giveAway(0, [i]); netSend({ t: 'gift', to: tradeWho, coins: 0, dragons: [card] }); refreshTrade();
+        });
+        row.appendChild(what); row.appendChild(b); tradeBody.appendChild(row);
+      });
+    } else if (tradeView === 'trade' && trading) {
+      $('tradeTitle').textContent = '🤝 Trading with ' + trading.name;
+      tradeBody.appendChild(el('h3', '', trading.name + ' gives you'));
+      const th = el('div', 'theirs');
+      th.appendChild(el('p', '', trading.theirs.coins > 0 ? '🪙 ' + fmtCoins(trading.theirs.coins) : '🪙 No coins'));
+      if (!trading.theirs.dragons.length) th.appendChild(el('p', '', 'No dragons yet'));
+      trading.theirs.dragons.forEach((d) => th.appendChild(el('p', '', '🐉 ' + cardLabel(d))));
+      tradeBody.appendChild(th);
+      tradeBody.appendChild(el('h3', '', 'You give: coins'));
+      tradeBody.appendChild(coinBox('Put in', (n) => { if (n > 0 && !okCoins(n)) return; trading.coins = Math.max(0, n); sendOffer(); }, trading.coins));
+      tradeBody.appendChild(el('h3', '', 'You give: dragons'));
+      const list = ownDragons.map((k, i) => i).filter(canGive);
+      if (!list.length) tradeBody.appendChild(el('p', 'sub', 'You have no dragons you can trade.'));
+      list.forEach((i) => {
+        const on = trading.mine.includes(i), row = el('div', 'uprow'), what = el('div', 'what'), b = el('button', on ? 'in' : '', on ? '✓ In' : 'Put in');
+        what.appendChild(el('b', '', dragonLabel(i)));
+        b.type = 'button';
+        b.addEventListener('click', () => { trading.mine = on ? trading.mine.filter((j) => j !== i) : [...trading.mine, i]; sendOffer(); });
+        row.appendChild(what); row.appendChild(b); tradeBody.appendChild(row);
+      });
+      tradeBody.appendChild(el('p', 'status', trading.myOk && trading.theirOk ? 'Trading...' : trading.myOk ? 'You accepted. Waiting for ' + trading.name + '...' : trading.theirOk ? trading.name + ' accepted! Press Accept to trade.' : 'When you\'re both happy, both press Accept.'));
+      tradeOkBtn.textContent = trading.myOk ? 'Waiting...' : 'Accept the trade';
+      tradeOkBtn.className = trading.myOk ? 'waiting' : '';
+      tradeOkBtn.disabled = trading.myOk;
+    }
+  }
+  function sendOffer() {                                  // what you put in changed: tell the server (both have to accept again)
+    trading.mine = trading.mine.filter(canGive);
+    trading.myOk = trading.theirOk = false;
+    netSend({ t: 'tradeset', coins: trading.coins, dragons: trading.mine.map(dragonCard) });
+    refreshTrade();
+  }
+  function openTrade(view) {
+    if (!started || shopping || (menuOpen() && !tradeOpen)) return;
+    tradeOpen = true; tradeView = view || 'list'; walking = false;
+    keys.clear(); touchJump = false; mouseDrag = false; joy.id = null; joy.x = joy.y = 0; look.id = null;
+    stick.classList.remove('on'); knob.style.transform = 'translate(-50%, -50%)';
+    shopBtn.hidden = true; tradeEl.hidden = false;
+    document.body.classList.add('shopping');
+    refreshTrade();
+  }
+  function closeTrade() {
+    if (!tradeOpen) return;
+    if (tradeView === 'gift') { tradeView = 'list'; refreshTrade(); return; }   // Done on a gift page goes back to the list
+    if (trading) { netSend({ t: 'tradecancel' }); trading = null; toast('You stopped the trade.', 3); }
+    tradeOpen = false; tradeEl.hidden = true;
+    document.body.classList.remove('shopping');
+    canvas.focus();
+  }
+  tradeBtnEl.addEventListener('click', () => openTrade('list'));
+  $('tradeDone').addEventListener('click', closeTrade);
+  tradeOkBtn.addEventListener('click', () => { if (!trading || trading.myOk) return; trading.myOk = true; netSend({ t: 'tradeaccept' }); refreshTrade(); });
+  function answerAsk(yes) { if (!tradeAskFrom) return; netSend({ t: 'tradeanswer', id: tradeAskFrom, yes }); tradeAskFrom = 0; tradeAskEl.hidden = true; }
+  $('tradeAskYes').addEventListener('click', () => answerAsk(true));
+  $('tradeAskNo').addEventListener('click', () => answerAsk(false));
+  function tradeMessage(m) {
+    if (m.t === 'gifted') { getStuff(m.coins, m.dragons); toast('🎁 ' + m.from + ' gave you ' + stuffText(m.coins, m.dragons) + '!', 6); addChat('', m.from + ' gave you ' + stuffText(m.coins, m.dragons) + '.', true); if (tradeOpen) refreshTrade(); }
+    else if (m.t === 'giftsent') toast('🎁 You gave ' + m.to + ' ' + stuffText(m.coins, m.dragons) + '.', 4);
+    else if (m.t === 'giftback') { getStuff(m.coins, m.dragons); toast('They left the server, so your gift came back.', 4); if (tradeOpen) refreshTrade(); }
+    else if (m.t === 'tradeask') {
+      if (trading || tradeAskFrom) { netSend({ t: 'tradeanswer', id: m.id, yes: false }); return; }
+      tradeAskFrom = m.id; tradeAskT = 20; $('tradeAskText').textContent = '🤝 ' + m.name + ' wants to trade with you!'; tradeAskEl.hidden = false;
+    } else if (m.t === 'tradeno') { toast(m.why, 4); if (tradeOpen && tradeView === 'list') refreshTrade(); }
+    else if (m.t === 'tradeopen') {
+      trading = { id: m.id, name: m.name, mine: [], coins: 0, theirs: { coins: 0, dragons: [] }, myOk: false, theirOk: false };
+      if (!tradeOpen) { if (menuOpen() || shopping) { closeUpShop(); closePlotMenu(); closeSecret(); closeSell(); closeAll(); if (shopping) closeShop(); } openTrade('trade'); }
+      else { tradeView = 'trade'; refreshTrade(); }
+    } else if (m.t === 'tradestate' && trading) { trading.theirs = m.theirs; trading.myOk = m.myOk; trading.theirOk = m.theirOk; refreshTrade(); }
+    else if (m.t === 'tradedone' && trading) {
+      giveAway(m.gave.coins, trading.mine); getStuff(m.got.coins, m.got.dragons);
+      toast('🤝 Trade done! You got ' + stuffText(m.got.coins, m.got.dragons) + ' from ' + m.name + '.', 6);
+      trading = null; tradeView = 'list'; closeTrade();
+    } else if (m.t === 'tradeclosed') { if (trading) { trading = null; toast(m.why, 4); if (tradeOpen) { tradeView = 'list'; refreshTrade(); } } }
+  }
+  function tradeStep(dt) {                                // the 🎁 button shows when someone else is here; an unanswered ask runs out
+    const show = started && netOnline && others.size > 0;
+    if (tradeBtnEl.hidden === show) tradeBtnEl.hidden = !show;
+    if (tradeAskFrom) { tradeAskT -= dt; if (tradeAskT <= 0 || !others.has(tradeAskFrom)) answerAsk(false); }
+    if (!netOnline && (trading || tradeOpen)) { trading = null; if (tradeOpen) { tradeView = 'list'; closeTrade(); } }
   }
   function setOwner(i, o) {
     if (i < 0 || i >= 7) return;
@@ -6115,6 +6342,7 @@ const World = (function () {
     });
   }
   function netTick(dt, time) {                           // every frame: send where you are (10 times a second), move everyone else
+    tradeStep(dt);
     if (netOnline && started) {
       netT -= dt;
       if (netT <= 0) { netT = 0.1; netSend({ t: 'state', x: p.x, y: p.y, z: p.z, yaw: p.yaw, ride: riding ? riding.kind : '', fly: flying }); }
@@ -6188,7 +6416,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => hatching, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, startEvent, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

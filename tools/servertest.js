@@ -35,6 +35,36 @@ function player(name, code) {
   check(!ps[7].got.some((m) => m.t === 'chat'), 'but not players on Server 2');
   a.send({ t: 'announce', text: 'I am not an admin' }); await wait(80);
   check(!b.got.some((m) => m.t === 'announce'), 'a non-admin can\'t announce');
+  // gifts and trades
+  const [c, d, e] = [ps[2], ps[3], ps[4]], ruby = { k: 'ruby', m: 'taco', u: 1, s: 4, n: 'Rex', o: -1 };
+  c.send({ t: 'gift', to: d.welcome.id, coins: 500, dragons: [ruby] }); await wait(80);
+  const gift = d.got.find((m) => m.t === 'gifted');
+  check(gift && gift.from === 'Kid3' && gift.coins === 500 && gift.dragons[0].k === 'ruby' && gift.dragons[0].m === 'taco', 'a gift of coins and a dragon gets to the other player');
+  check(c.got.some((m) => m.t === 'giftsent' && m.to === 'Kid4'), 'the giver hears it arrived');
+  check(!e.got.some((m) => m.t === 'gifted'), 'nobody else gets it');
+  c.send({ t: 'gift', to: 999, coins: 40, dragons: [] }); await wait(80);
+  check(c.got.some((m) => m.t === 'giftback' && m.coins === 40), 'a gift to someone who isn\'t there comes back');
+  c.send({ t: 'tradeask', to: d.welcome.id }); await wait(80);
+  check(d.got.some((m) => m.t === 'tradeask' && m.name === 'Kid3'), 'asking to trade reaches the other player');
+  e.send({ t: 'tradeanswer', id: c.welcome.id, yes: true }); await wait(80);
+  check(!c.got.some((m) => m.t === 'tradeopen'), 'someone who wasn\'t asked can\'t open the trade');
+  d.send({ t: 'tradeanswer', id: c.welcome.id, yes: true }); await wait(80);
+  check(c.got.some((m) => m.t === 'tradeopen' && m.name === 'Kid4') && d.got.some((m) => m.t === 'tradeopen' && m.name === 'Kid3'), 'saying yes opens the trade for both');
+  c.send({ t: 'tradeset', coins: 100, dragons: [ruby] }); d.send({ t: 'tradeset', coins: 2000, dragons: [] }); await wait(80);
+  c.send({ t: 'tradeaccept' }); await wait(80);
+  d.send({ t: 'tradeset', coins: 1, dragons: [] }); await wait(80);
+  const st2 = c.got.filter((m) => m.t === 'tradestate').pop();
+  check(st2 && st2.theirs.coins === 1 && st2.myOk === false, 'changing an offer after someone accepted means they have to accept again');
+  d.send({ t: 'tradeaccept' }); await wait(80);
+  check(!c.got.some((m) => m.t === 'tradedone'), 'one accept is not enough');
+  c.send({ t: 'tradeaccept' }); await wait(80);
+  const dc = c.got.find((m) => m.t === 'tradedone'), dd = d.got.find((m) => m.t === 'tradedone');
+  check(dc && dd && dc.gave.coins === 100 && dc.gave.dragons[0].n === 'Rex' && dc.got.coins === 1 && dd.got.dragons[0].k === 'ruby', 'when both accept, the trade happens for both');
+  c.send({ t: 'tradeask', to: d.welcome.id }); await wait(80); d.send({ t: 'tradeanswer', id: c.welcome.id, yes: true }); await wait(80);
+  d.send({ t: 'tradecancel' }); await wait(80);
+  check(c.got.some((m) => m.t === 'tradeclosed' && /stopped/.test(m.why)), 'stopping a trade tells the other player');
+  c.send({ t: 'gift', to: d.welcome.id, coins: -50, dragons: 'lots' }); await wait(80);
+  check(d.got.filter((m) => m.t === 'gifted').length === 1, 'a gift of nothing (or minus coins) is ignored');
   const adminName = process.env.ADMIN_NAME, adminCode = process.env.ADMIN_CODE;
   if (adminName) {
     ps[7].ws.close(); await wait(80);

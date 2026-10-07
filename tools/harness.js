@@ -1176,6 +1176,29 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   if (I.zoneName() !== 'Desert') throw new Error('the tunnel should come out in the desert');
 }
 
+// ---- gifts and trades (the server's side is in servertest.js) ----
+if (process.env.MODE !== 'admin') {
+  const c0 = I.coins(); I.setCoins(1000);
+  const n0 = I.ownDragons.length;
+  I.tradeMessage({ t: 'gifted', from: 'Ellie', coins: 250, dragons: [{ k: 'ruby', m: 'taco fire', u: 2, s: 12, n: 'Taco Tim', o: -1 }, { k: 'stormboy', m: '', u: -1, s: 0, n: '', o: -1 }] });
+  const got = I.ownDragons.length - 1;
+  console.log('gift arrives: coins', I.coins(), '| dragons', n0, '->', I.ownDragons.length, '| new one', I.ownDragons[got], I.dragonMutation[got], I.dragonNames[got], '| storm dragon refused', !I.ownDragons.slice(n0).includes('stormboy'), '|', said());
+  if (I.coins() !== 1250 || I.ownDragons.length !== n0 + 1 || I.ownDragons[got] !== 'ruby' || I.dragonMutation[got] !== 'taco fire' || I.dragonNames[got] !== 'Taco Tim') throw new Error('a gift should arrive');
+  I.tradeMessage({ t: 'tradeopen', id: 9, name: 'Ellie' });
+  console.log('trade opens: panel', I.tradeOpen(), I.tradeView(), '| with', I.trading().name);
+  if (!I.tradeOpen() || I.tradeView() !== 'trade') throw new Error('the trade panel should open');
+  I.trading().mine = [got]; I.trading().coins = 200;
+  I.tradeMessage({ t: 'tradestate', mine: {}, theirs: { coins: 5000, dragons: [{ k: 'jade', m: '', u: -1, s: 0, n: '', o: -1 }] }, myOk: false, theirOk: true });
+  console.log('they accepted:', I.trading().theirOk);
+  I.tradeMessage({ t: 'tradedone', name: 'Ellie', gave: { coins: 200, dragons: [I.dragonCard(got)] }, got: { coins: 5000, dragons: [{ k: 'jade', m: '', u: -1, s: 0, n: '', o: -1 }] } });
+  console.log('trade done: coins', I.coins(), '| taco ruby gone', !I.dragonNames.includes('Taco Tim'), '| got a', I.ownDragons[I.ownDragons.length - 1], '| panel closed', !I.tradeOpen(), '|', said());
+  if (I.coins() !== 6050 || I.dragonNames.includes('Taco Tim') || I.ownDragons[I.ownDragons.length - 1] !== 'jade' || I.tradeOpen() || I.trading()) throw new Error('the trade should swap the dragons and coins');
+  I.tradeMessage({ t: 'tradeopen', id: 9, name: 'Ellie' }); I.tradeMessage({ t: 'tradeclosed', why: 'Ellie stopped the trade.' });
+  console.log('they stop a trade:', !I.trading(), '|', said()); I.closeTrade();
+  if (I.trading() || I.tradeOpen()) throw new Error('a stopped trade should close');
+  I.setCoins(c0);
+}
+
 // ---- accounts: each name has its own save ----
 {
   const mine = store['mutation-mayhem-active'], dragons0 = store['mutation-mayhem-dragons'], banned0 = store['mutation-mayhem-banned'];

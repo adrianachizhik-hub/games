@@ -61,6 +61,22 @@ function pickRoom(want) {                             // the server the player c
   return rooms.find((r) => r.players.size < PLOTS) || null;
 }
 
+/* Gifts and trades (Adriana: gift coins or dragons; trade dragons and coins, and both have to say yes). The server only
+   checks the offers look right and passes them along; each player's device takes away and adds the dragons and coins. */
+const MAX_COINS = 1e15;
+const cleanDragon = (d) => (d && typeof d === 'object' ? { k: clean(d.k, 12), m: clean(d.m, 400), u: Number.isInteger(d.u) ? d.u : -1, s: num(d.s), n: clean(d.n, 16), o: Number.isInteger(d.o) ? d.o : -1 } : null);
+const cleanOffer = (m) => ({ coins: Math.max(0, Math.min(MAX_COINS, Math.floor(num(m.coins)))), dragons: (Array.isArray(m.dragons) ? m.dragons : []).slice(0, 30).map(cleanDragon).filter((d) => d && d.k) });
+const send = (pl, msg) => sendRaw(pl.sock, JSON.stringify(msg));
+function tradeState(pl) {                             // both players see both offers, and who has said yes
+  const o = pl.tr.with;
+  send(pl, { t: 'tradestate', mine: pl.tr.offer, theirs: o.tr.offer, myOk: pl.tr.ok, theirOk: o.tr.ok });
+}
+function endTrade(pl, why) {                          // the trade stops; the other player hears why
+  if (!pl.tr) return;
+  const o = pl.tr.with; pl.tr = null;
+  if (o.tr && o.tr.with === pl) { o.tr = null; send(o, { t: 'tradeclosed', why }); }
+}
+
 function join(sock, hello) {
   const room = pickRoom(hello.room);
   if (!room) { sendRaw(sock, JSON.stringify({ t: 'full' })); sock.end(); return null; }
@@ -75,6 +91,7 @@ function leave(pl) {
   if (!pl || !pl.room.players.has(pl.id)) return;
   const room = pl.room;
   room.players.delete(pl.id);
+  endTrade(pl, pl.name + ' left the server.');
   if (pl.plot >= 0 && room.plots[pl.plot] === pl) room.plots[pl.plot] = null;
   broadcast(room, { t: 'left', id: pl.id, plot: pl.plot });
 }
@@ -109,6 +126,39 @@ function handle(pl, m) {
     if (pl.admin && ['day', 'night', 'auto'].includes(m.mode)) { timeMode = m.mode; rooms.forEach((r) => broadcast(r, { t: 'time', mode: m.mode, by: pl.name }, pl)); }
   } else if (m.t === 'firestorm') {                   // an admin starts a fire storm for everyone, on every server
     if (pl.admin) rooms.forEach((r) => broadcast(r, { t: 'firestorm', by: pl.name }, pl));
+  } else if (m.t === 'gift') {                         // coins and/or dragons for another player; if they've gone, it all comes back
+    const to = room.players.get(m.to | 0), offer = cleanOffer(m);
+    if (!offer.coins && !offer.dragons.length) return;
+    if (to && to !== pl) { send(to, { t: 'gifted', from: pl.name, coins: offer.coins, dragons: offer.dragons }); send(pl, { t: 'giftsent', to: to.name, coins: offer.coins, dragons: offer.dragons }); }
+    else send(pl, { t: 'giftback', coins: offer.coins, dragons: offer.dragons });
+  } else if (m.t === 'tradeask') {                     // ask another player to trade
+    const to = room.players.get(m.to | 0);
+    if (!to || to === pl) return;
+    if (pl.tr || to.tr) { send(pl, { t: 'tradeno', why: (to.tr ? to.name + ' is already trading.' : 'You are already trading.') }); return; }
+    pl.ask = to.id; send(to, { t: 'tradeask', id: pl.id, name: pl.name });
+  } else if (m.t === 'tradeanswer') {                  // yes or no to someone who asked
+    const from = room.players.get(m.id | 0);
+    if (!from || from.ask !== pl.id) return;
+    from.ask = 0;
+    if (!m.yes) { send(from, { t: 'tradeno', why: pl.name + ' said no.' }); return; }
+    if (pl.tr || from.tr) { send(pl, { t: 'tradeno', why: 'One of you is already trading.' }); send(from, { t: 'tradeno', why: 'One of you is already trading.' }); return; }
+    from.tr = { with: pl, offer: { coins: 0, dragons: [] }, ok: false }; pl.tr = { with: from, offer: { coins: 0, dragons: [] }, ok: false };
+    send(from, { t: 'tradeopen', id: pl.id, name: pl.name }); send(pl, { t: 'tradeopen', id: from.id, name: from.name });
+  } else if (m.t === 'tradeset') {                     // change what you put in: both have to say yes again
+    if (!pl.tr) return;
+    const o = pl.tr.with;
+    pl.tr.offer = cleanOffer(m); pl.tr.ok = false; o.tr.ok = false;
+    tradeState(pl); tradeState(o);
+  } else if (m.t === 'tradeaccept') {                  // you say yes; when both have, the trade happens
+    if (!pl.tr) return;
+    const o = pl.tr.with;
+    pl.tr.ok = true;
+    if (o.tr.ok) {
+      send(pl, { t: 'tradedone', gave: pl.tr.offer, got: o.tr.offer, name: o.name }); send(o, { t: 'tradedone', gave: o.tr.offer, got: pl.tr.offer, name: pl.name });
+      pl.tr = null; o.tr = null;
+    } else { tradeState(pl); tradeState(o); }
+  } else if (m.t === 'tradecancel') {
+    endTrade(pl, pl.name + ' stopped the trade.');
   } else if (m.t === 'zap') {                          // a storm dragon's lightning hit another player: they get bounced back
     const target = room.players.get(m.id | 0);
     if (target && pl.admin) sendRaw(target.sock, JSON.stringify({ t: 'zapped', by: pl.name, dx: num(m.dx), dz: num(m.dz) }));
