@@ -4635,7 +4635,7 @@ const World = (function () {
      FIRE_SECONDS to get it to your plot, while the villagers, who are very fast, chase you with axes. If one reaches you,
      or time runs out, you are sent back to your plot without the egg (it goes back into the fire). Home in time, and it
      hatches a fire dragon, boy or girl. One fire egg per fire. */
-  const FIRE_PERIOD = 600, FIRE_LIT = 120, FIRE_SECONDS = 15, VILLAGER_SPEED = 122, CATCH_RANGE = 2.5, HEAT_RANGE = 3.4;
+  const FIRE_PERIOD = 600, FIRE_LIT = 120, FIRE_SECONDS = 15, VILLAGER_SPEED = 110, CATCH_RANGE = 2.5, HEAT_RANGE = 3.4;
   const vY = W.bil(H, VILLAGE.x, VILLAGE.z);
   let fireOverride = null, fireTakenRound = -1;            // fireOverride: tests only (seconds into the cycle)
   try { fireTakenRound = +localStorage.getItem('mutation-mayhem-fire-taken') || -1; } catch (e) { /* none */ }
@@ -4928,10 +4928,10 @@ const World = (function () {
      Getting in also needs a radioactive resistant upgrader from the secret shop, or the radiation bounces you back.
      Inside, a nuke egg glows on a stand. Grab it and you have NUKE_SECONDS to get it home, while the nuclear monster
      climbs out of its toxic pit behind the bunker and chases you. Its speed and start (MONSTER_SPEED, MONSTER_RING)
-     were worked out so a fire dragon needs 6 Prismatic upgraders to get away from every plot (Adriana, 7 October 2026; was 9). Home in time: a nuke
+     were worked out so a fire dragon needs 5 Prismatic upgraders to get away (Adriana: slower again on 8 October; was 6, and 9 before that). Home in time: a nuke
      dragon, boy or girl. One nuke egg every NUKE_PERIOD seconds. */
   const BK = W.BUNKER, bkFace = Math.atan2(HUB.x - BK.x, HUB.z - BK.z), BY = W.bil(H, BK.x, BK.z), NUKE_TIER = 6;
-  const NUKE_SECONDS = 13, NUKE_PERIOD = 600, NUKE_CODE = '5367', MONSTER_SPEED = 139, MONSTER_CATCH = 3;
+  const NUKE_SECONDS = 13, NUKE_PERIOD = 600, NUKE_CODE = '5367', MONSTER_SPEED = 128, MONSTER_CATCH = 3;
   const bkC = Math.cos(bkFace), bkS = Math.sin(bkFace);
   const bkWorld = (lx, lz) => ({ x: BK.x + lx * bkC + lz * bkS, z: BK.z - lx * bkS + lz * bkC });   // the bunker's own frame: +z is the door side, toward town
   const bkLocal = (x, z) => { const dx = x - BK.x, dz = z - BK.z; return { lx: dx * bkC - dz * bkS, lz: dx * bkS + dz * bkC }; };
@@ -5070,7 +5070,7 @@ const World = (function () {
      palace the aqua egg glows on a stand, watched by the guardian of Atlantis, a giant merman with a trident. Grab it and
      he chases you until you're out of Atlantis (GUARD_LEASH); you have AQUA_SECONDS to get it home. It hatches an aqua
      dragon, boy or girl, with the Water mutation already. One aqua egg every AQUA_PERIOD seconds. Numbers are Claude's. */
-  const ATL = W.ATL, AF = ATL.floor, BREATH = 10, AQUA_SECONDS = 90, AQUA_PERIOD = 600, GUARD_SPEED = 8.5, GUARD_CATCH = 3.2, GUARD_LEASH = 46;
+  const ATL = W.ATL, AF = ATL.floor, BREATH = 10, AQUA_SECONDS = 90, AQUA_PERIOD = 600, GUARD_SPEED = 7.5, GUARD_CATCH = 3.2, GUARD_LEASH = 46;
   const WALL_R = 17, WALL_H = 9, GATE = Math.atan2(HUB.z - ATL.z, HUB.x - ATL.x), GATE_W = 0.2;   // the gate faces the island
   const PAL = 5.2, PAL_H = 6.5;                          // the palace: a square block in the middle, half width and height
   const TOWERS = [0, 1, 2, 3, 4, 5].map((k) => { const a = GATE + Math.PI / 6 + k * Math.PI / 3; return { x: ATL.x + Math.cos(a) * WALL_R, z: ATL.z + Math.sin(a) * WALL_R }; });
@@ -6490,11 +6490,19 @@ const World = (function () {
 
   /* Admin command: start any event. */
   const evRow = adminSection('Start or stop an event (5 minutes)'), evPick = document.createElement('select'), evBtn = document.createElement('button');
-  EVENT_LIST.forEach((e) => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.name; evPick.appendChild(o); });
+  EVENT_LIST.filter((e) => !e.month).forEach((e) => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.name; evPick.appendChild(o); });   // the seasonal ones have their own section below
   evPick.setAttribute('aria-label', 'Event to start'); evBtn.type = 'button'; evBtn.className = 'small'; evBtn.textContent = 'Start';
   const evStop = document.createElement('button'); evStop.type = 'button'; evStop.className = 'small'; evStop.textContent = 'Stop';
   evStop.addEventListener('click', (e) => { stopEvent(evPick.value); toast(EVENTS[evPick.value].name + ' turned off' + (netOnline ? ' for everyone.' : '.'), 3); if (e.detail > 0) evStop.blur(); });
   evRow.appendChild(evPick); evRow.appendChild(evBtn); evRow.appendChild(evStop);
+  /* Seasonal events (Adriana, 8 October 2026: the monthly specials in a section of their own). */
+  const seaRow = adminSection('Seasonal events (5 minutes)'), seaPick = document.createElement('select'), seaBtn = document.createElement('button'), seaStop = document.createElement('button');
+  EVENT_LIST.filter((e) => e.month).forEach((e) => { const o = document.createElement('option'), [y, mo] = e.month.split('-'); o.value = e.id; o.textContent = e.name + ' (' + ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][+mo - 1] + ' ' + y + ')'; seaPick.appendChild(o); });
+  seaPick.setAttribute('aria-label', 'Seasonal event'); seaBtn.type = seaStop.type = 'button'; seaBtn.className = seaStop.className = 'small'; seaBtn.textContent = 'Start'; seaStop.textContent = 'Stop';
+  seaBtn.addEventListener('click', (e) => { startEvent(seaPick.value); toast(EVENTS[seaPick.value].name + ' started' + (netOnline ? ' for everyone!' : '!'), 3); if (e.detail > 0) seaBtn.blur(); });
+  seaStop.addEventListener('click', (e) => { stopEvent(seaPick.value); toast(EVENTS[seaPick.value].name + ' turned off' + (netOnline ? ' for everyone.' : '.'), 3); if (e.detail > 0) seaStop.blur(); });
+  if (thisMonth()) seaPick.value = thisMonth().id;       // this month's one first
+  seaRow.appendChild(seaPick); seaRow.appendChild(seaBtn); seaRow.appendChild(seaStop);
   /* Admin command: make it day or night (for everyone online), or back to the normal clock. */
   const timeRow = adminSection('Day and night');
   [['day', '☀️ Day'], ['night', '🌙 Night'], ['auto', '🔄 Normal']].forEach(([mode, label]) => {

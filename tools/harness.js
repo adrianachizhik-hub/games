@@ -980,10 +980,10 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     const out = { kind: pet.kind, speed: I.rideSpeed ? (I.riding() ? I.rideSpeed(true).toFixed(0) : '-') : '-', got, secs: (k / 60).toFixed(1), msg: said(), dragons: I.ownDragons.slice(-1)[0] };
     if (I.riding()) I.dismount(true); pet.kind = kind0; I.dragonSpeed[pet.index] = 0; return out;
   };
-  const slow = flyHome(40); console.log('fly it home on a', slow.kind, 'dragon with 4 Prismatic upgraders: grabbed', slow.got, '| after', slow.secs, 's:', slow.msg);
-  if (!/caught/.test(slow.msg)) throw new Error('4 upgraders should be caught');
-  const before = I.ownDragons.length, fast = flyHome(50); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
-  console.log('fly it home on a', fast.kind, 'dragon with 5 Prismatic upgraders: grabbed', fast.got, '| home after', fast.secs, 's | dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], '| it earns', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], 'every 3 s | fire egg there now', I.fireEggThere());
+  const slow = flyHome(30); console.log('fly it home on a', slow.kind, 'dragon with 3 Prismatic upgraders: grabbed', slow.got, '| after', slow.secs, 's:', slow.msg);
+  if (!/caught/.test(slow.msg)) throw new Error('3 upgraders should be caught');
+  const before = I.ownDragons.length, fast = flyHome(40); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
+  console.log('fly it home on a', fast.kind, 'dragon with 4 Prismatic upgraders: grabbed', fast.got, '| home after', fast.secs, 's | dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], '| it earns', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], 'every 3 s | fire egg there now', I.fireEggThere());
   if (I.ownDragons.length !== before + 1 || !/^fire(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.fireEggThere()) throw new Error('a fast dragon should get the fire egg home and hatch a fire dragon');
   const n50 = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(5); n50[d] = (n50[d] || 0) + 1; } console.log('fire egg hatches:', Object.keys(n50).map((k) => k + ' ' + (n50[k] / 200).toFixed(0) + '%').join(', '));
   I.setFireClock(null);
@@ -1024,7 +1024,7 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
   let n = 0; while (I.carrying() && n++ < 600) fr();
   console.log('stand still: caught after', (n / 60).toFixed(2), 's | home', I.plotAt(I.p.x, I.p.z) === I.myPlot(), '| egg back', I.nukeEggThere(), '|', said());
   if (I.carrying() || !/nuclear monster caught/.test(said())) throw new Error('the monster should catch you');
-  // fly it home on a fire dragon with 5, then 6 Prismatic upgraders (each +10% speed)
+  // fly it home on a fire dragon with 4, then 5 Prismatic upgraders (each +10% speed)
   const flyHome = (ups) => {
     const hp = I.plotWorld(I.myPlot(), 0, 2); stand(hp, 6.3); fr(2);
     const pet = I.plotPets.find((d) => !d.homing && !I.DRAGON_KINDS[d.kind].storm), kind0 = pet.kind; pet.kind = 'fireboy'; I.dragonSpeed[pet.index] = ups * 10; I.mount(pet); const spd = I.rideSpeed(true).toFixed(0);
@@ -1037,11 +1037,11 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     const out = { speed: spd, got, secs: (k / 60).toFixed(1), msg: said(), last: I.ownDragons.slice(-1)[0] };
     if (I.riding()) I.dismount(true); pet.kind = kind0; I.dragonSpeed[pet.index] = 0; return out;
   };
-  const r8 = flyHome(5); console.log('fire dragon + 5 Prismatic (speed', r8.speed + '): grabbed', r8.got, '| after', r8.secs, 's:', r8.msg);
-  if (!/caught/.test(r8.msg)) throw new Error('5 upgraders should not be enough');
-  const before = I.ownDragons.length, r9 = flyHome(6); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
-  console.log('fire dragon + 6 Prismatic (speed', r9.speed + '): grabbed', r9.got, '| home after', r9.secs, 's |', r9.msg, '| dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], 'earning', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], '| egg gone till next time', !I.nukeEggThere());
-  if (I.ownDragons.length !== before + 1 || !/^nuke(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.nukeEggThere()) throw new Error('6 upgraders should get the nuke egg home');
+  const r8 = flyHome(4); console.log('fire dragon + 4 Prismatic (speed', r8.speed + '): grabbed', r8.got, '| after', r8.secs, 's:', r8.msg);
+  if (!/caught/.test(r8.msg)) throw new Error('4 upgraders should not be enough');
+  const before = I.ownDragons.length, r9 = flyHome(5); for (let k = 0; k < 150; k++) I.eggsAnimate(1 / 60, 0);
+  console.log('fire dragon + 5 Prismatic (speed', r9.speed + '): grabbed', r9.got, '| home after', r9.secs, 's |', r9.msg, '| dragons', before, '->', I.ownDragons.length, '| hatched', I.ownDragons.slice(-1)[0], 'earning', I.DRAGON_COINS[I.ownDragons.slice(-1)[0]], '| egg gone till next time', !I.nukeEggThere());
+  if (I.ownDragons.length !== before + 1 || !/^nuke(boy|girl)$/.test(I.ownDragons.slice(-1)[0]) || I.nukeEggThere()) throw new Error('5 upgraders should get the nuke egg home');
   const n50 = {}; for (let k = 0; k < 20000; k++) { const d = I.pickDragon(I.NUKE_TIER); n50[d] = (n50[d] || 0) + 1; } console.log('nuke egg hatches:', Object.keys(n50).map((k) => k + ' ' + (n50[k] / 200).toFixed(0) + '%').join(', '));
 }
 
@@ -1314,6 +1314,16 @@ if (process.env.MODE !== 'admin') {
   console.log('another player sees the first admin in the hood: pieces', count(a1), 'vs a non-admin asking for it', count(fk));
   if (count(a1) <= count(fk) + 15) throw new Error('the hood should only show on a real admin');
   I.netMessage({ t: 'left', id: 901, plot: -1 }); I.netMessage({ t: 'left', id: 902, plot: -1 });
+}
+
+// ---- admin panel: seasonal events in their own section ----
+{
+  const heads = els.adminCommands.children.filter((c) => c.className === 'adminhead').map((c) => c.textContent);
+  const rows = els.adminCommands.children.filter((c) => c.className === 'adminrow'), sel = (i) => rows[i].children.find((c) => c.tagName === 'SELECT' || (c.children && c.options));
+  const iEv = heads.indexOf('Start or stop an event (5 minutes)'), iSea = heads.indexOf('Seasonal events (5 minutes)');
+  const evOpts = rows[iEv].children[0].children.map((o) => o.value), seaOpts = rows[iSea].children[0].children.map((o) => o.value);
+  console.log('admin events: normal', evOpts.length, '| seasonal', seaOpts.length, '(' + rows[iSea].children[0].children.slice(0, 3).map((o) => o.textContent).join(', ') + ' ...)');
+  if (iSea < 0 || seaOpts.length !== 15 || evOpts.some((id) => I.EVENTS[id].month) || evOpts.length !== I.EVENT_LIST.length - 15) throw new Error('the seasonal events should have their own section');
 }
 
 // ---- the leaderboard in town ----
