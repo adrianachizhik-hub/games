@@ -1285,7 +1285,7 @@ if (process.env.MODE !== 'admin') {
 {
   console.log('monthly specials:', I.MONTHLY.map((m) => m.month + ' ' + m.name).join(' | '));
   if (I.MONTHLY.length !== 15 || I.MONTHLY[0].month !== '2026-10' || I.MONTHLY[14].month !== '2027-12') throw new Error('one special for every month from October 2026 to December 2027');
-  I.clockEventsOff(false);
+  I.clockEventsOff(false); I.resetEvents();   // (earlier tests started and stopped events by hand)
   for (const m of I.MONTHLY) {
     I.setMonth(m.month); I.eggsAnimate(1 / 60, 0);
     const deco = I.monthDeco(), other = I.MONTHLY.filter((q) => q !== m && I.eventOn(q.id)).length, t = Date.now() / 1000 % 1800, should = t >= 900 && t < 1200;
