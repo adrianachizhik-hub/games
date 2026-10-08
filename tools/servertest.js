@@ -2,6 +2,7 @@
 // Starts the server on a spare port, connects pretend players, and checks servers fill up in order, plots are
 // shared fairly, positions, dragons, chat and announcements get through, and admins are checked properly.
 process.env.PORT = 18080;
+process.env.LEADERS_FILE = require('path').join(require('os').tmpdir(), 'dk-leaders-test-' + process.pid + '.json');   // not the real one
 const { server } = require('../server/server.js');
 const URL = 'ws://localhost:18080', wait = (ms) => new Promise((r) => setTimeout(r, ms));
 function player(name, code) {
@@ -67,6 +68,12 @@ function player(name, code) {
   check(c.got.some((m) => m.t === 'tradeclosed' && /stopped/.test(m.why)), 'stopping a trade tells the other player');
   c.send({ t: 'gift', to: d.welcome.id, coins: -50, dragons: 'lots' }); await wait(80);
   check(d.got.filter((m) => m.t === 'gifted').length === 1, 'a gift of nothing (or minus coins) is ignored');
+  // the leaderboard
+  c.send({ t: 'score', worth: 5000, best: 'Ruby' }); d.send({ t: 'score', worth: 90000, best: 'Jade' }); e.send({ t: 'score', worth: 120, best: 'Green' });
+  await wait(3300);
+  const lb = c.got.filter((m) => m.t === 'leaders').pop();
+  check(lb && lb.list.map((q) => q.name).join() === 'Kid4,Kid3,Kid5' && lb.list[0].worth === 90000 && lb.list[0].best === 'Jade', 'the leaderboard puts the richest player first, and everyone hears it');
+  check(ps[7].got.some((m) => m.t === 'leaders'), 'players on other servers see the same leaderboard');
   // plot decorations and spawned eggs
   c.send({ t: 'decor', decor: { d: ['flowers', 'fountain'], arch: 'rainbow', admin: ['portal'] } }); await wait(80);
   const dm = d.got.find((m) => m.t === 'decor');
@@ -94,6 +101,10 @@ function player(name, code) {
     ad.send({ t: 'time', mode: 'night' }); await wait(80);
     check(b.got.some((m) => m.t === 'time' && m.mode === 'night'), 'an admin can make it night for everyone');
     const late2 = await player('LateNight'); check(late2.welcome.time === 'night', 'someone joining later gets the same night'); late2.ws.close();
+    ad.send({ t: 'score', worth: 1e15, best: 'Storm' }); await wait(3300);
+    const lb2 = b.got.filter((m) => m.t === 'leaders').pop();
+    check(!lb2 || !lb2.list.some((q) => q.name.toLowerCase().startsWith(adminName.split('#')[0].toLowerCase())), 'admins are not on the leaderboard');
+    const late4 = await player('LateBoard'); check(late4.welcome.leaders && late4.welcome.leaders.length >= 3, 'someone joining sees the leaderboard straight away'); late4.ws.close();
     ad.send({ t: 'eventoff', kind: 'all' }); await wait(80);
     check(b.got.some((m) => m.t === 'eventoff' && m.kind === 'all'), 'an admin can turn off all the events for everyone');
     ad.send({ t: 'firestorm' }); await wait(80);

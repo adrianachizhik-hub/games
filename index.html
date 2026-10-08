@@ -2349,7 +2349,7 @@ const World = (function () {
     bx(0.62, 0.26, 0.04, 0xffffff, sd * 0.42, 1.42, 0.3, 0, sd * 0.35, sd * 0.45),
     bx(0.5, 0.22, 0.04, 0xf1f5f8, sd * 0.36, 1.18, 0.29, 0, sd * 0.3, sd * 0.2),
     bx(0.32, 0.2, 0.04, 0xffffff, sd * 0.27, 0.98, 0.28, 0, sd * 0.25, 0)]), []));
-  /* The first admin's own look (Adriana, 7-8 October 2026), only for her: brown hair in a ponytail with two loose strands
+  /* The first admin's own look (Adriana, 7-8 October 2026), only for her: brown hair in a ponytail with one loose strand
      by her face, her black hood pulled down behind her neck, a white shirt under an open black sweater, a utility belt
      with a buckle, pouches and a sword in its sheath at her left side, and black pants. Other players see it too
      (look.special, shown only on a real admin). */
@@ -2358,8 +2358,7 @@ const World = (function () {
     const G = (parent) => { const g = new THREE.Group(); parent.add(g); return g; }, head = G(f.head), body = G(f.root), arms = [G(f.armL), G(f.armR)], H = HOOD;
     HAIR_SHAPES.ponytail.on.forEach((q) => block(head, H.hair, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8]));   // a brown ponytail
     HAIR_SHAPES.ponytail.tie.forEach((q) => block(head, H.tie, q[0], q[1], q[2], q[3], q[4], q[5]));
-    block(head, H.hair, 0.035, 0.36, 0.02, -0.215, 0.3, -0.27, 0, 0, 0.12);    // two loose strands by her face, beside her eyes
-    block(head, H.hair, 0.03, 0.28, 0.02, 0.22, 0.34, -0.27, 0, 0, -0.1);
+    block(head, H.hair, 0.035, 0.36, 0.02, -0.215, 0.3, -0.27, 0, 0, 0.12);    // one loose strand by her face, beside her eye
     block(body, H.hood, 0.56, 0.2, 0.22, 0, 1.56, 0.2);                         // the hood, pulled down behind her neck
     block(body, H.hood, 0.44, 0.22, 0.12, 0, 1.4, 0.27, -0.3, 0, 0);
     block(body, H.black, 0.76, 0.78, 0.04, 0, 1.17, 0.215);                     // the open sweater: back, sides and two front panels
@@ -3520,6 +3519,7 @@ const World = (function () {
     bunkerAnimate(dt, time);
     atlantisAnimate(dt, time);
     monthDecorStep(dt);
+    leaderStep(dt);
     const tw = (s, k) => { const v = reduced ? 1 : 0.55 + 0.45 * Math.sin(time * 4 + k); s.scale.set(v, v, v); };
     for (const egg of eggs) {
       if (!egg.g.visible) continue;
@@ -6514,6 +6514,63 @@ const World = (function () {
   $('adminCommands').appendChild(offEvBtn);
   evBtn.addEventListener('click', (e) => { startEvent(evPick.value); toast(EVENTS[evPick.value].name + ' started' + (netOnline ? ' for everyone!' : '!'), 3); if (e.detail > 0) evBtn.blur(); });
 
+  /* ---------- The leaderboard in town ---------- */
+  /* Adriana (8 October 2026): a leaderboard in town of the best players, by their dragons and their coins: what you're
+     worth is your coins plus what all your dragons would sell for at the green stall (sellPrice). Admins aren't on it.
+     It stands in front of where everyone starts, between two stalls, and shows the top ten from every server (the server
+     keeps it). Offline it shows just you. */
+  const BOARD_AT = { x: HUB.x + Math.cos(Math.PI / 4) * 14.5, z: HUB.z + Math.sin(Math.PI / 4) * 14.5 };
+  const boardCv = document.createElement('canvas'); boardCv.width = 1024; boardCv.height = 768;
+  const boardG = boardCv.getContext('2d'), boardTex = new THREE.CanvasTexture(boardCv);
+  let leaders = [], boardShown = '', scoreT = 0, scoreSent = '';
+  (function buildBoard() {
+    const g = new THREE.Group(), wood = lam('#7a5533'), dark = lam('#4a3420'), gold = lam('#ffc21f');
+    g.position.set(BOARD_AT.x, HUB.h, BOARD_AT.z); g.rotation.y = Math.atan2(HUB.x - BOARD_AT.x, HUB.z - BOARD_AT.z);   // facing the middle of town
+    [-3.7, 3.7].forEach((x) => block(g, wood, 0.4, 6.6, 0.4, x, 3.3, 0));
+    block(g, dark, 7.8, 5.6, 0.25, 0, 3.9, 0);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(7.4, 5.55), new THREE.MeshBasicMaterial({ map: boardTex })); face.position.set(0, 3.9, 0.14); g.add(face);
+    block(g, wood, 8.2, 0.35, 0.5, 0, 6.85, 0); block(g, gold, 1.0, 0.7, 0.3, 0, 7.3, 0.05);   // a roof edge with a gold trophy plate
+    scene.add(g);
+    [-3.7, 0, 3.7].forEach((lx) => { const c = Math.cos(g.rotation.y), sn = Math.sin(g.rotation.y); addCollider(BOARD_AT.x + lx * c, BOARD_AT.z - lx * sn, 0.6); });
+  })();
+  function myWorth() {                                    // coins plus what your dragons would sell for
+    const own = coins === Infinity ? 0 : Math.floor(coins);
+    return own + ownDragons.reduce((s, k, i) => s + (DRAGON_KINDS[k].storm ? 0 : sellPrice(i)), 0);
+  }
+  function bestDragon() {
+    let best = -1; ownDragons.forEach((k, i) => { if (!DRAGON_KINDS[k].storm && (best < 0 || dragonValue(i) > dragonValue(best))) best = i; });
+    return best < 0 ? '' : DRAGON_KINDS[ownDragons[best]].name;
+  }
+  const shortNum = (n) => n >= 1e12 ? (n / 1e12).toFixed(1) + 'T' : n >= 1e9 ? (n / 1e9).toFixed(1) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e4 ? (n / 1e3).toFixed(1) + 'K' : fmt(n);
+  function drawBoard() {
+    const list = netOnline ? leaders : (started && !isAdmin ? [{ name: playerName, worth: myWorth(), best: bestDragon() }] : []);
+    const key = JSON.stringify(list) + netOnline;
+    if (key === boardShown) return;
+    boardShown = key;
+    const g = boardG; if (!g.fillText) return;
+    g.fillStyle = '#10343c'; g.fillRect(0, 0, 1024, 768);
+    g.fillStyle = '#ffd23f'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '700 70px "Trebuchet MS", "Segoe UI", sans-serif';
+    g.fillText('🏆 Best Keepers 🏆', 512, 60);
+    g.font = '500 28px "Trebuchet MS", "Segoe UI", sans-serif'; g.fillStyle = '#bfe9ff';
+    g.fillText(netOnline ? 'Coins + dragons, on every server' : 'Play online to see everyone', 512, 118);
+    if (!list.length) { g.font = '600 40px "Trebuchet MS", sans-serif'; g.fillStyle = '#f3e6c0'; g.fillText('Nobody yet. Hatch some dragons!', 512, 400); }
+    list.slice(0, 10).forEach((q, k) => {
+      const y = 175 + k * 58, me = q.name === playerName;
+      if (k % 2 === 0 || me) { g.fillStyle = me ? 'rgba(255, 210, 63, 0.25)' : 'rgba(255, 255, 255, 0.06)'; g.fillRect(40, y - 26, 944, 52); }
+      g.textAlign = 'left'; g.font = '700 38px "Trebuchet MS", "Segoe UI", sans-serif';
+      g.fillStyle = k === 0 ? '#ffd23f' : k === 1 ? '#d8dde6' : k === 2 ? '#e0a060' : '#f3e6c0';
+      g.fillText((k < 3 ? ['🥇', '🥈', '🥉'][k] : (k + 1) + '.') + ' ' + String(q.name).slice(0, 16), 60, y);
+      g.font = '500 30px "Trebuchet MS", "Segoe UI", sans-serif'; g.fillStyle = '#9fd8c8'; g.fillText(q.best ? '🐉 ' + q.best : '', 520, y);
+      g.textAlign = 'right'; g.font = '700 36px "Trebuchet MS", "Segoe UI", sans-serif'; g.fillStyle = '#ffd23f'; g.fillText(shortNum(q.worth), 964, y);
+    });
+    boardTex.needsUpdate = true;
+  }
+  function leaderStep(dt) {                              // every few seconds: tell the server what you're worth, and redraw the board
+    scoreT -= dt; if (scoreT > 0) return; scoreT = 4;
+    if (started && netOnline && !isAdmin) { const msg = { t: 'score', worth: myWorth(), best: bestDragon() }, k = msg.worth + '|' + msg.best; if (k !== scoreSent) { scoreSent = k; netSend(msg); } }
+    drawBoard();
+  }
+
   /* ---------- Multiplayer ---------- */
   /* Adriana's request: everyone who plays joins the same server, unless all 7 plots there are taken; then the next of
      10 more servers with room (the server program in server/server.js decides). Players see each other walking and
@@ -6584,7 +6641,7 @@ const World = (function () {
       m.plots.forEach((o, i) => { if (o && o.id !== netId) setOwner(i, o); });
       addChat('', 'You\'re on Server ' + m.room + (m.players.length ? ' with ' + m.players.length + ' other player' + (m.players.length === 1 ? '' : 's') : ', and nobody else is here yet') + '. Chat goes to everyone on this server.', true);
       toast(m.room === chosenRoom || !chosenRoom ? 'You joined Server ' + m.room + '!' : 'Server ' + chosenRoom + ' filled up, so you joined Server ' + m.room + '.', 4);
-      sendDecor(); drawAllDecor(); (m.eggs || []).forEach(netEgg);
+      sendDecor(); drawAllDecor(); (m.eggs || []).forEach(netEgg); leaders = Array.isArray(m.leaders) ? m.leaders : []; scoreSent = ''; scoreT = 0;
       if (myPlot >= 0) { if (plotOwners[myPlot]) { releasePlot(); toast('Someone already has that plot. Walk onto a free one!', 4); } else netSend({ t: 'claim', plot: myPlot }); }
       petsSent = '';
     } else if (m.t === 'full') toast('All 11 servers are full right now. Playing offline.', 5);
@@ -6594,6 +6651,7 @@ const World = (function () {
     else if (m.t === 'plot') { const o = others.get(m.id); if (m.id && o) { o.plot = m.plot; setOwner(m.plot, { id: m.id, name: m.name }); } else { [...others.values()].forEach((q) => { if (q.plot === m.plot) q.plot = -1; }); setOwner(m.plot, null); } if (o) showPets(o); drawAllDecor(); }
     else if (m.t === 'egg') { netEgg(m.egg); if (m.egg && EGG_TIERS[m.egg.tier]) addChat('', 'An admin spawned a ' + EGG_TIERS[m.egg.tier].name + ' egg! Find it and take it home.', true); }
     else if (m.t === 'eggtaken') netEggTaken(m.id);
+    else if (m.t === 'leaders') { leaders = Array.isArray(m.list) ? m.list : []; drawBoard(); }
     else if (m.t === 'decor') { const o = others.get(m.id); if (o) { o.decor = m.decor; drawAllDecor(); } }
     else if (m.t === 'claimed') { if (!m.ok && myPlot === m.plot) { releasePlot(); toast('That\'s ' + m.owner + '\'s Plot. Find a free one!', 4); } }
     else if (m.t === 'pets') { const o = others.get(m.id); if (o) { o.pets = m.kinds; showPets(o); } }
@@ -6910,7 +6968,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, adminGiveMut, hoodOn, myHood, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, leaders: () => leaders, myWorth, bestDragon, BOARD_AT, drawBoard, boardShown: () => boardShown, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, adminGiveMut, hoodOn, myHood, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

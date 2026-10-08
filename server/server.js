@@ -5,7 +5,7 @@
    which dragons are on each plot, chat and admin announcements. Everything else (coins, dragons, eggs) stays on each
    player's own device, like before.
    Run it with: node server/server.js   (PORT sets the port; Render sets it by itself.) */
-const http = require('http'), crypto = require('crypto');
+const http = require('http'), crypto = require('crypto'), fs = require('fs'), path = require('path');
 const PORT = process.env.PORT || 8080, ROOMS = 11, PLOTS = 7, SEND_EVERY = 100;   // ms between position updates
 
 /* Admins: the same scrambled numbers as the game uses. The real name and code are never written down. */
@@ -79,13 +79,28 @@ function endTrade(pl, why) {                          // the trade stops; the ot
   if (o.tr && o.tr.with === pl) { o.tr = null; send(o, { t: 'tradeclosed', why }); }
 }
 
+/* The leaderboard in town (Adriana, 8 October 2026): the best players by what they're worth (their coins plus what all
+   their dragons would sell for), across every server. Admins aren't on it. Each player's latest worth is kept, also after
+   they leave, in leaders.json next to this file (Render's free plan wipes it when the server restarts). */
+const LEADERS_FILE = process.env.LEADERS_FILE || path.join(__dirname, 'leaders.json'), LEADERS_SHOWN = 10, LEADERS_KEPT = 200;
+const leaders = new Map();                            // lower-case name -> { name, worth, best }
+try { (JSON.parse(fs.readFileSync(LEADERS_FILE, 'utf8')) || []).forEach((q) => { if (q && q.name) leaders.set(String(q.name).toLowerCase(), q); }); } catch (e) { /* none yet */ }
+const topLeaders = () => [...leaders.values()].sort((a, b) => b.worth - a.worth).slice(0, LEADERS_SHOWN);
+let leadersDirty = false;
+function saveLeaders() { try { fs.writeFileSync(LEADERS_FILE, JSON.stringify([...leaders.values()])); } catch (e) { /* can't save: kept in memory */ } }
+setInterval(() => {                                    // tell everyone the new top ten, at most every 3 seconds
+  if (!leadersDirty) return;
+  leadersDirty = false; saveLeaders();
+  const list = topLeaders(); rooms.forEach((r) => broadcast(r, { t: 'leaders', list }));
+}, 3000);
+
 function join(sock, hello) {
   const room = pickRoom(hello.room);
   if (!room) { sendRaw(sock, JSON.stringify({ t: 'full' })); sock.end(); return null; }
   const pl = { id: nextId++, sock, room, name: clean(hello.name, 16) || 'Player', admin: isAdmin(hello.name, hello.code), look: hello.look && typeof hello.look === 'object' ? hello.look : {}, plot: -1, pets: [], s: null, decor: null };
   if (JSON.stringify(pl.look).length > 600) pl.look = {};
   room.players.set(pl.id, pl);
-  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), eggs: room.eggs, plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
+  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), eggs: room.eggs, leaders: topLeaders(), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
   broadcast(room, { t: 'join', p: card(pl) }, pl);
   return pl;
 }
@@ -130,6 +145,14 @@ function handle(pl, m) {
     if (pl.admin && ['day', 'night', 'auto'].includes(m.mode)) { timeMode = m.mode; rooms.forEach((r) => broadcast(r, { t: 'time', mode: m.mode, by: pl.name }, pl)); }
   } else if (m.t === 'firestorm') {                   // an admin starts a fire storm for everyone, on every server
     if (pl.admin) rooms.forEach((r) => broadcast(r, { t: 'firestorm', by: pl.name }, pl));
+  } else if (m.t === 'score') {                       // what a player is worth now (admins don't count)
+    if (pl.admin || pl.name === 'Player') return;
+    const worth = Math.max(0, Math.min(1e18, Math.floor(num(m.worth))));
+    const key = pl.name.toLowerCase(), was = leaders.get(key);
+    if (was && was.worth === worth && was.best === clean(m.best, 20)) return;
+    leaders.set(key, { name: pl.name, worth, best: clean(m.best, 20) });
+    if (leaders.size > LEADERS_KEPT) { const low = [...leaders.entries()].sort((a, b) => a[1].worth - b[1].worth)[0]; leaders.delete(low[0]); }
+    leadersDirty = true;
   } else if (m.t === 'decor') {                        // the decorations on this player's plot, for everyone to see
     const d = m.decor && typeof m.decor === 'object' ? m.decor : {};
     pl.decor = { d: ids(d.d), arch: clean(d.arch, 20), admin: pl.admin ? ids(d.admin) : [] };
@@ -226,4 +249,4 @@ server.on('upgrade', (req, sock) => {
   sock.on('close', close); sock.on('error', close); sock.on('end', close);
 });
 server.listen(PORT, () => console.log('Dragon Keepers server on port ' + PORT));
-module.exports = { server, rooms, PLOTS };
+module.exports = { server, rooms, PLOTS, leaders };

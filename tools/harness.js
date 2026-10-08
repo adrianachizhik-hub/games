@@ -1316,6 +1316,15 @@ if (process.env.MODE !== 'admin') {
   I.netMessage({ t: 'left', id: 901, plot: -1 }); I.netMessage({ t: 'left', id: 902, plot: -1 });
 }
 
+// ---- the leaderboard in town ----
+{
+  const w = I.myWorth(), best = I.bestDragon(), d = Math.hypot(I.BOARD_AT.x - 26, I.BOARD_AT.z + 26);
+  console.log('leaderboard: stands', d.toFixed(1), 'from the middle of town | I\'m worth', w, '(coins', Math.floor(I.coins() === Infinity ? 0 : I.coins()) + ') | best dragon', best);
+  if (d < 12 || d > 17 || !(w >= 0)) throw new Error('the leaderboard should be in town');
+  I.netMessage({ t: 'leaders', list: [{ name: 'Zoe', worth: 999999, best: 'Jade' }, { name: 'Max', worth: 500, best: 'Green' }] });
+  console.log('the server sends a top ten: board shows', JSON.parse(I.boardShown().replace(/(true|false)$/, '')).map((q) => q.name).join(', ') || '(offline: just me)');
+}
+
 // ---- the hatching timer ----
 {
   if (I.riding()) I.dismount(true);
