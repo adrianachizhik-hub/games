@@ -1306,6 +1306,14 @@ if (process.env.MODE !== 'admin') {
   if (pet && ok !== (process.env.MODE === 'admin')) throw new Error('only admins can give mutations');
   console.log('special hooded look on me:', I.hoodOn(), '| shown', I.myHood[0].visible, '(only the first admin has it; these tests sign in as the second)');
   if (I.hoodOn() || I.myHood[0].visible) throw new Error('only the first admin wears the hood');
+  if (process.env.MODE === 'admin') {                    // these tests sign in as the second admin: shown as Soccer Queen, in her jersey
+    console.log('second admin: shown as', JSON.stringify(I.playerName()), '| look', I.specialLook(), '| jersey showing', I.myJersey[0].visible);
+    if (I.playerName() !== 'Soccer Queen' || I.specialLook() !== 'jersey' || !I.myJersey[0].visible) throw new Error('the second admin should be Soccer Queen in her jersey');
+  } else if (I.myJersey[0].visible) throw new Error('players don\'t wear the jersey');
+  if (process.env.MODE === 'admin') {                    // these tests sign in as the second admin: shown as Soccer Queen, in her jersey
+    console.log('second admin: shown as', JSON.stringify(I.playerName()), '| look', I.specialLook(), '| jersey showing', I.myJersey[0].visible);
+    if (I.playerName() !== 'Soccer Queen' || I.specialLook() !== 'jersey' || !I.myJersey[0].visible) throw new Error('the second admin should be Soccer Queen in her jersey');
+  } else if (I.myJersey[0].visible) throw new Error('players don\'t wear the jersey');
   const look = { skin: '#c68642', shirt: '#ff0000', pants: '#00ff00', hairColor: '#000000', hair: 'short', special: 'hood' };
   I.netMessage({ t: 'join', p: { id: 901, name: 'Admin1', admin: true, look, plot: -1, pets: [], s: [0, 0, 0, 0, '', 0] } });
   I.netMessage({ t: 'join', p: { id: 902, name: 'Faker', admin: false, look, plot: -1, pets: [], s: [0, 0, 0, 0, '', 0] } });

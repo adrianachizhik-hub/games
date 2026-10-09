@@ -99,6 +99,7 @@ function join(sock, hello) {
   if (!room) { sendRaw(sock, JSON.stringify({ t: 'full' })); sock.end(); return null; }
   const pl = { id: nextId++, sock, room, name: clean(hello.name, 16) || 'Player', admin: isAdmin(hello.name, hello.code), look: hello.look && typeof hello.look === 'object' ? hello.look : {}, plot: -1, pets: [], s: null, decor: null };
   if (JSON.stringify(pl.look).length > 600) pl.look = {};
+  if (pl.admin) pl.name = clean(hello.display, 16) || clean(String(hello.name).split(/[@#]/)[0], 16) || 'Admin';   // an admin is shown by their display name, never their sign-in name
   room.players.set(pl.id, pl);
   sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), eggs: room.eggs, leaders: topLeaders(), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
   broadcast(room, { t: 'join', p: card(pl) }, pl);
