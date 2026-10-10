@@ -3521,6 +3521,7 @@ const World = (function () {
     villagePlay(dt);
     bunkerPlay(dt);
     atlantisPlay(dt);
+    hideoutStep();
     luckyPlay();
     if (carryingBlock) { blockStep(dt); return; }        // hands full: no eggs until the block is open
     if (!carrying) {
@@ -5236,6 +5237,83 @@ const World = (function () {
     else if (wasUnder) { if (scene.fog) { scene.fog.near = 140; scene.fog.far = 720; } skyGroup.visible = true; }
     wasUnder = under;
   }
+  /* ---------- Secret hideouts ---------- */
+  /* Adriana (10 October 2026): more secret hiding spots, spread out across the map, each with a secret entrance, and
+     admins can see where they are (on the map, with "Lucky blocks + secret shop on map"). One in each part of the island
+     (where there's flat open ground): from outside each looks like scenery (a giant tree stump, a sandstone rock, a
+     grassy hill...), and its way in is hidden behind a curtain you can walk through (vines, moss, icicles...). Inside: a
+     little room with a rug, crates, a lantern and a treasure chest; the first time you find each one you get
+     HIDEOUT_COINS. Eggs can turn up inside too. Places, looks and the reward are Claude's choices. */
+  const HIDEOUT_COINS = 25000, HIDE_R = 6.5;
+  const HIDE_THEMES = [
+    { name: 'Hollow tree stump', where: 'jungle', test: (x, z) => W.jungleF(x, z) > 0.5, clear: 3.5, wall: [0x6b4a2b, 0x5a3d22], roof: 0x3f8a3a, curtain: [0x3f8a3a, 0x5fb83a, 0x2f6a2a], blob: 0x2f6a2a },
+    { name: 'Sandstone rock', where: 'desert', test: (x, z) => W.desertF(x, z) > 0.6, wall: [0xd08a4a, 0xc07a3a], roof: 0xd8964e, curtain: [0xe8c890, 0xd8a868], blob: 0xc87a3a },
+    { name: 'Sea cave', where: 'beach', test: (x, z, h) => h < 3 && W.coastS(x, z) < 0.28, wall: [0x8a8f93, 0x77706a], roof: 0x9aa0a6, curtain: [0x2f8a6a, 0x3fa04a, 0x1f6a5a], blob: 0x8a8f93 },
+    { name: 'Grassy hill', where: 'meadow', test: (x, z) => meadowF(x, z) > 0.6, wall: [0x5fb83a, 0x4fa030], roof: 0x5fb83a, curtain: [0x3f8a3a, 0xff8fd6, 0xffd23f, 0x5fb83a], blob: 0x4fa030 },
+    { name: 'Mountain grotto', where: 'mountains', test: (x, z) => W.mountainAt(x, z) > 6, clear: 4.5, flat: 3.4, wall: [0x8a8f93, 0x6e7479], roof: 0xd8e6ee, curtain: [0xd8f6ff, 0xbfe9ff, 0xffffff], blob: 0x77706a },
+    { name: 'Mossy hut', where: 'swamp', test: (x, z) => W.swampF(x, z) > 0.45, wall: [0x4a3a24, 0x3a2e1c], roof: 0x3f5a2a, curtain: [0x5a7a3a, 0x6b8a3a, 0x3f5a2a], blob: 0x3f5a2a },
+    { name: 'Lava rock grotto', where: 'volcano land', test: (x, z) => { const d = Math.hypot(x - W.VOLC.x, z - W.VOLC.z); return d > 27 && d < 85; }, flat: 3.6, wall: [0x2a2422, 0x3a2e2a], roof: 0x2a2422, curtain: [0xff5a1f, 0xff8a3d, 0xffc21f], blob: 0x2a2422 }
+  ];
+  const hideouts = [];
+  let hideFound = [];
+  try { hideFound = JSON.parse(localStorage.getItem('mutation-mayhem-hideouts') || '[]') || []; } catch (e) { hideFound = []; }
+  (function placeHideouts() {
+    const R = W.rng(5150), avoid = [[HUB.x, HUB.z, 55], [VILLAGE.x, VILLAGE.z, 35], [SECRET.x, SECRET.z, 20], [W.BUNKER.x, W.BUNKER.z, 28], [W.VOLC.x, W.VOLC.z, 28], [QS.x, QS.z, 16], [W.ATL.x, W.ATL.z, 40]];
+    for (const th of HIDE_THEMES) {
+      for (let k = 0; k < 30000; k++) {
+        const x = (R() * 2 - 1) * 215, z = (R() * 2 - 1) * 215, h = W.bil(H, x, z);
+        if (h < 0.5 || W.coastS(x, z) < 0.04 || W.lidAt(x, z) || !th.test(x, z, h)) continue;
+        if (avoid.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar) || hideouts.some((o) => Math.hypot(x - o.x, z - o.z) < 50)) continue;
+        let lo = h, hi = h;
+        for (let a = 0; a < 12; a++) { const g = W.bil(H, x + Math.cos(a * 0.524) * (HIDE_R + 0.5), z + Math.sin(a * 0.524) * (HIDE_R + 0.5)); lo = Math.min(lo, g); hi = Math.max(hi, g); }
+        if (hi - lo > (th.flat || 2.6) || lo < 0.4 || !clearOfTrees(x, z, th.clear || HIDE_R - 0.3)) continue;   // (in the thick jungle, only the middle needs to be clear)
+        hideouts.push({ x, z, y: h, lo, door: R() * Math.PI * 2, th, n: hideouts.length });
+        break;
+      }
+    }
+  })();
+  (function buildHideouts() {
+    const parts = [], RR = W.rng(5151);
+    const B = (w, h, d, c, x, y, z, ry) => parts.push(bx(w, h, d, c, x, y, z, 0, ry || 0, 0));
+    for (const o of hideouts) {
+      const th = o.th, base = o.lo - 0.4, WALL = 4.6, n = 26, gap = 0.36;
+      for (let k = 0; k < n; k++) {                       // the wall, round, with a gap for the door
+        const a = o.door + (k + 0.5) / n * Math.PI * 2;
+        if (Math.abs(((a - o.door + Math.PI) % (Math.PI * 2)) - Math.PI) < gap) continue;
+        const x = o.x + Math.cos(a) * HIDE_R, z = o.z + Math.sin(a) * HIDE_R;
+        B(1.75, WALL + 0.4, 0.9, th.wall[k % 2], x, base + (WALL + 0.4) / 2, z, -a + Math.PI / 2);
+        addCollider(x, z, 0.75);
+      }
+      const dx = Math.cos(o.door), dz = Math.sin(o.door);
+      B(4.6, 1.2, 1.0, th.wall[0], o.x + dx * HIDE_R, base + WALL - 0.2, o.z + dz * HIDE_R, -o.door + Math.PI / 2);   // over the doorway
+      parts.push({ g: new THREE.SphereGeometry(HIDE_R + 0.6, 18, 7, 0, Math.PI * 2, 0, Math.PI / 2), color: th.roof, m: xf(o.x, base + WALL, o.z, 1, 0.55, 1), jitter: 0.12 });   // the dome roof
+      for (let k = 0; k < 16; k++) {                     // lumps all over the outside, so it looks like part of the land
+        const a = RR() * Math.PI * 2; if (Math.abs(((a - o.door + Math.PI) % (Math.PI * 2)) - Math.PI) < gap + 0.25) continue;
+        const r = HIDE_R + 0.6 + RR() * 0.8, s = 0.9 + RR() * 1.3;
+        parts.push({ g: new THREE.DodecahedronGeometry(s, 0), color: th.blob, m: xf(o.x + Math.cos(a) * r, base + 0.6 + RR() * 3.2, o.z + Math.sin(a) * r, 1, 0.8, 1, RR(), RR(), RR()), jitter: 0.15 });
+      }
+      for (let k = 0; k < 14; k++) {                     // the curtain over the way in: you can walk straight through it
+        const t = (k + 0.5) / 14 - 0.5, px = -dz * t * 4.2, pz = dx * t * 4.2, len = 2.6 + RR() * 1.2;
+        B(0.14, len, 0.08, th.curtain[k % th.curtain.length], o.x + dx * (HIDE_R + 0.25) + px, base + WALL - 0.75 - len / 2, o.z + dz * (HIDE_R + 0.25) + pz, -o.door + Math.PI / 2);
+      }
+      const at = (lx, lz) => [o.x + dx * lx - dz * lz, o.z + dz * lx + dx * lz], fy = o.y + 0.05;   // inside, measured from the middle (lx toward the door)
+      { const [x, z] = at(0, 0); parts.push({ g: new THREE.CylinderGeometry(3.2, 3.2, 0.06, 20), color: 0x8a2a3a, m: xf(x, fy, z, 1, 1, 1), jitter: 0.05 }); }   // a round rug
+      { const [x, z] = at(-4.2, 0); B(1.4, 0.8, 0.9, 0x8a5a2b, x, fy + 0.4, z, -o.door + Math.PI / 2); B(1.44, 0.3, 0.94, 0x6b4423, x, fy + 0.95, z, -o.door + Math.PI / 2); B(1.2, 0.12, 0.7, 0xffc21f, x, fy + 0.86, z, -o.door + Math.PI / 2); addCollider(x, z, 0.8); o.chest = { x, z }; }   // the treasure chest
+      [[-2.6, 3.4], [-1.4, 4.1], [-2.8, -3.4]].forEach(([lx, lz], k) => { const [x, z] = at(lx, lz); B(1, 1, 1, k % 2 ? 0x9a6b3c : 0x7a5533, x, fy + 0.5, z, RR()); });   // crates
+      { const [x, z] = at(-1.2, -4.4); B(0.12, 2.2, 0.12, 0x2a2f33, x, fy + 1.1, z); parts.push({ g: new THREE.BoxGeometry(0.4, 0.45, 0.4), color: 0xffe68a, m: xf(x, fy + 2.3, z, 1, 1, 1), jitter: 0.02 }); }   // a lantern
+      const sp = at(1.5, 0); eggSpots.push({ x: sp[0], y: W.bil(H, sp[0], sp[1]), z: sp[1], hide: true }); hardSpots.push(eggSpots[eggSpots.length - 1]);   // eggs can turn up in here
+    }
+    if (parts.length) { const m = new THREE.Mesh(merge(parts), new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })); scene.add(m); }   // (both sides, so you see the walls and roof from inside)
+  })();
+  const inHideout = () => hideouts.find((o) => Math.hypot(p.x - o.x, p.z - o.z) < HIDE_R - 0.6 && !p.dungeon && !p.under);
+  function hideoutStep() {                               // from eggsPlay: the first time you find each one, its treasure
+    const o = inHideout();
+    if (!o || hideFound.includes(o.n)) return;
+    hideFound.push(o.n);
+    try { localStorage.setItem('mutation-mayhem-hideouts', JSON.stringify(hideFound)); } catch (e) { /* not saved */ }
+    if (coins !== Infinity) { coins += HIDEOUT_COINS; saveCoins(); }
+    toast('🗝️ You found a secret hideout: the ' + o.th.name + '! (' + hideFound.length + ' of ' + hideouts.length + ') The treasure chest had ' + fmt(HIDEOUT_COINS) + ' coins in it!', 6);
+  }
   /* The keypad by the door. */
   const kpEl = $('keypad'), kpScreen = $('kpScreen');
   function kpShow() { kpScreen.textContent = (keypadTyped + '----').slice(0, 4); }
@@ -6076,6 +6154,7 @@ const World = (function () {
     if (Math.hypot(p.x - VILLAGE.x, p.z - VILLAGE.z) < VILLAGE.r + 6) return 'Fire village';
     if (a.dB < 19 || (a.dB < 27 && p.y < 10)) return 'Waterfall lagoon';
     if (Math.hypot(p.x - W.ATL.x, p.z - W.ATL.z) < W.ATL.r + 4 && h < -10) return 'Atlantis';
+    if (inHideout()) return 'Secret hideout';
     if (h < -0.6) return s > 0.06 ? 'River' : 'Ocean';
     if (p.y > 36) return 'Snowy peak';
     if (h < 1.9 && s < 0.22) return 'Beach';
@@ -6150,6 +6229,12 @@ const World = (function () {
       mapCtx.beginPath();
       for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? R * 0.45 : R; mapCtx.lineTo(sx + Math.cos(a) * rr, sz + Math.sin(a) * rr); }
       mapCtx.closePath(); mapCtx.fillStyle = '#b27bff'; mapCtx.fill(); mapCtx.stroke();
+      hideouts.forEach((o) => {                         // the secret hideouts: a dark purple dot with a gold key-hole, and a tick on their door side
+        const hx = toMap(o.x, size), hz = toMap(o.z, size), hr = size * 0.032;
+        mapCtx.beginPath(); mapCtx.arc(hx, hz, hr, 0, Math.PI * 2); mapCtx.fillStyle = '#4a1a7a'; mapCtx.fill(); mapCtx.stroke();
+        mapCtx.fillStyle = '#ffd23f'; mapCtx.fillRect(hx - hr * 0.2, hz - hr * 0.45, hr * 0.4, hr * 0.9);
+        mapCtx.beginPath(); mapCtx.moveTo(hx + Math.cos(o.door) * hr, hz + Math.sin(o.door) * hr); mapCtx.lineTo(hx + Math.cos(o.door) * hr * 1.8, hz + Math.sin(o.door) * hr * 1.8); mapCtx.strokeStyle = '#ffd23f'; mapCtx.stroke(); mapCtx.strokeStyle = '#0d2f37';
+      });
     }
     const near = radarOn && isAdmin && started ? nearestEgg() : null;
     if (near) {                                           // admin egg radar: a line from you to the nearest egg, and a pulsing ring on it
@@ -7029,7 +7114,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, leaders: () => leaders, myWorth, bestDragon, BOARD_AT, drawBoard, boardShown: () => boardShown, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, adminGiveMut, adminGiveAllMut, saveProgress, dragonPlaced, hoodOn, myHood, myJersey, specialLook, playerName: () => playerName, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, leaders: () => leaders, myWorth, bestDragon, BOARD_AT, drawBoard, boardShown: () => boardShown, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, hideouts, hideFound: () => hideFound, inHideout, HIDEOUT_COINS, adminGiveMut, adminGiveAllMut, saveProgress, dragonPlaced, hoodOn, myHood, myJersey, specialLook, playerName: () => playerName, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
