@@ -1400,6 +1400,14 @@ if (process.env.MODE !== 'admin') {
   if (worstIn < bestOut || (process.env.MODE !== 'admin' && placed.length !== Math.min(I.ownDragons.length, I.plotSlots()))) throw new Error('the best dragons should be on the plot');
 }
 
+// ---- the second admin can sign in as Soccer Queen and still gets her own save ----
+if (process.env.MODE === 'admin') {
+  const keep = els.name.value, act = store['mutation-mayhem-active'];
+  els.name.value = 'Soccer Queen'; const a1 = I.adminAccount(); els.name.value = 'soccerqueen'; const a2 = I.adminAccount(); els.name.value = keep;
+  console.log('signing in as Soccer Queen uses the save of', a1 === act ? 'her first name (the account in use)' : JSON.stringify(a1), '| as soccerqueen:', a2 === act ? 'the same' : JSON.stringify(a2), '| admin number', I.adminNo());
+  if (a1 !== act || a2 !== act) throw new Error('Soccer Queen should get the same save as her first name');
+}
+
 // ---- the leaderboard in town ----
 {
   const w = I.myWorth(), best = I.bestDragon(), d = Math.hypot(I.BOARD_AT.x - 26, I.BOARD_AT.z + 26);

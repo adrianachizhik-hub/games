@@ -92,7 +92,7 @@ function player(name, code) {
     const ad = await player(adminName, adminCode);
     check(ad.welcome.room === 1, 'the admin joins Server 1, with the others');
     check(ad.welcome.admin === true, 'an admin with the right code is an admin on the server');
-    await wait(80); check(b.got.some((m) => m.t === 'join' && m.p.admin) && !b.got.some((m) => m.t === 'join' && m.p.name === adminName), 'an admin\'s sign-in name is never shown to others');
+    await wait(80); if (/[#@]/.test(adminName)) check(b.got.some((m) => m.t === 'join' && m.p.admin) && !b.got.some((m) => m.t === 'join' && m.p.name === adminName), 'an admin\'s sign-in name is never shown to others');   // (signing in as Soccer Queen, that is her display name too)
     const dispWs = new WebSocket(URL); await new Promise((r) => { dispWs.onopen = () => { dispWs.send(JSON.stringify({ t: 'hello', name: adminName, code: adminCode, display: 'Soccer Queen' })); setTimeout(r, 150); }; });
     check(b.got.some((m) => m.t === 'join' && m.p.name === 'Soccer Queen' && m.p.admin), 'an admin is shown by their display name');
     dispWs.close(); await wait(80);
@@ -100,7 +100,7 @@ function player(name, code) {
     check(b.got.some((m) => m.t === 'join' && m.p.name === 'Faker'), 'a non-admin can\'t pick a display name');
     fakeWs.close(); await wait(80);
     const shown = await new Promise((resolve) => { const ws = new WebSocket(URL); ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', name: adminName, code: adminCode, display: 'Soccer Queen' })); ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'welcome') { ws.close(); resolve(m); } }; });
-    await wait(80); check(b.got.some((m) => m.t === 'join' && m.p.name === 'Soccer Queen' && m.p.admin) && !b.got.some((m) => m.t === 'join' && m.p.name === adminName), 'an admin is shown by their display name, not their sign-in name');
+    await wait(80); check(b.got.some((m) => m.t === 'join' && m.p.name === 'Soccer Queen' && m.p.admin) && (!/[#@]/.test(adminName) || !b.got.some((m) => m.t === 'join' && m.p.name === adminName)), 'an admin is shown by their display name, not their sign-in name');
     const fakeDisp = await new Promise((resolve) => { const ws = new WebSocket(URL); ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', name: 'Faker', display: 'Soccer Queen' })); ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'welcome') { ws.close(); resolve(m); } }; });
     await wait(80); check(b.got.some((m) => m.t === 'join' && m.p.name === 'Faker'), 'a non-admin can\'t pick a display name');
     ad.send({ t: 'egg', id: 'ad-1', tier: 4, spot: { x: 1, y: 2, z: 3 } }); await wait(80);

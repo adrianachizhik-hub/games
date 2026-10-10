@@ -2737,8 +2737,17 @@ const World = (function () {
   };
   const ADMINS = [                                       // each admin: [scrambled name, scrambled name + '#' + code]
     [1869928790200511, 8246370880143628],                // Adriana
-    [2807844638872252, 4072327928453000]                 // Ellie, added 6 October 2026 at Adriana's request
+    [2807844638872252, 4072327928453000],                // Ellie, added 6 October 2026 at Adriana's request
+    [8418006782282951, 7490142826103264],                // Ellie again, signing in as "Soccer Queen" (11 October 2026), same code
+    [2437609250495327, 3338054308928182]                 // and as "soccerqueen"
   ];
+  const ADMIN_OF = [0, 1, 1, 1];                         // which admin each line above is
+  function adminAccount() {                              // signing in with another of an admin's names: use the save from their first name on this device
+    const no = ADMIN_OF[ADMINS.indexOf(adminFor())], first = ADMINS[ADMIN_OF.indexOf(no)][0], names = [];
+    try { names.push(activeAccount()); for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('dk-acct:')) names.push(k.slice(8)); } } catch (e) { /* none */ }
+    const mine = ADMINS.filter((x, i) => ADMIN_OF[i] === no).map((x) => x[0]);   // or a save under any of their names
+    return names.find((n) => n && scramble(n) === first) || names.find((n) => n && mine.includes(scramble(n))) || accountKey(typedName());
+  }
   const codeEl = $('code'), codeMsg = $('codeMsg');
   let isAdmin = false, adminNo = -1;                    // adminNo: which admin (their place in ADMINS)
   const typedName = () => (nameEl.value || '').replace(/\s+/g, ' ').trim().slice(0, 16);
@@ -2898,11 +2907,11 @@ const World = (function () {
     if (egg.round !== r) { egg.round = r; egg.gen = 0; }
     egg.gen = wildGen(egg);
     const pool = wildPool(egg.tier), memo = new Map();
+    const starts = new Set(eggs.filter((o) => o.slot !== undefined && wildPool(o.tier) === pool).map((o) => baseIdx(o, memo)));
     let at = baseIdx(egg, memo);
-    if (egg.gen > 0) {                                   // taken this round: somewhere none of the other eggs started
-      const used = new Set(eggs.filter((o) => o !== egg && o.slot !== undefined && wildPool(o.tier) === pool).map((o) => baseIdx(o, memo)));
-      at = wildRoll(egg.slot, r, egg.gen, pool.length);
-      for (let n = 0; n < pool.length && used.has(at); n++) at = (at + 1) % pool.length;
+    for (let g = 1; g <= egg.gen; g++) {                 // taken this round: somewhere none of the eggs started, and not where it just was
+      const prev = at; at = wildRoll(egg.slot, r, g, pool.length);
+      for (let n = 0; n < pool.length && (starts.has(at) || at === prev); n++) at = (at + 1) % pool.length;
     }
     placeEgg(egg, pool[at]);
   }
@@ -5923,7 +5932,7 @@ const World = (function () {
     if (TESTING) { lockedName = ''; sure = true; }        // testing: any name, no "are you sure", nothing locked
     const typed = typedName();
     try {                                                 // a different name: switch to that name's own save
-      const acct = accountKey(typed), act = activeAccount();
+      const acct = isAdminName() ? adminAccount() : accountKey(typed), act = activeAccount();
       try { localStorage.setItem('mutation-mayhem-last', typed); } catch (e) { /* not saved */ }
       if (!act) localStorage.setItem('mutation-mayhem-active', acct);   // the old save becomes this account's
       else if (act !== acct && canSwitch()) {
@@ -5951,7 +5960,7 @@ const World = (function () {
         codeEl.hidden = false; codeMsg.hidden = false; codeEl.value = ''; codeEl.focus();
         return;
       }
-      isAdmin = true; adminNo = ADMINS.indexOf(adminFor());
+      isAdmin = true; adminNo = ADMIN_OF[ADMINS.indexOf(adminFor())];
     }
     started = true;
     playerName = (isAdmin ? (adminNo === 1 ? 'Soccer Queen' : typed.charAt(0).toUpperCase() + typed.split('@')[0].split('#')[0].slice(1)) : typed) || 'Player';   // an admin shows as the part before the @ (the second admin as "Soccer Queen", Adriana's request)
@@ -7216,7 +7225,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, leaders: () => leaders, myWorth, bestDragon, BOARD_AT, drawBoard, boardShown: () => boardShown, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, putBest, hideouts, hideFound: () => hideFound, inHideout, prisSpots, wildTakes, netWildTaken, placeWild, wildRound, adminGiveMut, adminGiveAllMut, saveProgress, dragonPlaced, hoodOn, myHood, myJersey, specialLook, playerName: () => playerName, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, leaders: () => leaders, myWorth, bestDragon, BOARD_AT, drawBoard, boardShown: () => boardShown, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, putBest, adminAccount, hideouts, hideFound: () => hideFound, inHideout, prisSpots, wildTakes, netWildTaken, placeWild, wildRound, adminGiveMut, adminGiveAllMut, saveProgress, dragonPlaced, hoodOn, myHood, myJersey, specialLook, playerName: () => playerName, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

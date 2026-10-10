@@ -9,7 +9,7 @@ const http = require('http'), crypto = require('crypto'), fs = require('fs'), pa
 const PORT = process.env.PORT || 8080, ROOMS = 11, PLOTS = 7, SEND_EVERY = 100;   // ms between position updates
 
 /* Admins: the same scrambled numbers as the game uses. The real name and code are never written down. */
-const ADMINS = [[1869928790200511, 8246370880143628], [2807844638872252, 4072327928453000]];
+const ADMINS = [[1869928790200511, 8246370880143628], [2807844638872252, 4072327928453000], [8418006782282951, 7490142826103264], [2437609250495327, 3338054308928182]];   // the second admin can also sign in as Soccer Queen
 function scramble(str) {
   let h1 = 0xdeadbeef ^ 77, h2 = 0x41c6ce57 ^ 77;
   for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
@@ -99,7 +99,7 @@ function join(sock, hello) {
   if (!room) { sendRaw(sock, JSON.stringify({ t: 'full' })); sock.end(); return null; }
   const pl = { id: nextId++, sock, room, name: clean(hello.name, 16) || 'Player', admin: isAdmin(hello.name, hello.code), look: hello.look && typeof hello.look === 'object' ? hello.look : {}, plot: -1, pets: [], s: null, decor: null };
   if (JSON.stringify(pl.look).length > 600) pl.look = {};
-  if (pl.admin) pl.name = clean(hello.display, 16) || clean(String(hello.name).split(/[@#]/)[0], 16) || 'Admin';   // an admin is shown by their display name, never their sign-in name
+  if (pl.admin) { pl.name = clean(hello.display, 16) || clean(String(hello.name).split(/[@#]/)[0], 16) || 'Admin'; if (leaders.delete(pl.name.toLowerCase())) leadersDirty = true; }   // an admin is shown by their display name, never their sign-in name, and isn't on the leaderboard
   room.players.set(pl.id, pl);
   sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), eggs: room.eggs, wild: [...room.wild].map(([k, n]) => [...k.split(':').map(Number), n]), leaders: topLeaders(), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
   broadcast(room, { t: 'join', p: card(pl) }, pl);
