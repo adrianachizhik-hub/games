@@ -2889,8 +2889,13 @@ const World = (function () {
      seconds, each slot at its own time) and how many times it has been taken this round. When someone picks one up, the
      server tells everyone (wildtaken), and it turns up somewhere else for all of them. Prismatic eggs only hide in the
      secret hideouts (prisSpots, filled in once they're built). */
+  /* One clock for everyone (bug fix, 11 October 2026: a friend couldn't see an egg right in front of her). Every
+     computer's clock is a little different, so things everyone shares (where the eggs are, events, the fire village,
+     restocks, day and night) use the server's time: clockSkew is set when you join. */
+  let clockSkew = 0;
+  const sharedNow = () => Date.now() + clockSkew;
   const EGG_ROUND = 600, wildTakes = new Map(), prisSpots = [];
-  const wildRound = (slot) => Math.floor((Date.now() / 1000 + slot * 53) / EGG_ROUND);
+  const wildRound = (slot) => Math.floor((sharedNow() / 1000 + slot * 53) / EGG_ROUND);
   const wildPool = (tier) => (tier === 4 ? (prisSpots.length ? prisSpots : hardSpots) : eggSpots);
   const carried = (o) => { try { return !!carrying && carrying.egg === o; } catch (e) { return false; } };   // (try: eggs are placed before carrying is set up)
   const wildGen = (e) => { const r = wildRound(e.slot), t = wildTakes.get(e.slot + ':' + r) || 0; return e.round === r ? Math.max(e.gen || 0, t) : t; };
@@ -2925,6 +2930,13 @@ const World = (function () {
     const egg = eggs.find((e) => e.slot === slot);
     if (!egg || egg.round !== round || carried(egg) || egg.gen > gen) return;
     placeWild(egg);
+  }
+  function netWildDrop(m) {                              // someone put a wild egg down: it's there for everyone
+    const egg = eggs.find((e) => e.slot === (m.slot | 0)), sp = m.spot;
+    if (!egg || !sp || carried(egg) || egg.round !== (m.round | 0)) return;
+    const key = egg.slot + ':' + egg.round; wildTakes.set(key, Math.max(wildTakes.get(key) || 0, m.gen | 0));
+    egg.gen = Math.max(egg.gen, m.gen | 0);
+    placeEgg(egg, { x: +sp.x || 0, y: +sp.y || 0, z: +sp.z || 0, dungeon: !!sp.dungeon, cave: !!sp.cave, mud: !!sp.mud, hide: sp.hide });
   }
   let wildT = 0;
   function wildStep(dt) {                                // every second: eggs whose time is up move on
@@ -3481,6 +3493,10 @@ const World = (function () {
     }
     const spot = { x: p.x, y: p.dungeon ? (p.mud ? MUD.floor : DG.floor) : p.inCave ? W.bil(H, p.x, p.z) : standing(p.x, p.z), z: p.z, dungeon: p.dungeon, cave: p.inCave, mud: !!p.mud };
     placeEgg(egg, spot); egg.waitAway = true;            // not picked straight back up: walk away from it first
+    if (egg.slot !== undefined) {                        // a wild egg: everyone sees it where you put it down
+      egg.gen = Math.max(egg.gen, wildTakes.get(egg.slot + ':' + egg.round) || 0);
+      netSend({ t: 'wilddrop', slot: egg.slot, round: egg.round, gen: egg.gen, spot });
+    }
     if (egg.netId) netSend({ t: 'egg', id: egg.netId, tier: egg.tier, spot });   // an admin's egg: everyone sees it again
     toast('You dropped the ' + EGG_TIERS[egg.tier].name + ' egg. Walk back to it to pick it up again.', 3);
   }
@@ -3560,6 +3576,7 @@ const World = (function () {
   }
   function dropEgg() {                                    // leaving the game: the egg goes back where it was
     const egg = stopCarrying();
+    if (egg && egg.slot !== undefined) { respawnEgg(egg); return; }   // a wild egg: where everyone else already sees it
     if (egg && !egg.lucky) { placeEgg(egg, egg.spot); if (egg.netId) netSend({ t: 'egg', id: egg.netId, tier: egg.tier, spot: egg.spot }); }
   }
   function jumpTo(i) {
@@ -3886,7 +3903,7 @@ const World = (function () {
   const RADAR_CHANCE = 0.05, RADAR_PRICE = 999999999;
   let stockOverride = null;                              // tests only: pretend it is this restock round
   let adminRestocks = 0, fullRound = null;               // an admin's "Restock shops": a fresh round with everything in stock, until the next normal restock
-  const stockRound = () => (stockOverride !== null ? stockOverride : Math.floor(Date.now() / 1000 / RESTOCK_SECONDS)) + adminRestocks * 100000;
+  const stockRound = () => (stockOverride !== null ? stockOverride : Math.floor(sharedNow() / 1000 / RESTOCK_SECONDS)) + adminRestocks * 100000;
   function adminRestock() {
     adminRestocks++; fullRound = stockRound();
     if (upShopOpen) refreshUpShop();
@@ -3936,7 +3953,7 @@ const World = (function () {
     restockTick();
   }
   function restockTick() {                               // "New stock in 3:12", and a fresh list when the round turns over
-    const secs = RESTOCK_SECONDS - (Math.floor(Date.now() / 1000) % RESTOCK_SECONDS), txt = 'New stock in ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+    const secs = RESTOCK_SECONDS - (Math.floor(sharedNow() / 1000) % RESTOCK_SECONDS), txt = 'New stock in ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
     if (txt !== restockShown) { restockShown = txt; $('upRestock').textContent = txt; }
     if (secs === RESTOCK_SECONDS && upChoice < 0) upRows.forEach((r, i) => { r.left.textContent = stockLeft(i) ? stockLeft(i) + ' left' : 'Out of stock'; });
   }
@@ -4743,8 +4760,8 @@ const World = (function () {
   const vY = W.bil(H, VILLAGE.x, VILLAGE.z);
   let fireOverride = null, fireTakenRound = -1;            // fireOverride: tests only (seconds into the cycle)
   try { fireTakenRound = +localStorage.getItem('mutation-mayhem-fire-taken') || -1; } catch (e) { /* none */ }
-  const fireClock = () => (fireOverride !== null ? fireOverride : (Date.now() / 1000) % FIRE_PERIOD);
-  const fireRound = () => (fireOverride !== null ? 1 : Math.floor(Date.now() / 1000 / FIRE_PERIOD));
+  const fireClock = () => (fireOverride !== null ? fireOverride : (sharedNow() / 1000) % FIRE_PERIOD);
+  const fireRound = () => (fireOverride !== null ? 1 : Math.floor(sharedNow() / 1000 / FIRE_PERIOD));
   const fireLit = () => fireClock() < FIRE_LIT;
   const fireEggThere = () => fireLit() && fireTakenRound !== fireRound() && !(carrying && carrying.egg.fire && !carrying.egg.spawned);
   (function buildVillage() {
@@ -5042,7 +5059,7 @@ const World = (function () {
   const EGG_AT = { lx: 0, lz: -2 }, DEN = { lx: 2.6, lz: -4.6 }, keypadFront = bkWorld(2.1, 7.4);
   let bunkerOpen = false, doorSlide = 0, nukeTakenRound = -1, keypadTyped = '';
   try { nukeTakenRound = +localStorage.getItem('mutation-mayhem-nuke-taken') || -1; } catch (e) { /* none */ }
-  const nukeRound = () => Math.floor(Date.now() / 1000 / NUKE_PERIOD);
+  const nukeRound = () => Math.floor(sharedNow() / 1000 / NUKE_PERIOD);
   const nukeEggThere = () => nukeTakenRound !== nukeRound() && !(carrying && carrying.egg.nuke && !carrying.egg.spawned);
   (function buildBunker() {
     const parts = [], F = M4().makeTranslation(BK.x, BY, BK.z).multiply(M4().makeRotationY(bkFace));
@@ -5164,7 +5181,7 @@ const World = (function () {
     if (Math.hypot(p.x - BK.x, p.z - BK.z) > 30 || p.dungeon) return '';
     if (!bunkerOpen) return 'The nuke bunker. The door needs a 4-number code.';
     if (Date.now() >= radResUntil) return 'The door is open, but the radiation will bounce you back without radioactive resistance.';
-    return nukeEggThere() ? 'The nuke egg is inside. Grab it and FLY!' : 'The nuke egg is gone. Another one comes in ' + clock(NUKE_PERIOD - (Date.now() / 1000) % NUKE_PERIOD) + '.';
+    return nukeEggThere() ? 'The nuke egg is inside. Grab it and FLY!' : 'The nuke egg is gone. Another one comes in ' + clock(NUKE_PERIOD - (sharedNow() / 1000) % NUKE_PERIOD) + '.';
   }
   /* ---------- Atlantis, under the sea ---------- */
   /* Adriana's idea (7 October 2026): swim out from the south-west coast (W.ATL, about 45 out to sea) and dive down to
@@ -5181,7 +5198,7 @@ const World = (function () {
   const AQUA_AT = { x: ATL.x + Math.cos(GATE) * 9, z: ATL.z + Math.sin(GATE) * 9 };   // the egg's stand, between the gate and the palace
   let breath = BREATH, aquaTakenRound = -1, gchase = null;
   try { aquaTakenRound = +localStorage.getItem('mutation-mayhem-aqua-taken') || -1; } catch (e) { /* none */ }
-  const aquaRound = () => Math.floor(Date.now() / 1000 / AQUA_PERIOD);
+  const aquaRound = () => Math.floor(sharedNow() / 1000 / AQUA_PERIOD);
   const aquaEggThere = () => aquaTakenRound !== aquaRound() && !(carrying && carrying.egg.aqua);
   const angGap = (a, b) => { let d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
   function atlantisBlocks(x, z, y) {                     // would standing here, at height y, be inside a wall, a tower or the palace?
@@ -5297,7 +5314,7 @@ const World = (function () {
     const d = Math.hypot(p.x - ATL.x, p.z - ATL.z);
     if (d > ATL.r + 25) return '';
     if (!p.under) return Date.now() < waterResUntil ? 'Atlantis is down below! Hold C (or the Down button) to dive.' : 'Atlantis is down below, but you need the breathe underwater upgrader to get in.';
-    return aquaEggThere() ? 'The aqua egg is on the stand in front of the palace. Watch out for the guardian!' : 'The aqua egg is gone. Another one comes in ' + clock(AQUA_PERIOD - (Date.now() / 1000) % AQUA_PERIOD) + '.';
+    return aquaEggThere() ? 'The aqua egg is on the stand in front of the palace. Watch out for the guardian!' : 'The aqua egg is gone. Another one comes in ' + clock(AQUA_PERIOD - (sharedNow() / 1000) % AQUA_PERIOD) + '.';
   }
   /* Underwater, everything turns blue and misty. */
   const deepBlue = new THREE.Color(0x0d5a7a);
@@ -6380,7 +6397,7 @@ const World = (function () {
     if (started && eventOn('phantom')) return 1;        // the ghost event: night
     if (timeMode === 'day') return 0;
     if (timeMode === 'night') return 1;
-    const t = (Date.now() / 1000) % DAY_LEN;
+    const t = (sharedNow() / 1000) % DAY_LEN;
     if (t < NIGHT_STARTS - FADE) return 0;
     if (t < NIGHT_STARTS) return (t - (NIGHT_STARTS - FADE)) / FADE;
     if (t < NIGHT_ENDS) return 1;
@@ -6459,7 +6476,7 @@ const World = (function () {
     if (slotCache.size > 50) slotCache.clear();
     slotCache.set(k, list); return list;
   }
-  const slotNow = () => { const t = Date.now() / 1000; return { k: Math.floor(t / EV_EVERY), phase: t % EV_EVERY }; };
+  const slotNow = () => { const t = sharedNow() / 1000; return { k: Math.floor(t / EV_EVERY), phase: t % EV_EVERY }; };
   let clockEventsOff = false;                            // tests only: no events from the clock
   const evStopped = {};                                  // an admin turned this event off: it stays off until then (the rest of its 5 minutes)
   const monthOn = (e) => { if (!e.month || e.month !== monthKey()) return 0; const ph = slotNow().phase - MONTH_AT; return ph >= 0 && ph < EV_LEN ? EV_LEN - ph : 0; };   // this month's special: seconds left, or 0
@@ -6468,7 +6485,7 @@ const World = (function () {
   const eventLeft = (id) => { if (!EVENTS[id] || Date.now() < (evStopped[id] || 0)) return 0; return Math.max(clockEventsOff ? 0 : clockLeft(id), ((evUntil[id] || 0) - Date.now()) / 1000, 0); };
   const thisMonth = () => MONTHLY.find((m) => m.month === monthKey());
   const monthNext = () => { const ph = slotNow().phase; return ph < MONTH_AT ? MONTH_AT - ph : EV_EVERY - ph + MONTH_AT; };
-  const nextEvent = () => { const t = Date.now() / 1000, k = Math.floor(t / EV_EVERY) + 1; return { e: slotEvents(k)[0], both: slotEvents(k), inS: k * EV_EVERY - t }; };
+  const nextEvent = () => { const t = sharedNow() / 1000, k = Math.floor(t / EV_EVERY) + 1; return { e: slotEvents(k)[0], both: slotEvents(k), inS: k * EV_EVERY - t }; };
   function startEvent(id, by) {
     if (!EVENTS[id]) return;
     evUntil[id] = Date.now() + EV_LEN * 1000; evStopped[id] = 0;
@@ -6883,6 +6900,7 @@ const World = (function () {
   function netMessage(m) {
     if (m.t === 'welcome') {
       netOnline = true; netId = m.id; netRoom = m.room; if (m.time) setTimeMode(m.time);
+      if (typeof m.now === 'number') { clockSkew = m.now - Date.now(); eggs.forEach((e) => { if (e.slot !== undefined && !carried(e)) placeWild(e); }); }   // the server's clock, so everyone's eggs match
       m.players.forEach(addOther);
       m.plots.forEach((o, i) => { if (o && o.id !== netId) setOwner(i, o); });
       addChat('', 'You\'re on Server ' + m.room + (m.players.length ? ' with ' + m.players.length + ' other player' + (m.players.length === 1 ? '' : 's') : ', and nobody else is here yet') + '. Chat goes to everyone on this server.', true);
@@ -6899,6 +6917,7 @@ const World = (function () {
     else if (m.t === 'egg') { netEgg(m.egg); if (m.egg && EGG_TIERS[m.egg.tier]) addChat('', 'An admin spawned a ' + EGG_TIERS[m.egg.tier].name + ' egg! Find it and take it home.', true); }
     else if (m.t === 'eggtaken') netEggTaken(m.id);
     else if (m.t === 'wildtaken') netWildTaken(m.slot | 0, m.round | 0, m.gen | 0);
+    else if (m.t === 'wilddrop') netWildDrop(m);
     else if (m.t === 'leaders') { leaders = Array.isArray(m.list) ? m.list : []; drawBoard(); }
     else if (m.t === 'decor') { const o = others.get(m.id); if (o) { o.decor = m.decor; drawAllDecor(); } }
     else if (m.t === 'claimed') { if (!m.ok && myPlot === m.plot) { releasePlot(); toast('That\'s ' + m.owner + '\'s Plot. Find a free one!', 4); } }
@@ -7225,7 +7244,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, leaders: () => leaders, myWorth, bestDragon, BOARD_AT, drawBoard, boardShown: () => boardShown, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, putBest, adminAccount, hideouts, hideFound: () => hideFound, inHideout, prisSpots, wildTakes, netWildTaken, placeWild, wildRound, adminGiveMut, adminGiveAllMut, saveProgress, dragonPlaced, hoodOn, myHood, myJersey, specialLook, playerName: () => playerName, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netWildDrop, sharedNow, setClockSkew: (k) => { clockSkew = k; }, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, leaders: () => leaders, myWorth, bestDragon, BOARD_AT, drawBoard, boardShown: () => boardShown, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, putBest, adminAccount, hideouts, hideFound: () => hideFound, inHideout, prisSpots, wildTakes, netWildTaken, placeWild, wildRound, adminGiveMut, adminGiveAllMut, saveProgress, dragonPlaced, hoodOn, myHood, myJersey, specialLook, playerName: () => playerName, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };

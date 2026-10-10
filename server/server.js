@@ -101,7 +101,7 @@ function join(sock, hello) {
   if (JSON.stringify(pl.look).length > 600) pl.look = {};
   if (pl.admin) { pl.name = clean(hello.display, 16) || clean(String(hello.name).split(/[@#]/)[0], 16) || 'Admin'; if (leaders.delete(pl.name.toLowerCase())) leadersDirty = true; }   // an admin is shown by their display name, never their sign-in name, and isn't on the leaderboard
   room.players.set(pl.id, pl);
-  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), eggs: room.eggs, wild: [...room.wild].map(([k, n]) => [...k.split(':').map(Number), n]), leaders: topLeaders(), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
+  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, now: Date.now(), time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), eggs: room.eggs, wild: [...room.wild].map(([k, n]) => [...k.split(':').map(Number), n]), leaders: topLeaders(), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
   broadcast(room, { t: 'join', p: card(pl) }, pl);
   return pl;
 }
@@ -164,6 +164,10 @@ function handle(pl, m) {
     const key = slot + ':' + round; room.wild.set(key, Math.max(room.wild.get(key) || 0, gen + 1));
     if (room.wild.size > 300) room.wild.delete(room.wild.keys().next().value);
     broadcast(room, { t: 'wildtaken', slot, round, gen }, pl);
+  } else if (m.t === 'wilddrop') {                    // someone put a wild egg down: everyone on this server sees it there
+    const sp = m.spot && typeof m.spot === 'object' ? m.spot : null;
+    if (!sp) return;
+    broadcast(room, { t: 'wilddrop', slot: m.slot | 0, round: m.round | 0, gen: m.gen | 0, spot: { x: num(sp.x), y: num(sp.y), z: num(sp.z), dungeon: !!sp.dungeon, cave: !!sp.cave, mud: !!sp.mud, hide: Number.isInteger(sp.hide) ? sp.hide : undefined } }, pl);
   } else if (m.t === 'egg') {                          // an admin spawned an egg: everyone on this server sees it and can pick it up
     const sp = m.spot && typeof m.spot === 'object' ? m.spot : null, tier = m.tier | 0;
     const id0 = clean(m.id, 24), dropped = room.taken.get(id0) === tier;   // or someone put down an admin's egg they had picked up

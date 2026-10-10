@@ -72,6 +72,9 @@ function player(name, code) {
   c.send({ t: 'wildtaken', slot: 3, round: 900, gen: 0 }); await wait(80);
   check(d.got.some((m) => m.t === 'wildtaken' && m.slot === 3 && m.round === 900 && m.gen === 0) && !ps[7].got.some((m) => m.t === 'wildtaken'), 'when someone takes a wild egg, everyone on that server hears');
   check(require('../server/server.js').rooms[0].wild.get('3:900') === 1, 'and the server remembers it, for people joining later');
+  c.send({ t: 'wilddrop', slot: 3, round: 900, gen: 1, spot: { x: 12.5, y: 6, z: -4 } }); await wait(80);
+  check(d.got.some((m) => m.t === 'wilddrop' && m.slot === 3 && m.spot.x === 12.5), 'when someone puts a wild egg down, everyone on that server sees it there');
+  check(typeof c.welcome.now === 'number' && Math.abs(c.welcome.now - Date.now()) < 60000, 'the server tells everyone its clock, so they all agree where the eggs are');
   // the leaderboard
   c.send({ t: 'score', worth: 5000, best: 'Ruby' }); d.send({ t: 'score', worth: 90000, best: 'Jade' }); e.send({ t: 'score', worth: 120, best: 'Green' });
   await wait(3300);

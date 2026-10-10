@@ -1388,6 +1388,13 @@ if (process.env.MODE !== 'admin') {
   I.netWildTaken(e0.slot, e0.round, e0.gen);            // another player picked it up
   console.log('wild eggs:', w.length, '| placed the same way every time', same, '| another player takes a Rare egg: it moves', at0 !== e0.spot, '| the server is told when I take one', typeof I.wildTakes.get === 'function');
   if (!same || at0 === e0.spot) throw new Error('wild eggs should be placed the same for everyone, and move when someone takes one');
+  I.netWildDrop({ slot: e0.slot, round: e0.round, gen: e0.gen, spot: { x: 30, y: 6.3, z: -20 } });
+  console.log('another player puts it down: here too', e0.spot.x === 30 && e0.spot.z === -20 && e0.g.visible);
+  if (e0.spot.x !== 30 || !e0.g.visible) throw new Error('a dropped egg should show where they put it');
+  const t0 = I.sharedNow(); I.setClockSkew(120000); const t1 = I.sharedNow(); I.setClockSkew(0);
+  console.log('the shared clock follows the server: +2 minutes ->', Math.round((t1 - t0) / 1000), 's');
+  if (Math.abs(t1 - t0 - 120000) > 1000) throw new Error('the shared clock should follow the server');
+  w.forEach((e) => I.placeWild(e));
 }
 // ---- put my best dragons on the plot ----
 {
