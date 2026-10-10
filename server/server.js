@@ -19,7 +19,7 @@ function scramble(str) {
 }
 const isAdmin = (name, code) => { const n = String(name || '').toLowerCase(); return ADMINS.some((a) => a[0] === scramble(n) && a[1] === scramble(n + '#' + String(code || '').trim())); };
 
-const rooms = Array.from({ length: ROOMS }, (_, i) => ({ id: i + 1, players: new Map(), plots: new Array(PLOTS).fill(null), eggs: [], taken: new Map() }));   // eggs: ones admins spawned, still waiting to be picked up
+const rooms = Array.from({ length: ROOMS }, (_, i) => ({ id: i + 1, players: new Map(), plots: new Array(PLOTS).fill(null), eggs: [], taken: new Map(), wild: new Map() }));   // wild: 'slot:round' -> how many times that wild egg was taken   // eggs: ones admins spawned, still waiting to be picked up
 let nextId = 1, timeMode = 'auto';                    // timeMode: an admin made it 'day' or 'night' for everyone, until 'auto' again
 
 /* ---------- A tiny WebSocket: just enough for text messages ---------- */
@@ -101,7 +101,7 @@ function join(sock, hello) {
   if (JSON.stringify(pl.look).length > 600) pl.look = {};
   if (pl.admin) pl.name = clean(hello.display, 16) || clean(String(hello.name).split(/[@#]/)[0], 16) || 'Admin';   // an admin is shown by their display name, never their sign-in name
   room.players.set(pl.id, pl);
-  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), eggs: room.eggs, leaders: topLeaders(), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
+  sendRaw(sock, JSON.stringify({ t: 'welcome', id: pl.id, room: room.id, time: timeMode, rooms: ROOMS, admin: pl.admin, players: [...room.players.values()].filter((q) => q !== pl).map(card), eggs: room.eggs, wild: [...room.wild].map(([k, n]) => [...k.split(':').map(Number), n]), leaders: topLeaders(), plots: room.plots.map((o) => (o ? { id: o.id, name: o.name } : null)) }));
   broadcast(room, { t: 'join', p: card(pl) }, pl);
   return pl;
 }
@@ -158,6 +158,12 @@ function handle(pl, m) {
     const d = m.decor && typeof m.decor === 'object' ? m.decor : {};
     pl.decor = { d: ids(d.d), arch: clean(d.arch, 20), admin: pl.admin ? ids(d.admin) : [] };
     broadcast(room, { t: 'decor', id: pl.id, decor: pl.decor }, pl);
+  } else if (m.t === 'wildtaken') {                   // someone picked up a wild egg: it moves on for everyone on this server
+    const slot = m.slot | 0, round = m.round | 0, gen = m.gen | 0;
+    if (slot < 0 || slot > 100 || gen < 0 || gen > 1000) return;
+    const key = slot + ':' + round; room.wild.set(key, Math.max(room.wild.get(key) || 0, gen + 1));
+    if (room.wild.size > 300) room.wild.delete(room.wild.keys().next().value);
+    broadcast(room, { t: 'wildtaken', slot, round, gen }, pl);
   } else if (m.t === 'egg') {                          // an admin spawned an egg: everyone on this server sees it and can pick it up
     const sp = m.spot && typeof m.spot === 'object' ? m.spot : null, tier = m.tier | 0;
     const id0 = clean(m.id, 24), dropped = room.taken.get(id0) === tier;   // or someone put down an admin's egg they had picked up

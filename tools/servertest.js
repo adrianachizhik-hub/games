@@ -68,6 +68,10 @@ function player(name, code) {
   check(c.got.some((m) => m.t === 'tradeclosed' && /stopped/.test(m.why)), 'stopping a trade tells the other player');
   c.send({ t: 'gift', to: d.welcome.id, coins: -50, dragons: 'lots' }); await wait(80);
   check(d.got.filter((m) => m.t === 'gifted').length === 1, 'a gift of nothing (or minus coins) is ignored');
+  // wild eggs: one player takes one, everyone else on the server hears
+  c.send({ t: 'wildtaken', slot: 3, round: 900, gen: 0 }); await wait(80);
+  check(d.got.some((m) => m.t === 'wildtaken' && m.slot === 3 && m.round === 900 && m.gen === 0) && !ps[7].got.some((m) => m.t === 'wildtaken'), 'when someone takes a wild egg, everyone on that server hears');
+  check(require('../server/server.js').rooms[0].wild.get('3:900') === 1, 'and the server remembers it, for people joining later');
   // the leaderboard
   c.send({ t: 'score', worth: 5000, best: 'Ruby' }); d.send({ t: 'score', worth: 90000, best: 'Jade' }); e.send({ t: 'score', worth: 120, best: 'Green' });
   await wait(3300);

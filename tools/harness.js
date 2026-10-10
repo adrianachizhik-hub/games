@@ -345,16 +345,17 @@ if (process.env.SAVED === '1') {
 const E = I.EGG_TIERS, said = () => JSON.stringify(els.toast.hidden ? '' : els.toast.textContent);
 const reclaim = () => { I.goTo(7); const w = I.plotWorld(2, 0, 2); I.p.x = w.x; I.p.z = w.z; I.p.y = 6.3; I.update(1 / 60, 0); };   // after Leave the plot is free again: step back onto Plot 3
 const tick = (secs) => { for (let f = 0; f < secs * 60; f++) { I.update(1 / 60, f / 60); I.eggsAnimate(1 / 60, f / 60); I.earn(1 / 60); } };
-const stand = (spot) => { I.p.x = spot.x; I.p.z = spot.z; I.p.y = spot.y; I.p.vy = 0; I.p.onGround = true; I.p.dungeon = !!spot.dungeon; I.p.mud = !!spot.mud; I.p.inLid = !!spot.cave; I.p.inCave = !!spot.cave; };
+const stand = (spot) => { I.p.x = spot.x; I.p.z = spot.z; I.p.y = spot.y; I.p.vy = 0; I.p.onGround = true; I.p.dungeon = !!spot.dungeon; I.p.mud = !!spot.mud; I.p.hide = spot.hide !== undefined ? spot.hide : -1; I.p.inLid = !!spot.cave; I.p.inCave = !!spot.cave; };
 const zonesOf = (t) => { const z = {}; t.spots.forEach((s) => { stand(s); const n = I.zoneName(); z[n] = (z[n] || 0) + 1; }); return JSON.stringify(z); };
 I.goTo(0);
 console.log('egg hiding places:'); E.forEach((t, i) => console.log(' ', t.name.padEnd(10), t.spots.length, 'spots,', I.eggs.filter((e) => e.tier === i).length, 'out at once | zones', zonesOf(t)));
 els.start.fire('click', ev({ pointerType: 'mouse' })); I.keys.clear();
 if (I.myPlot() >= 0 || !document.body.classList.contains('playing')) { els.leave.fire('click', ev({ detail: 1 })); document.getElementById('confirm').hidden = true; els.name.value = MODE === 'admin' ? AN : I.name(); els.name.fire('input', ev({})); els.code.value = AC; els.start.fire('click', ev({ pointerType: 'mouse' })); }   // start with no plot
 { const where = {}, pr = I.eggs.find((e) => e.tier === 4), keep = pr.spot;
-  for (let k = 0; k < 300; k++) { pr.taken = true; I.goTo(k % 8); I.eggsRespawn(pr); stand(pr.spot); const z = I.zoneName(); where[z] = (where[z] || 0) + 1; }
-  console.log('all hiding places:', I.eggSpots.length, '(hard places', I.hardSpots.length + ') | where the Prismatic egg turned up over 300 respawns:', JSON.stringify(where));
-  if (Object.keys(where).some((z) => !['Mountains', 'Snowy peak', 'Crystal cave', 'Dungeon', 'Mud cavern', 'Secret hideout'].includes(z)) || Object.keys(where).length < 3) throw new Error('prismatic eggs belong in the hard places');
+  const which = new Set();
+  for (let k = 0; k < 300; k++) { pr.taken = true; I.goTo(k % 8); I.eggsRespawn(pr); stand(pr.spot); const z = I.zoneName(); where[z] = (where[z] || 0) + 1; which.add(I.prisSpots.indexOf(pr.spot)); }
+  console.log('all hiding places:', I.eggSpots.length, '| where the Prismatic egg turned up over 300 respawns:', JSON.stringify(where), '| in', which.size, 'of the', I.prisSpots.length, 'secret hideouts');
+  if (Object.keys(where).some((z) => z !== 'Secret hideout') || which.size < 5 || which.has(-1)) throw new Error('prismatic eggs hide in the secret hideouts');
   const cw = {}, cm = I.eggs.find((e) => e.tier === 0); for (let k = 0; k < 300; k++) { cm.taken = true; I.goTo(k % 8); I.eggsRespawn(cm); stand(cm.spot); const z = I.zoneName(); cw[z] = (cw[z] || 0) + 1; }
   console.log('where a Common egg turned up over 300 respawns:', JSON.stringify(cw)); if (Object.keys(cw).length < 5) throw new Error('other eggs should still turn up anywhere'); I.goTo(0); }
 const common = I.eggs.find((e) => e.tier === 0);
@@ -1358,26 +1359,45 @@ if (process.env.MODE !== 'admin') {
   }
 }
 
-// ---- secret hideouts ----
+// ---- secret hideouts (underground, with hidden holes) ----
 {
   if (I.riding()) I.dismount(true);
   console.log('secret hideouts:', I.hideouts.length, '|', I.hideouts.map((o) => o.th.name + ' (' + o.th.where + ') at ' + o.x.toFixed(0) + ',' + o.z.toFixed(0)).join(' | '));
   const far = Math.min(...I.hideouts.flatMap((a, i) => I.hideouts.slice(i + 1).map((b) => Math.hypot(a.x - b.x, a.z - b.z))));
   if (I.hideouts.length < 7 || far < 50) throw new Error('there should be 7 hideouts, spread out');
-  const o = I.hideouts[0], dx = Math.cos(o.door), dz = Math.sin(o.door), c0 = I.coins(), found0 = I.hideFound().length;
-  I.goTo(7); I.p.x = o.x + dx * 11; I.p.z = o.z + dz * 11; I.p.y = W.bil(W.H, I.p.x, I.p.z); I.p.onGround = true; I.p.dungeon = false;
-  I.p.yaw = Math.atan2(dx, dz); I.keys.add('KeyW'); let k = 0;
+  const o = I.hideouts[0], dx = Math.cos(o.door), dz = Math.sin(o.door);
+  I.goTo(7); I.p.x = o.x + dx * 6; I.p.z = o.z + dz * 6; I.p.y = W.bil(W.H, I.p.x, I.p.z); I.p.onGround = true;
+  I.keys.add('KeyW'); let k = 0;
   while (!I.inHideout() && k++ < 60 * 6) { I.p.yaw = Math.atan2(-(o.x - I.p.x), -(o.z - I.p.z)); I.update(1 / 60, 0); }
   I.keys.clear(); for (let q = 0; q < 12; q++) raf(500000 + q * 16);
-  console.log('walk in through the', o.th.name + '\'s secret entrance: inside', !!I.inHideout(), 'after', (k / 60).toFixed(1), 's | zone', I.zoneName(), '| found', I.hideFound().length, '|', said());
-  if (!I.inHideout()) throw new Error('you should be able to walk in through the secret entrance');
-  if (process.env.MODE !== 'admin' && found0 === 0 && I.coins() !== c0 + I.HIDEOUT_COINS) throw new Error('the first time you find one you get its treasure');
-  I.p.x = o.x + dx * 11; I.p.z = o.z + dz * 11; I.p.y = W.bil(W.H, I.p.x, I.p.z); const side = Math.atan2(-dz, -dx) + Math.PI / 2;   // and the walls are solid everywhere else
-  I.p.x = o.x + Math.cos(o.door + Math.PI) * 11; I.p.z = o.z + Math.sin(o.door + Math.PI) * 11; I.p.y = W.bil(W.H, I.p.x, I.p.z); I.keys.add('KeyW'); k = 0;
-  while (!I.inHideout() && k++ < 60 * 4) { I.p.yaw = Math.atan2(-(o.x - I.p.x), -(o.z - I.p.z)); I.update(1 / 60, 0); }
-  I.keys.clear(); console.log('walk at the back wall instead: got in', !!I.inHideout(), '| stopped', Math.hypot(I.p.x - o.x, I.p.z - o.z).toFixed(1), 'from the middle');
-  if (I.inHideout()) throw new Error('the walls should be solid');
+  console.log('walk onto the', o.th.name + ': slipped down into the hideout', !!I.inHideout(), 'after', (k / 60).toFixed(1), 's | deep down at', I.p.y.toFixed(0), '| zone', I.zoneName(), '|', said());
+  if (!I.inHideout() || I.p.y > -100 || I.zoneName() !== 'Secret hideout') throw new Error('the hidden hole should take you down into the hideout');
+  I.keys.add('KeyW'); k = 0;
+  while (I.inHideout() && k++ < 60 * 8) { I.p.yaw = Math.atan2(-(o.rope.x - I.p.x), -(o.rope.z - I.p.z)); I.update(1 / 60, 0); }
+  I.keys.clear();
+  console.log('walk to the rope: back up', !I.inHideout(), '| on the surface', I.p.y > -5, '|', said());
+  if (I.inHideout() || I.p.y < -5) throw new Error('the rope should take you back up');
   I.goTo(7);
+}
+// ---- wild eggs are the same for everyone ----
+{
+  const w = I.eggs.filter((e) => e.slot !== undefined); w.forEach((e) => I.placeWild(e));   // (earlier tests dropped some by hand)
+  const before = w.map((e) => e.spot); [...w].reverse().forEach((e) => I.placeWild(e));   // in the other order: still the same spots
+  const same = w.every((e, k) => e.spot === before[k]);
+  const e0 = w.find((e) => e.tier === 1), at0 = e0.spot;
+  I.netWildTaken(e0.slot, e0.round, e0.gen);            // another player picked it up
+  console.log('wild eggs:', w.length, '| placed the same way every time', same, '| another player takes a Rare egg: it moves', at0 !== e0.spot, '| the server is told when I take one', typeof I.wildTakes.get === 'function');
+  if (!same || at0 === e0.spot) throw new Error('wild eggs should be placed the same for everyone, and move when someone takes one');
+}
+// ---- put my best dragons on the plot ----
+{
+  if (I.myPlot() < 0) reclaim();
+  if (I.riding()) I.dismount(true);
+  I.putBest();
+  const placed = I.ownDragons.map((k, i) => i).filter((i) => I.dragonPlaced[i]), out = I.ownDragons.map((k, i) => i).filter((i) => !I.dragonPlaced[i]);
+  const worstIn = Math.min(...placed.map(I.dragonValue)), bestOut = out.length ? Math.max(...out.map(I.dragonValue)) : -1;
+  console.log('put in my best: on the plot', placed.length, '| in the inventory', out.length, '| every one on the plot earns at least as much as any left out', worstIn >= bestOut, '|', said());
+  if (worstIn < bestOut || (process.env.MODE !== 'admin' && placed.length !== Math.min(I.ownDragons.length, I.plotSlots()))) throw new Error('the best dragons should be on the plot');
 }
 
 // ---- the leaderboard in town ----
