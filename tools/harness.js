@@ -1211,6 +1211,11 @@ if (process.env.MODE !== 'admin') {
   console.log('trade opens: panel', I.tradeOpen(), I.tradeView(), '| with', I.trading().name);
   if (!I.tradeOpen() || I.tradeView() !== 'trade') throw new Error('the trade panel should open');
   I.trading().mine = [got]; I.trading().coins = 200;
+  I.tradeMessage({ t: 'tradestate', mine: {}, theirs: { coins: 0, dragons: [] }, myOk: false, theirOk: false });
+  const boxes = (function find(e, out) { if (e.type === 'number') out.push(e); (e.children || []).forEach((c) => find(c, out)); return out; })(els.tradeBody, []);
+  const texts = (function all(e, out) { if (e.textContent && !(e.children || []).length) out.push(e.textContent); (e.children || []).forEach((c) => all(c, out)); return out; })(els.tradeBody, []);
+  console.log('trade screen: coin box usable', boxes.length > 0 && !boxes[0].disabled, '| shows my offer', texts.includes('🪙 200 coins'), texts.some((t) => /Taco Tim/.test(t)));
+  if (!boxes.length || boxes[0].disabled || !texts.includes('🪙 200 coins')) throw new Error('you should be able to put coins in, and see your own offer');
   I.tradeMessage({ t: 'tradestate', mine: {}, theirs: { coins: 5000, dragons: [{ k: 'jade', m: '', u: -1, s: 0, n: '', o: -1 }] }, myOk: false, theirOk: true });
   console.log('they accepted:', I.trading().theirOk);
   I.tradeMessage({ t: 'tradedone', name: 'Ellie', gave: { coins: 200, dragons: [I.dragonCard(got)] }, got: { coins: 5000, dragons: [{ k: 'jade', m: '', u: -1, s: 0, n: '', o: -1 }] } });
@@ -1332,6 +1337,25 @@ if (process.env.MODE !== 'admin') {
   const evOpts = rows[iEv].children[0].children.map((o) => o.value), seaOpts = rows[iSea].children[0].children.map((o) => o.value);
   console.log('admin events: normal', evOpts.length, '| seasonal', seaOpts.length, '(' + rows[iSea].children[0].children.slice(0, 3).map((o) => o.textContent).join(', ') + ' ...)');
   if (iSea < 0 || seaOpts.length !== 15 || evOpts.some((id) => I.EVENTS[id].month) || evOpts.length !== I.EVENT_LIST.length - 15) throw new Error('the seasonal events should have their own section');
+}
+
+// ---- dragons stay where you put them (plot or inventory) after you come back ----
+{
+  I.saveProgress();
+  const saved = JSON.parse(store['mutation-mayhem-dragons']), placed = JSON.parse(store['mutation-mayhem-placed']);
+  const want = I.ownDragons.map((k, i) => [k, I.dragonPlaced[i]]).filter(([k]) => !I.DRAGON_KINDS[k].storm);
+  const got = saved.map((k, n) => [k, placed.includes(n)]);
+  console.log('saved: dragons', saved.length, '(storm dragons left out:', !saved.some((k) => I.DRAGON_KINDS[k].storm) + ') | on the plot', placed.length, '| matches what\'s on the plot and in the inventory now', JSON.stringify(want) === JSON.stringify(got));
+  if (JSON.stringify(want) !== JSON.stringify(got)) throw new Error('the saved plot and inventory should match');
+}
+// ---- admin: give a dragon every mutation ----
+{
+  const pet = I.plotPets.find((d) => !d.homing && !d.ridden && !I.DRAGON_KINDS[d.kind].storm);
+  if (pet) {
+    const n = I.adminGiveAllMut(pet.index), has = I.MUTATIONS.filter((m) => I.hasMut(pet.index, m.id)).length;
+    console.log('give ALL mutations (' + (process.env.MODE === 'admin' ? 'admin' : 'player') + '): added', n, '| it has', has, 'of', I.MUTATIONS.length, '|', said());
+    if (process.env.MODE === 'admin' ? has !== I.MUTATIONS.length : n !== 0) throw new Error('only admins can give all mutations, and then it has them all');
+  }
 }
 
 // ---- the leaderboard in town ----

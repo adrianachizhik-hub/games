@@ -613,6 +613,7 @@
   #tradeMenu .coinrow input { flex: 1; min-width: 0; font: inherit; font-size: 0.95rem; padding: 5px 9px; border: 2px solid #0d2f37; border-radius: 10px; background: #fff; color: #0d2f37; -webkit-user-select: text; user-select: text; }
   #tradeMenu .theirs { padding: 8px 12px; border: 3px dashed #0d2f37; border-radius: 14px; background: #fff; color: #0d2f37; font-size: 0.92rem; }
   #tradeMenu .theirs p { margin: 2px 0; }
+  #tradeMenu .theirs.mine { background: #fff7d6; }
   #tradeMenu .status { margin: 10px 0 0; font-weight: 600; }
   #tradeMenu .foot { position: sticky; bottom: 0; display: flex; gap: 10px; margin: 12px -18px 0; padding: 10px 18px 16px; background: var(--panel-solid); }
   #tradeOk, #tradeDone { flex: 1; font: inherit; font-size: 1.05rem; font-weight: 600; color: #0d2f37; background: #ffd23f; border: 4px solid #0d2f37; border-radius: 14px; padding: 8px 12px; box-shadow: 0 4px 0 #0d2f37; cursor: pointer; }
@@ -3257,8 +3258,10 @@ const World = (function () {
     const outf = JSON.parse(localStorage.getItem('mutation-mayhem-dragon-outfits') || '[]') || [];
     const nms = JSON.parse(localStorage.getItem('mutation-mayhem-dragon-names') || '[]') || [];
     const muts = JSON.parse(localStorage.getItem('mutation-mayhem-mutations') || '[]') || [];
+    const newAt = [];                                     // a saved dragon's place in the list now (saves from before 10 October still have storm dragons in them)
     (JSON.parse(localStorage.getItem('mutation-mayhem-dragons') || '[]') || []).forEach((k, i) => {
       if (!DRAGON_KINDS[k] || DRAGON_KINDS[k].storm) return;     // storm dragons are admin-only: they come back when an admin signs in
+      newAt[i] = ownDragons.length;
       ownDragons.push(k); dragonUpgrades.push(Number.isInteger(ups[i]) && ups[i] >= 0 && ups[i] < 5 ? ups[i] : -1);
       dragonSpeed.push(typeof spd[i] === 'number' && spd[i] > 0 ? spd[i] : 0);
       dragonOutfit.push(Number.isInteger(outf[i]) && outf[i] >= 0 && outf[i] < 5 ? outf[i] : -1);
@@ -3269,7 +3272,7 @@ const World = (function () {
     if (sl >= 5 && sl <= MAX_SLOTS) plotSlots = Math.floor(sl);
     (JSON.parse(localStorage.getItem('mutation-mayhem-upgraders') || '[]') || []).slice(0, 5).forEach((n, i) => { upgradersOwned[i] = Number.isInteger(n) && n > 0 ? n : 0; });
     const pl = localStorage.getItem('mutation-mayhem-placed');
-    if (pl) placedSaved = JSON.parse(pl);
+    if (pl) placedSaved = (JSON.parse(pl) || []).map((i) => newAt[i]).filter((i) => i !== undefined);
   } catch (e) { /* nothing saved, start fresh */ }
   /* Coins. Every PAYOUT_SECONDS, the dragons on your plot pay out together: each gives its DRAGON_COINS, more for
      rarer ones (jade a little more than diamond, being the rarer of the two), times any upgrader. Stored dragons
@@ -3296,7 +3299,6 @@ const World = (function () {
   ownDragons.forEach((k, i) => { dragonPlaced[i] = false; });
   if (Array.isArray(placedSaved)) placedSaved.forEach((i) => { if (Number.isInteger(i) && i >= 0 && i < ownDragons.length) dragonPlaced[i] = true; });
   else ownDragons.map((k, i) => i).sort((a, b) => dragonValue(b) - dragonValue(a)).slice(0, plotSlots).forEach((i) => { dragonPlaced[i] = true; });
-  while (dragonPlaced.filter(Boolean).length > plotSlots) dragonPlaced[dragonPlaced.lastIndexOf(true)] = false;
   const placedCount = () => dragonPlaced.filter(Boolean).length;
   let stormCount = 0;                                    // how many Storm dragons the signed-in admin has (each admin's kept apart, not in the normal list)
   const stormKey = () => 'mutation-mayhem-storm-' + adminNo, stormKind = () => (adminNo === 1 ? 'stormgirl' : 'stormboy');   // first admin a boy, second a girl
@@ -3344,6 +3346,7 @@ const World = (function () {
      Leaving gives it back. (Only the dragons, upgrades and spaces are saved, not which plot.) */
   function claimPlot(i) {
     myPlot = i; nameMyPlot(); netSend({ t: 'claim', plot: i }); petsSent = '';
+    if (!isAdmin) while (placedCount() > plotSlots) dragonPlaced[dragonPlaced.lastIndexOf(true)] = false;   // (admins have room for all of theirs)
     ownDragons.forEach((k, d) => { if (dragonPlaced[d]) addPet(k, true, d); });
     buildDecor(); showIncubating();
     toast(ownDragons.length ? 'Welcome back! This is ' + playerName + '\'s Plot, and your dragons are here.' : 'This is now ' + playerName + '\'s Plot! Find eggs around the island and bring them here to hatch.', 6);
@@ -3361,10 +3364,13 @@ const World = (function () {
   function saveProgress() {
     if (switchingAccount) return;
     try {
-      localStorage.setItem('mutation-mayhem-dragons', JSON.stringify(ownDragons));
-      localStorage.setItem('mutation-mayhem-upgrades', JSON.stringify(dragonUpgrades)); localStorage.setItem('mutation-mayhem-speed', JSON.stringify(dragonSpeed)); localStorage.setItem('mutation-mayhem-dragon-outfits', JSON.stringify(dragonOutfit)); localStorage.setItem('mutation-mayhem-dragon-names', JSON.stringify(ownDragons.map((k, i) => dragonNames[i] || ''))); localStorage.setItem('mutation-mayhem-mutations', JSON.stringify(ownDragons.map((k, i) => dragonMutation[i] || ''))); localStorage.setItem('mutation-mayhem-slots', String(plotSlots));
+      /* Admin storm dragons are kept apart (their own count), so they're left out here: otherwise the dragons after them
+         would shift by one when the list is loaded again, and the wrong dragons would be on the plot (bug fix, 10 October 2026). */
+      const keep = ownDragons.map((k, i) => i).filter((i) => !DRAGON_KINDS[ownDragons[i]].storm), each = (f) => JSON.stringify(keep.map(f));
+      localStorage.setItem('mutation-mayhem-dragons', each((i) => ownDragons[i]));
+      localStorage.setItem('mutation-mayhem-upgrades', each((i) => dragonUpgrades[i])); localStorage.setItem('mutation-mayhem-speed', each((i) => dragonSpeed[i])); localStorage.setItem('mutation-mayhem-dragon-outfits', each((i) => dragonOutfit[i])); localStorage.setItem('mutation-mayhem-dragon-names', each((i) => dragonNames[i] || '')); localStorage.setItem('mutation-mayhem-mutations', each((i) => dragonMutation[i] || '')); localStorage.setItem('mutation-mayhem-slots', String(plotSlots));
       localStorage.setItem('mutation-mayhem-upgraders', JSON.stringify(upgradersOwned));
-      localStorage.setItem('mutation-mayhem-placed', JSON.stringify(dragonPlaced.map((on, i) => (on ? i : -1)).filter((i) => i >= 0)));
+      localStorage.setItem('mutation-mayhem-placed', JSON.stringify(keep.map((i, n) => (dragonPlaced[i] ? n : -1)).filter((n) => n >= 0)));
     } catch (e) { /* not saved, still playable */ }
   }
 
@@ -5639,9 +5645,21 @@ const World = (function () {
     toast('⭐ Admin gift! Your ' + DRAGON_KINDS[ownDragons[i]].name + ' dragon (in your inventory) got the ' + MUT[id].name.toUpperCase() + ' mutation!', 4);
     return true;
   }
+  function adminGiveAllMut(i) {                          // Adriana: every mutation at once, on one dragon
+    if (!isAdmin || !ownDragons[i]) return 0;
+    const add = MUT_IDS.filter((id) => !hasMut(i, id));
+    add.forEach((id) => addMut(i, id)); saveProgress(); renderInventory();
+    const d = plotPets.find((q) => q.index === i);
+    if (d) { dressPet(d); const ps = petSize(d); d.root.scale.set(ps, ps, ps); }
+    toast(add.length ? '⭐ Admin gift! Your ' + DRAGON_KINDS[ownDragons[i]].name + ' dragon got ALL ' + MUT_IDS.length + ' mutations! It makes ' + fmt(dragonValue(i)) + ' coins every ' + PAYOUT_SECONDS + ' seconds.' : 'That dragon already has every mutation.', 5);
+    return add.length;
+  }
+  const mutAllBtn = document.createElement('button');
+  mutAllBtn.type = 'button'; mutAllBtn.className = 'small'; mutAllBtn.textContent = 'Give ALL';
+  mutAllBtn.addEventListener('click', (e) => { fillMutDragons(); if (!ownDragons.length) toast('You have no dragons yet.', 3); else adminGiveAllMut(+mutDragon.value || 0); fillMutDragons(); if (e.detail > 0) mutAllBtn.blur(); });
   ['focus', 'pointerdown'].forEach((n) => mutDragon.addEventListener(n, fillMutDragons));
   mutBtn.addEventListener('click', (e) => { fillMutDragons(); if (!ownDragons.length) toast('You have no dragons yet.', 3); else adminGiveMut(+mutDragon.value || 0, mutPick.value); fillMutDragons(); if (e.detail > 0) mutBtn.blur(); });
-  mutRow.appendChild(mutDragon); mutRow.appendChild(mutPick); mutRow.appendChild(mutBtn);
+  mutRow.appendChild(mutDragon); mutRow.appendChild(mutPick); mutRow.appendChild(mutBtn); mutRow.appendChild(mutAllBtn);
   const stormBtn = document.createElement('button');
   stormBtn.type = 'button'; stormBtn.className = 'storm'; stormBtn.textContent = '⚡ Add a Storm dragon (admins only)';
   stormBtn.addEventListener('click', (e) => { adminAddDragon(stormKind()); if (e.detail > 0) stormBtn.blur(); });
@@ -6745,8 +6763,10 @@ const World = (function () {
   const fmtCoins = (n) => fmt(n) + ' coin' + (n === 1 ? '' : 's');
   const stuffText = (c, ds) => [c > 0 ? fmtCoins(c) : '', ...(ds || []).filter((d) => DRAGON_KINDS[d.k] && !DRAGON_KINDS[d.k].storm).map(cardLabel)].filter(Boolean).join(', ') || 'nothing';
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
-  function coinBox(label, onGo, value) {                  // a box to type how many coins, and a button
+  let coinDraft = null, coinFocused = false;             // what's typed in the trade's coin box, kept when the screen redraws
+  function coinBox(label, onGo, value, keep) {            // a box to type how many coins, and a button
     const row = el('div', 'coinrow'), inp = el('input'), b = el('button', '', label);
+    if (keep) { inp.addEventListener('input', () => { coinDraft = inp.value; }); inp.addEventListener('focus', () => { coinFocused = true; }); inp.addEventListener('blur', () => { coinFocused = false; }); if (coinDraft !== null) value = coinDraft; if (coinFocused) setTimeout(() => { try { inp.focus(); } catch (e) { /* fine */ } }, 0); }
     inp.type = 'number'; inp.min = '0'; inp.step = '1'; inp.inputMode = 'numeric'; inp.placeholder = 'How many coins'; inp.setAttribute('aria-label', 'How many coins');
     if (value) inp.value = String(value);
     b.type = 'button';
@@ -6754,12 +6774,11 @@ const World = (function () {
     b.addEventListener('click', go);
     inp.addEventListener('focus', () => keys.clear());
     inp.addEventListener('keydown', (e) => { if (e.code === 'Enter' || e.key === 'Enter') { e.preventDefault(); go(); } });
-    if (coins === Infinity) { inp.disabled = true; b.disabled = true; inp.placeholder = 'Admin coins can\'t be given'; }
     row.appendChild(inp); row.appendChild(b); return row;
   }
-  function okCoins(n) {
-    if (coins === Infinity) { toast('Admins\' unlimited coins can\'t be given.', 3); return false; }
+  function okCoins(n) {                                  // (admins have unlimited coins, so they can give any amount)
     if (!(n > 0)) { toast('Type how many coins first.', 3); return false; }
+    if (n > 1e15) { toast('That\'s too many coins!', 3); return false; }
     if (n > coins) { toast('You only have ' + fmtCoins(Math.floor(coins)) + '.', 3); return false; }
     return true;
   }
@@ -6810,9 +6829,15 @@ const World = (function () {
       if (!trading.theirs.dragons.length) th.appendChild(el('p', '', 'No dragons yet'));
       trading.theirs.dragons.forEach((d) => th.appendChild(el('p', '', '🐉 ' + cardLabel(d))));
       tradeBody.appendChild(th);
-      tradeBody.appendChild(el('h3', '', 'You give: coins'));
-      tradeBody.appendChild(coinBox('Put in', (n) => { if (n > 0 && !okCoins(n)) return; trading.coins = Math.max(0, n); sendOffer(); }, trading.coins));
-      tradeBody.appendChild(el('h3', '', 'You give: dragons'));
+      tradeBody.appendChild(el('h3', '', 'You give ' + trading.name));
+      const mine = el('div', 'theirs mine');                // your own offer, the way they see it
+      mine.appendChild(el('p', '', trading.coins > 0 ? '🪙 ' + fmtCoins(trading.coins) : '🪙 No coins'));
+      if (!trading.mine.length) mine.appendChild(el('p', '', 'No dragons yet'));
+      trading.mine.filter((i) => ownDragons[i]).forEach((i) => mine.appendChild(el('p', '', '🐉 ' + dragonLabel(i))));
+      tradeBody.appendChild(mine);
+      tradeBody.appendChild(el('h3', '', 'Put in coins'));
+      tradeBody.appendChild(coinBox('Put in', (n) => { if (n > 0 && !okCoins(n)) return; trading.coins = Math.max(0, n); coinDraft = null; sendOffer(); }, trading.coins, true));
+      tradeBody.appendChild(el('h3', '', 'Put in dragons'));
       const list = ownDragons.map((k, i) => i).filter(canGive);
       if (!list.length) tradeBody.appendChild(el('p', 'sub', 'You have no dragons you can trade.'));
       list.forEach((i) => {
@@ -6866,6 +6891,7 @@ const World = (function () {
       tradeAskFrom = m.id; tradeAskT = 20; $('tradeAskText').textContent = '🤝 ' + m.name + ' wants to trade with you!'; tradeAskEl.hidden = false;
     } else if (m.t === 'tradeno') { toast(m.why, 4); if (tradeOpen && tradeView === 'list') refreshTrade(); }
     else if (m.t === 'tradeopen') {
+      coinDraft = null;
       trading = { id: m.id, name: m.name, mine: [], coins: 0, theirs: { coins: 0, dragons: [] }, myOk: false, theirOk: false };
       if (!tradeOpen) { if (menuOpen() || shopping) { closeUpShop(); closePlotMenu(); closeSecret(); closeSell(); closeAll(); if (shopping) closeShop(); } openTrade('trade'); }
       else { tradeView = 'trade'; refreshTrade(); }
@@ -7003,7 +7029,7 @@ const World = (function () {
   }
   window.__island = { p, places, goTo, update, zoneName, keys, DG, plots, shops, name: () => playerName, admin: () => isAdmin,
     AV, avatar, gear, hair, keeper, upKeeper, keepers, lexi, max, talking: () => talking, talkLineAt: () => talkAt, talkLines: () => talkLines, talkNear: () => talkNear, paint, camera, shopFront, shopping: () => shopping, camD: () => camD, optionButtons,
-    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, leaders: () => leaders, myWorth, bestDragon, BOARD_AT, drawBoard, boardShown: () => boardShown, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, adminGiveMut, hoodOn, myHood, myJersey, specialLook, playerName: () => playerName, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
+    ATL: W.ATL, AQUA_AT, AQUA_TIER, AQUA_SECONDS, aquaEggThere, guardian, gchase: () => gchase, breath: () => breath, setWaterRes: (t) => { waterResUntil = t; }, waterResLeft, atlantisBlocks, setAquaTaken: (r) => { aquaTakenRound = r; }, sendHome, netMessage, littleTacos, tradeMessage, openTrade, closeTrade, trading: () => trading, tradeOpen: () => tradeOpen, tradeView: () => tradeView, dragonCard, canGive, setNetOnline: (v) => { netOnline = v; }, eggs, EGG_TIERS, DRAGON_KINDS, pickDragon, dropEgg, carrying: () => carrying, hatching: () => incubating[0] || null, incubating, setHatchScale: (k) => { hatchScale = k; }, HATCH_SECS, myPlot: () => myPlot, ownDragons, plotPets, flyers, plotAt, plotWorld, jumpTo, eggsAnimate, radarOn: () => radarOn, seeAllOn: () => seeAllOn, stormCount: () => stormCount, dropCarried, decorOff, ADMIN_DECOR, adminDecorOn, openAdminShop, adminAnims: () => adminAnims, startFireStorm, fireStormOn, fireballs, spawnFireball, MUTATIONS, MUT, scene, leaders: () => leaders, myWorth, bestDragon, BOARD_AT, drawBoard, boardShown: () => boardShown, resetEvents: () => { Object.keys(evUntil).forEach((k) => { evUntil[k] = 0; }); Object.keys(evStopped).forEach((k) => { evStopped[k] = 0; }); }, adminGiveMut, adminGiveAllMut, saveProgress, dragonPlaced, hoodOn, myHood, myJersey, specialLook, playerName: () => playerName, MONTHLY, setMonth: (m) => { monthOverride = m; monthDecoT = 0; }, monthDeco: () => monthDeco, thisMonth, monthModel, startEvent, stopEvent, stopAllEvents, clickAt, megaLaunch, camera, dragonMutationArr: dragonMutation, eventOn, ufos, jets, giveMutation, spawnJet, EVENT_LIST, EVENTS, nextEvent, slotEvents, switchAccount, accountKey, nightness, nightShown: () => nightShown, setTimeMode, timeMode: () => timeMode, dayNightStep, tutAt: () => tutAt, TUTORIAL, clockEventsOff: (v) => { clockEventsOff = v; }, VOLCANO, crater, mutCoins, buildMutFx, mutStep, fireStormStep, hasMut, addMut, rideFromInventory, netTick, netOnline: () => netOnline, others, plotOwners, netRoom: () => netRoom, placeDragon, sinkT: () => sinkT, QS, MUD, MUD_EXIT, BK, bkWorld, bkLocal, bunkerOpen: () => bunkerOpen, kpPress, openKeypad, keypadOpen: () => keypadOpen, nukeEggThere, monster, mchase: () => mchase, NUKE_SECONDS, MONSTER_SPEED, radResLeft, setRadRes: (t) => { radResUntil = t; }, eggW, dragonMutation, NUKE_TIER, dragonValue, makeDragon, adminNo: () => adminNo, ownCoins: () => realCoins, zap, rayAt, bolts, knocked, zapStep, mouthAt, petSize, adminRestock, nearestEgg, signLabels, coins: () => coins, coinRate, DRAGON_COINS, earn,
     giveCoins: (n) => { coins += n; }, setCoins: (n) => { coins = n; }, UPGRADERS, dragonUpgrades, dragonSpeed, upFront, upShopOpen: () => upShopOpen, luckyBlocks, rollLucky,
     upgradersOwned, renderInventory, allFront, allOpen: () => allOpen, TREATS, DECOR, OUTFITS, ARCHES, archesOwned, archOn: () => archOn, archModel, treatUntil, treatCoins, treatSpeed, decorOwned, decorMeshes: () => decorMeshes, outfitsOwned, dragonOutfit, dragonNames, collarsOwned: () => collarsOwned, nameDragon, fairyBulbs: () => fairyBulbs, twinkleLights, hardSpots, sellFront, sellOpen: () => sellOpen, sellPrice, sellKeeper, spawnEgg, adminAddDragon, banName, banned, eggs, slotLimit, eggSpots, eggsRespawn: (e) => respawnEgg(e), showAnnouncement, annInput: () => annInput, annBtn: () => annBtn, VILLAGE, SECRET, secretFront, villagers, fireLit, fireEggThere, setFireClock: (t) => { fireOverride = t; }, fireResUntil: () => fireResUntil, chase: () => chase, secretOpen: () => secretOpen, FIRE_SECONDS, VILLAGER_SPEED, rideSpeed: (run) => rideSpeed(run), sendChat, chatLog: () => [...chatLog.children].map((l) => l.textContent || [...(l.children || l.childNodes)].map((c) => c.textContent || c.text || '').join('')), carryingBlock: () => carryingBlock, blockLeft: () => blockLeft, openLucky, stockFor, stockLeft, setStockRound: (r) => { stockOverride = r; }, dragonPlaced, plotSlots: () => plotSlots, PAYOUT_SECONDS, plotMenuOpen: () => plotMenuOpen, spacePrice, signSpot, spawnInTown,
     riding: () => riding, flying: () => flying, clickAt, mount, dismount };
