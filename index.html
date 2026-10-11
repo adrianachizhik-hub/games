@@ -5366,7 +5366,7 @@ const World = (function () {
     /* Each hideout looks different, outside and in (Adriana, 11 October 2026). */
     const parts = [], inside = [], glow = [], RR = W.rng(5151);
     const P = (list, g, c, x, y, z, sx, sy, sz, rx, ry, rz) => list.push({ g, color: c, m: xf(x, y, z, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0), jitter: 0.12 });
-    const BOX = new THREE.BoxGeometry(1, 1, 1), ROCK = new THREE.DodecahedronGeometry(1, 0), BALL = new THREE.SphereGeometry(1, 8, 6), CYL = new THREE.CylinderGeometry(1, 1, 1, 10), CONE = new THREE.ConeGeometry(1, 1, 6), GEM = new THREE.OctahedronGeometry(1, 0);
+    const BOX = new THREE.BoxGeometry(1, 1, 1), ROCK = new THREE.DodecahedronGeometry(1, 0), BALL = new THREE.SphereGeometry(1, 8, 6), CYL = new THREE.CylinderGeometry(1, 1, 1, 10), CONE = new THREE.ConeGeometry(1, 1, 6), GEM = new THREE.OctahedronGeometry(1, 0), CUPG = new THREE.CylinderGeometry(1, 0.55, 1, 10);
     for (const o of hideouts) {
       const th = o.th, hy = o.y, dx = Math.cos(o.door), dz = Math.sin(o.door), side = (a, r) => [o.x + Math.cos(o.door + a) * r, o.z + Math.sin(o.door + a) * r];
       /* ---- the entrance ---- */
@@ -5457,6 +5457,63 @@ const World = (function () {
         put(inside, BOX, 0x4a4f53, -2.6, 0.45, -2.8, 0.7, 0.9, 0.5); put(inside, BOX, 0x6e7479, -2.6, 1.0, -2.8, 1.5, 0.3, 0.6); solid(-2.6, -2.8, 0.8);   // the anvil
         for (let k = 0; k < 7; k++) { const a = k / 7 * 6.28 + 0.6, [x, z] = ring(a, 6.0), h = 0.8 + RR() * 1.2; P(glow, GEM, 0xff8a3d, x, fy + h / 2, z, 0.3, h, 0.3); }
         put(inside, BOX, 0x2a2f33, 1.5, 1.2, 4.8, 2.4, 0.12, 0.2); [0, 1, 2].forEach((k) => put(inside, BOX, 0xb8bec4, 0.8 + k * 0.6, 0.9, 4.75, 0.08, 1.2, 0.06));   // a weapon rack
+      }
+      /* ---- more things in each room, so every one is its own place (Adriana, 11 October 2026: "for the tomb, treasures
+         like gems and old golden pots and cups"). What goes in the other rooms is Claude's choice. ---- */
+      const GOLD = 0xc9a227, OLDGOLD = 0xa8862a, GEMS = [0xe2483d, 0x3f7fd6, 0x5fb83a, 0xb27bff, 0x5bf0e0];
+      const pot = (lx, lz, k, col) => {                  // an old pot: round body, thin neck, lip and two handles
+        put(inside, BALL, col, lx, 0.45 * k, lz, 0.42 * k, 0.48 * k, 0.42 * k); put(inside, CYL, col, lx, 0.98 * k, lz, 0.16 * k, 0.32 * k, 0.16 * k); put(inside, CYL, col, lx, 1.16 * k, lz, 0.24 * k, 0.06 * k, 0.24 * k);
+        [-1, 1].forEach((sd) => put(inside, BOX, col, lx, 0.82 * k, lz + sd * 0.3 * k, 0.06 * k, 0.32 * k, 0.06 * k, sd * 0.5));
+        put(inside, BOX, 0x5f8f7a, lx + 0.3 * k, 0.4 * k, lz, 0.05, 0.22 * k, 0.2 * k);   // a green tarnish patch: it's very old
+      };
+      const cup = (lx, y, lz, k) => {                    // a golden cup (a goblet)
+        put(inside, CYL, GOLD, lx, y + 0.02 * k, lz, 0.16 * k, 0.04 * k, 0.16 * k); put(inside, CYL, OLDGOLD, lx, y + 0.18 * k, lz, 0.04 * k, 0.3 * k, 0.04 * k);
+        put(inside, CUPG, GOLD, lx, y + 0.45 * k, lz, 0.2 * k, 0.26 * k, 0.2 * k); put(glow, GEM, GEMS[Math.floor(RR() * GEMS.length)], lx + 0.2 * k, y + 0.45 * k, lz, 0.05, 0.07, 0.05);
+      };
+      const heap = (lx, lz, k) => {                      // a heap of gold coins with gems on top
+        put(glow, CONE, 0xffd23f, lx, 0.3 * k, lz, 0.9 * k, 0.6 * k, 0.9 * k);
+        for (let n = 0; n < 6; n++) { const a = n * 1.05, r = 0.25 + RR() * 0.5; put(glow, GEM, GEMS[n % GEMS.length], lx + Math.cos(a) * r * k, 0.18 + RR() * 0.3 * k, lz + Math.sin(a) * r * k, 0.13, 0.18, 0.13, RR(), 0, RR()); }
+        for (let n = 0; n < 5; n++) { const a = RR() * 6.28, r = (0.9 + RR() * 0.5) * k; put(inside, CYL, GOLD, lx + Math.cos(a) * r, 0.02, lz + Math.sin(a) * r, 0.12, 0.03, 0.12); }   // coins spilled on the floor
+      };
+      if (th.props === 'cactus') {                       // LOST TOMB: treasure everywhere
+        heap(-3.4, 2.3, 1.1); heap(-3.6, -2.4, 0.9); heap(3.2, -5.2, 0.8);
+        [[-5.5, 3.8, 1.3, GOLD], [-5.6, -3.7, 1.1, OLDGOLD], [0.9, 5.7, 1.0, 0xb87333], [-1.2, 5.6, 1.2, GOLD], [5.3, -4.4, 0.9, OLDGOLD], [5.4, 4.6, 1.2, 0xb87333]].forEach(([lx, lz, k, col]) => { pot(lx, lz, k, col); solid(lx, lz, 0.5 * k); });
+        put(inside, BOX, 0xb8a888, 3.0, 0.4, 5.4, 2.4, 0.8, 0.9); solid(3.0, 5.4, 1.1);   // a stone altar with golden cups on it
+        [2.2, 3.0, 3.8].forEach((lx, k) => cup(lx, 0.8, 5.4, k === 1 ? 1.4 : 1));
+        cup(-4.6, 1.1, -0.9, 1); cup(-2.6, 0, 0.6, 1.2); cup(1.8, 0, -3.6, 1);   // and a few more about
+        put(inside, BOX, 0x8a8070, -6.1, 1.6, 0, 0.5, 3.2, 1.3);   // a golden mask on the wall over the sarcophagus
+        put(inside, BALL, GOLD, -5.8, 2.6, 0, 0.12, 0.55, 0.42); [-0.17, 0.17].forEach((z) => put(inside, BOX, 0x16181b, -5.67, 2.75, z, 0.04, 0.08, 0.14)); put(glow, BOX, 0x3f7fd6, -5.68, 2.3, 0, 0.04, 0.3, 0.08);
+        for (let n = 0; n < 14; n++) { const lx = (RR() - 0.5) * 9, lz = (RR() - 0.5) * 9; if (Math.hypot(lx - 1.5, lz - 1.5) > 1.4 && Math.hypot(lx - 4.6, lz) > 1.4) put(glow, GEM, GEMS[n % GEMS.length], lx, 0.12, lz, 0.12, 0.16, 0.12, RR(), 0, RR()); }   // loose gems on the floor
+      } else if (th.props === 'log') {                   // ROOT DEN: fireflies, a bird's nest with blue eggs, a pile of acorns
+        for (let n = 0; n < 22; n++) { const a = RR() * 6.28, r = 1 + RR() * 5; const [x, z] = ring(a, r); P(glow, BALL, n % 3 ? 0xeaff7a : 0xffe14a, x, fy + 1 + RR() * (RH - 1.6), z, 0.07, 0.07, 0.07); }
+        put(inside, new THREE.TorusGeometry(0.6, 0.22, 6, 12), 0x8a6a45, 2.2, 0.2, -4.6, 1, 1, 1, Math.PI / 2); [[-0.2, 0], [0.2, 0.1], [0, -0.2]].forEach(([a, b]) => put(inside, BALL, 0x8fd0f5, 2.2 + a, 0.25, -4.6 + b, 0.16, 0.2, 0.16));
+        for (let n = 0; n < 9; n++) put(inside, BALL, 0x8a5a2b, 3.2 + (n % 3) * 0.25, 0.15 + Math.floor(n / 3) * 0.15, 4.4 + (n % 2) * 0.2, 0.14, 0.17, 0.14);
+        put(inside, CYL, 0x6b4a2b, 0, RH / 2, -0.4, 0.5, RH, 0.5); solid(0, -0.4, 0.6);   // a big root holding the roof up
+      } else if (th.props === 'rocks') {                 // PIRATE CAVE: a ship's wheel, a cannon, a treasure map and spilled coins
+        put(inside, new THREE.TorusGeometry(0.9, 0.08, 6, 16), 0x6b4423, -6.75, 2.2, -1.2, 1, 1, 1, 0, Math.PI / 2); for (let n = 0; n < 4; n++) put(inside, BOX, 0x6b4423, -6.75, 2.2, -1.2, 0.06, 2.2, 0.08, n * Math.PI / 4);
+        put(inside, CYL, 0x2a2f33, 2.6, 0.6, 4.4, 0.32, 1.8, 0.32, 0, 0, Math.PI / 2 - 0.25); [-0.4, 0.4].forEach((z) => put(inside, CYL, 0x6b4423, 2.2, 0.35, 4.4 + z, 0.35, 0.1, 0.35, Math.PI / 2)); solid(2.4, 4.4, 0.8);   // a cannon
+        put(inside, BOX, 0xe8d8a8, -6.8, 1.6, 1.6, 0.04, 0.9, 1.2); put(inside, BOX, 0xd8241a, -6.78, 1.5, 1.8, 0.04, 0.12, 0.12, 0.8); put(inside, BOX, 0xd8241a, -6.78, 1.5, 1.8, 0.04, 0.12, 0.12, -0.8);   // the treasure map: X marks the spot
+        heap(-2.4, 2.4, 0.6); put(inside, new THREE.TorusGeometry(0.4, 0.12, 6, 12), 0xc8a060, 3.6, 0.12, -4.2, 1, 1, 1, Math.PI / 2);   // a coil of rope
+      } else if (th.props === 'bushes') {                // COZY BURROW: a round rug, a fireplace, a teapot and cups, little pictures
+        put(inside, new THREE.CylinderGeometry(2.2, 2.2, 0.03, 18), 0xd8433a, -2.2, 0.02, -1.5); put(inside, new THREE.CylinderGeometry(1.6, 1.6, 0.04, 18), 0xffd23f, -2.2, 0.03, -1.5);
+        put(inside, BOX, 0x8a8f93, -1.0, 0.9, 6.2, 2.0, 1.8, 0.6); put(inside, BOX, 0x1d140c, -1.0, 0.55, 5.85, 1.2, 0.9, 0.1); put(glow, CONE, 0xff8a3d, -1.0, 0.45, 5.9, 0.35, 0.6, 0.2); solid(-1.0, 6.0, 1.0);   // the fireplace
+        put(inside, BALL, 0x3f7fd6, -2.2, 0.98, -1.4, 0.22, 0.18, 0.22); put(inside, CYL, 0x3f7fd6, -1.95, 1.02, -1.4, 0.04, 0.25, 0.04, 0, 0, -0.8); [-1.8, -2.6].forEach((lx) => put(inside, CYL, 0xffffff, lx, 0.86, -1.8, 0.08, 0.12, 0.08));   // teapot and cups
+        [[1.0, 6.3, 0x5fb83a], [3.2, 5.9, 0x3f7fd6]].forEach(([lx, lz, col]) => { put(inside, BOX, 0x7a5533, lx, 1.8, lz, 0.7, 0.6, 0.05); put(inside, BOX, col, lx, 1.8, lz - 0.03, 0.55, 0.45, 0.04); });
+      } else if (th.props === 'boulders') {              // CRYSTAL GROTTO: a giant crystal in the middle, ice pillars, sparkles in the air
+        put(glow, GEM, 0x8fe8ff, -2.6, 1.8, 3.4, 0.9, 3.6, 0.9); put(glow, GEM, 0xb27bff, -1.9, 1.0, 3.9, 0.45, 2.0, 0.45, 0.3); put(glow, GEM, 0x5bf0e0, -3.2, 0.9, 2.9, 0.4, 1.8, 0.4, -0.3); solid(-2.6, 3.4, 1.1);
+        [[3.2, -4.0], [-4.6, -3.6], [1.0, 5.2]].forEach(([lx, lz]) => { put(inside, CONE, 0xd8f6ff, lx, RH - 1.4, lz, 0.4, 2.8, 0.4, Math.PI); put(inside, CONE, 0xd8f6ff, lx, 1.3, lz, 0.5, 2.6, 0.5); });
+        for (let n = 0; n < 20; n++) { const a = RR() * 6.28, r = 1 + RR() * 5, [x, z] = ring(a, r); P(glow, GEM, 0xffffff, x, fy + 1 + RR() * (RH - 2), z, 0.05, 0.08, 0.05); }
+        put(inside, BALL, 0xffffff, -2.0, 0.5, -1.4, 0.5, 0.5, 0.5); put(inside, BALL, 0xffffff, -2.0, 1.2, -1.4, 0.35, 0.35, 0.35); put(inside, CONE, 0xff8a3d, -1.7, 1.2, -1.4, 0.06, 0.3, 0.06, 0, 0, -Math.PI / 2);   // a little snowman on the frozen pond
+      } else if (th.props === 'stump') {                 // WITCH'S HUT: a spellbook on a stand, a black cat, candles, hanging herbs
+        put(inside, BOX, 0x4a3420, 1.2, 0.5, 4.2, 0.2, 1.0, 0.2); put(inside, BOX, 0x6b1a6b, 1.2, 1.05, 4.2, 0.6, 0.12, 0.8, 0, 0, 0.3); put(glow, BOX, 0xb6ff3d, 1.25, 1.13, 4.2, 0.4, 0.02, 0.6, 0, 0, 0.3);
+        put(inside, BALL, 0x16181b, 2.6, 0.3, -3.6, 0.35, 0.3, 0.25); put(inside, BALL, 0x16181b, 2.9, 0.6, -3.6, 0.2, 0.2, 0.2); [-0.1, 0.1].forEach((z) => { put(inside, CONE, 0x16181b, 2.9, 0.82, -3.6 + z, 0.06, 0.14, 0.06); put(glow, BALL, 0xb6ff3d, 3.08, 0.64, -3.6 + z, 0.035, 0.035, 0.035); });   // the cat, with glowing eyes
+        [[-1.2, -4.6], [-2.2, 4.8], [3.6, 2.6]].forEach(([lx, lz]) => { put(inside, CYL, 0xf3e6c0, lx, 0.2, lz, 0.08, 0.4, 0.08); put(glow, CONE, 0xffd23f, lx, 0.48, lz, 0.05, 0.14, 0.05); });
+        for (let n = 0; n < 6; n++) { const [x, z] = ring(n * 1.05 + 0.4, 3.2); P(inside, BOX, n % 2 ? 0x5fb83a : 0x8a6a45, x, fy + RH - 0.6, z, 0.12, 0.9, 0.12); }   // bunches of herbs hanging from the roof
+      } else if (th.props === 'lava') {                  // LAVA FORGE: a furnace, a sword stuck in a stone, gold bars, chains
+        put(inside, BOX, 0x4a3a32, 3.0, 1.2, -5.2, 2.0, 2.4, 1.2); put(glow, BOX, 0xff8a3d, 3.0, 0.8, -4.58, 1.0, 0.8, 0.04); solid(3.0, -5.2, 1.2);   // the furnace
+        put(inside, ROCK, 0x6e7479, -1.2, 0.3, 3.6, 0.7, 0.5, 0.7); put(inside, BOX, 0xd8e6ee, -1.2, 1.2, 3.6, 0.08, 1.4, 0.2); put(inside, BOX, GOLD, -1.2, 1.9, 3.6, 0.1, 0.08, 0.6); solid(-1.2, 3.6, 0.7);   // a sword in a stone
+        for (let n = 0; n < 6; n++) put(glow, BOX, 0xffd23f, -3.0 + (n % 3) * 0.32, 0.1 + Math.floor(n / 3) * 0.16, 1.2, 0.28, 0.14, 0.5);   // gold bars, just made
+        [[-1, -1.5], [1.8, 2.0]].forEach(([lx, lz]) => { for (let n = 0; n < 6; n++) put(inside, new THREE.TorusGeometry(0.12, 0.03, 4, 8), 0x2a2f33, lx, RH - 0.2 - n * 0.2, lz, 1, 1, 1, 0, n % 2 ? Math.PI / 2 : 0); });
       }
     }
     if (parts.length) scene.add(new THREE.Mesh(merge(parts), plantMat));
