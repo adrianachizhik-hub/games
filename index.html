@@ -5332,15 +5332,17 @@ const World = (function () {
      step into it and you slip down into a secret room deep underground (HIDE_Y), with a rug, crates, a lantern and a
      treasure chest. Prismatic eggs hide in these rooms (and nowhere else). A rope with daylight coming down it takes you
      back up. Finding one gives no reward (Adriana). Places and looks are Claude's choices. */
+  /* size: how long (towards the door), how wide, how tall, and how many sides (24 = round): every room a different
+     size and shape (Adriana, 11 October 2026). */
   const HIDE_R = 7, HIDE_Y = -110, HOLE_R = 1.1, SLIP = 0.8;
   const HIDE_THEMES = [
-    { name: 'Hollow log', room: 'Root den', where: 'jungle', test: (x, z) => W.jungleF(x, z) > 0.5, clear: 3.5, wall: 0x5a3d22, floor: 0x4a3420, props: 'log' },
-    { name: 'Sinking sand', room: 'Lost tomb', where: 'desert', test: (x, z) => W.desertF(x, z) > 0.6, wall: 0xc07a3a, floor: 0xd08a4a, props: 'cactus' },
-    { name: 'Old trapdoor', room: 'Pirate cave', where: 'beach', test: (x, z, h) => h < 3 && W.coastS(x, z) < 0.28, wall: 0x77706a, floor: 0xd8c08a, props: 'rocks' },
-    { name: 'Rabbit hole', room: 'Cozy burrow', where: 'meadow', test: (x, z) => meadowF(x, z) > 0.6, wall: 0x6b4a2b, floor: 0x5a3d22, props: 'bushes' },
-    { name: 'Old mine shaft', room: 'Crystal grotto', where: 'mountains', test: (x, z) => W.mountainAt(x, z) > 6, clear: 4.5, flat: 3.4, wall: 0x6e7479, floor: 0xd8e6ee, props: 'boulders' },
-    { name: 'Hollow stump', room: 'Witch\'s hut', where: 'swamp', test: (x, z) => W.swampF(x, z) > 0.45, wall: 0x3a2e1c, floor: 0x3f5a2a, props: 'stump' },
-    { name: 'Lava vent', room: 'Lava forge', where: 'volcano land', test: (x, z) => { const d = Math.hypot(x - W.VOLC.x, z - W.VOLC.z); return d > 27 && d < 85; }, flat: 3.6, wall: 0x2a2422, floor: 0x3a2e2a, props: 'lava' }
+    { name: 'Hollow log', room: 'Root den', where: 'jungle', test: (x, z) => W.jungleF(x, z) > 0.5, clear: 3.5, wall: 0x5a3d22, floor: 0x4a3420, props: 'log', size: [1, 1, 5, 24] },
+    { name: 'Sinking sand', room: 'Lost tomb', where: 'desert', test: (x, z) => W.desertF(x, z) > 0.6, wall: 0xc07a3a, floor: 0xd08a4a, props: 'cactus', size: [1.35, 1.35, 7, 4] },
+    { name: 'Old trapdoor', room: 'Pirate cave', where: 'beach', test: (x, z, h) => h < 3 && W.coastS(x, z) < 0.28, wall: 0x77706a, floor: 0xd8c08a, props: 'rocks', size: [1.7, 0.85, 4.2, 24] },
+    { name: 'Rabbit hole', room: 'Cozy burrow', where: 'meadow', test: (x, z) => meadowF(x, z) > 0.6, wall: 0x6b4a2b, floor: 0x5a3d22, props: 'bushes', size: [0.72, 0.72, 3.4, 24] },
+    { name: 'Old mine shaft', room: 'Crystal grotto', where: 'mountains', test: (x, z) => W.mountainAt(x, z) > 6, clear: 4.5, flat: 3.4, wall: 0x6e7479, floor: 0xd8e6ee, props: 'boulders', size: [1.55, 1.55, 9, 7] },
+    { name: 'Hollow stump', room: 'Witch\'s hut', where: 'swamp', test: (x, z) => W.swampF(x, z) > 0.45, wall: 0x3a2e1c, floor: 0x3f5a2a, props: 'stump', size: [0.9, 0.9, 4.5, 8] },
+    { name: 'Lava vent', room: 'Lava forge', where: 'volcano land', test: (x, z) => { const d = Math.hypot(x - W.VOLC.x, z - W.VOLC.z); return d > 27 && d < 85; }, flat: 3.6, wall: 0x2a2422, floor: 0x3a2e2a, props: 'lava', size: [1.35, 1.1, 6, 10] }
   ];
   const hideouts = [];
   let hideFound = [], slipT = -1, slipTo = null;
@@ -5400,26 +5402,30 @@ const World = (function () {
         [0, 1, 2].forEach((k) => P(parts, BALL, 0xd8d8d8, o.x + (k - 1) * 0.3, hy + 1.6 + k * 0.9, o.z, 0.5 + k * 0.2, 0.4 + k * 0.15, 0.5 + k * 0.2));   // steam
       }
       /* ---- the room underground ---- */
-      const c = { x: o.x, z: o.z }, at = (lx, lz) => [c.x + dx * lx - dz * lz, c.z + dz * lx + dx * lz], fy = HIDE_Y, ry = -o.door + Math.PI / 2;
+      const [SX, SZ, RH, segs] = th.size, square = segs === 4, wallR = square ? HIDE_R * 1.3 : HIDE_R, inR = wallR * Math.cos(Math.PI / segs);
+      o.sx = SX; o.sz = SZ; o.h = RH; o.lim = [inR * SX - 0.7, inR * SZ - 0.7];   // how far you can walk, along and across
+      const c = { x: o.x, z: o.z }, at = (lx, lz) => [c.x + dx * lx * SX - dz * lz * SZ, c.z + dz * lx * SX + dx * lz * SZ], fy = HIDE_Y, ry = -o.door;
+      const ring = (a, r) => at(Math.cos(a) * r, Math.sin(a) * r);   // a spot round the room, near the wall for r about 6
       const put = (list, g, col, lx, y, lz, sx, sy, sz, rx, ryy, rz) => { const [x, z] = at(lx, lz); P(list, g, col, x, fy + y, z, sx, sy, sz, rx, (ryy || 0) + ry, rz); return [x, z]; };
       const solid = (lx, lz, r) => { const [x, z] = at(lx, lz); o.blocks.push([x, z, r]); };
-      const square = th.props === 'cactus', segs = square ? 4 : 24, wallR = square ? HIDE_R * 1.3 : HIDE_R;
       o.blocks = [];
-      P(inside, new THREE.CylinderGeometry(wallR, wallR, 0.3, segs), th.floor, c.x, fy - 0.15, c.z, 1, 1, 1, 0, square ? Math.PI / 4 + ry : 0, 0);
-      P(inside, new THREE.CylinderGeometry(wallR, wallR, 5, segs, 1, true), th.wall, c.x, fy + 2.5, c.z, 1, 1, 1, 0, square ? Math.PI / 4 + ry : 0, 0);
-      if (square) P(inside, new THREE.CylinderGeometry(wallR, wallR, 0.3, 4), th.wall, c.x, fy + 5, c.z, 1, 1, 1, 0, Math.PI / 4 + ry, 0);
-      else P(inside, new THREE.SphereGeometry(HIDE_R, 24, 6, 0, Math.PI * 2, 0, Math.PI / 2), th.wall, c.x, fy + 5, c.z, 1, 0.35, 1);
-      { const [x, z] = at(4.6, 0); o.rope = { x, z }; P(inside, BOX, 0xc8a060, x, fy + 2.6, z, 0.12, 5.2, 0.12); inside.push({ g: new THREE.CylinderGeometry(0.8, 0.8, 5, 10, 1, true), color: 0xfff4c0, m: xf(x, fy + 2.5, z, 1, 1, 1), jitter: 0 }); }   // the rope back up, in a shaft of daylight
+      const turn = square ? Math.PI / 4 + ry : ry;
+      P(inside, new THREE.CylinderGeometry(wallR, wallR, 0.3, segs), th.floor, c.x, fy - 0.15, c.z, SX, 1, SZ, 0, turn, 0);
+      P(inside, new THREE.CylinderGeometry(wallR, wallR, RH, segs, 1, true), th.wall, c.x, fy + RH / 2, c.z, SX, 1, SZ, 0, turn, 0);
+      if (square) P(inside, new THREE.CylinderGeometry(wallR, wallR, 0.3, 4), th.wall, c.x, fy + RH, c.z, SX, 1, SZ, 0, turn, 0);   // the tomb: a flat stone ceiling
+      else if (th.props === 'stump') P(inside, new THREE.ConeGeometry(wallR, 4, segs, 1, true), th.wall, c.x, fy + RH + 2, c.z, SX, 1, SZ, 0, turn, 0);   // the witch's hut: a pointy roof
+      else P(inside, new THREE.SphereGeometry(wallR, segs, 6, 0, Math.PI * 2, 0, Math.PI / 2), th.wall, c.x, fy + RH, c.z, SX, segs < 12 ? 0.6 : 0.35, SZ, 0, turn, 0);
+      { const [x, z] = at(4.6, 0); o.rope = { x, z }; P(inside, BOX, 0xc8a060, x, fy + RH / 2 + 0.1, z, 0.12, RH + 0.2, 0.12); inside.push({ g: new THREE.CylinderGeometry(0.8, 0.8, RH, 10, 1, true), color: 0xfff4c0, m: xf(x, fy + RH / 2, z, 1, 1, 1), jitter: 0 }); }   // the rope back up, in a shaft of daylight
       const sp = at(1.5, 1.5); prisSpots.push({ x: sp[0], y: fy, z: sp[1], dungeon: true, hide: o.n });   // Prismatic eggs hide here (kept clear)
       if (th.props === 'log') {                          // ROOT DEN: roots hanging from the ceiling, glowing mushrooms, a hammock
-        for (let k = 0; k < 16; k++) { const a = RR() * 6.28, r = 1 + RR() * 5, len = 1 + RR() * 2.2; P(inside, BOX, 0x6b4a2b, c.x + Math.cos(a) * r, fy + 5 - len / 2, c.z + Math.sin(a) * r, 0.1, len, 0.1, 0, 0, (RR() - 0.5) * 0.4); }
-        for (let k = 0; k < 8; k++) { const a = k / 8 * 6.28, [x, z] = [c.x + Math.cos(a) * 6.1, c.z + Math.sin(a) * 6.1]; P(inside, CYL, 0xf3e6c0, x, fy + 0.3, z, 0.1, 0.6, 0.1); P(glow, BALL, k % 2 ? 0x5bf0e0 : 0xb27bff, x, fy + 0.65, z, 0.4, 0.18, 0.4); }
+        for (let k = 0; k < 16; k++) { const a = RR() * 6.28, r = 1 + RR() * 5, len = 1 + RR() * 2.2, [x, z] = ring(a, r); P(inside, BOX, 0x6b4a2b, x, fy + RH - len / 2, z, 0.1, len, 0.1, 0, 0, (RR() - 0.5) * 0.4); }
+        for (let k = 0; k < 8; k++) { const a = k / 8 * 6.28, [x, z] = ring(a, 6.1); P(inside, CYL, 0xf3e6c0, x, fy + 0.3, z, 0.1, 0.6, 0.1); P(glow, BALL, k % 2 ? 0x5bf0e0 : 0xb27bff, x, fy + 0.65, z, 0.4, 0.18, 0.4); }
         [[-4, 2.2], [-4, -2.2]].forEach(([lx, lz]) => { put(inside, BOX, 0x5a3d22, lx, 1.2, lz, 0.2, 2.4, 0.2); solid(lx, lz, 0.3); });
         put(inside, BOX, 0xd8b070, -4, 1.0, 0, 0.9, 0.12, 4.2, 0, 0, 0);   // the hammock
         put(inside, BOX, 0x3f8a3a, -2, 0.03, -3.5, 2.6, 0.06, 1.6);   // a leafy mat
       } else if (th.props === 'cactus') {                 // LOST TOMB: square, with pillars, painted stripes, a gold sarcophagus and torches
-        [[-4.2, 4.2], [4.2, 4.2], [-4.2, -4.2], [4.2, -4.2]].forEach(([lx, lz]) => { put(inside, CYL, 0xe8c890, lx, 2.5, lz, 0.6, 5, 0.6); solid(lx, lz, 0.75); });
-        [0x3f7fd6, 0xd8241a, 0xffc21f].forEach((col, k) => { for (let s = 0; s < 4; s++) { const a = s * Math.PI / 2; const [x, z] = at(Math.cos(a) * 6.3, Math.sin(a) * 6.3); P(inside, BOX, col, x, fy + 3.6 + k * 0.35, z, 0.1, 0.25, 8.6, 0, a + ry, 0); } });
+        [[-4.2, 4.2], [4.2, 4.2], [-4.2, -4.2], [4.2, -4.2]].forEach(([lx, lz]) => { put(inside, CYL, 0xe8c890, lx, RH / 2, lz, 0.6, RH, 0.6); solid(lx, lz, 0.75); });
+        [0x3f7fd6, 0xd8241a, 0xffc21f].forEach((col, k) => { for (let s = 0; s < 4; s++) { const a = s * Math.PI / 2; const [x, z] = at(Math.cos(a) * 6.3, Math.sin(a) * 6.3); P(inside, BOX, col, x, fy + 3.6 + k * 0.35, z, 0.1, 0.25, 8.6 * SX, 0, a + ry, 0); } });
         put(inside, BOX, 0xffc21f, -4.6, 0.5, 0, 1.2, 1.0, 2.6); put(inside, BOX, 0x3f7fd6, -4.6, 1.05, 0, 1.0, 0.12, 2.3); put(inside, BALL, 0xf1c27d, -4.6, 1.1, 0.9, 0.3, 0.2, 0.3); solid(-4.6, 0, 1.3);
         [[-2.2, 4.8], [2.2, 4.8], [2.2, -4.8], [-2.2, -4.8]].forEach(([lx, lz]) => { put(inside, BOX, 0x2a2f33, lx, 1.6, lz, 0.12, 1.2, 0.12); put(glow, CONE, 0xff8a3d, lx, 2.4, lz, 0.18, 0.4, 0.18); });
         [[-1, -4.6], [0.2, -4.9]].forEach(([lx, lz]) => { put(inside, CYL, 0xd08a2a, lx, 0.4, lz, 0.35, 0.8, 0.35); solid(lx, lz, 0.4); });
@@ -5437,8 +5443,8 @@ const World = (function () {
         put(inside, BOX, 0x8a5a2b, 1.2, 0.3, -4.6, 1.2, 0.6, 0.8); for (let k = 0; k < 4; k++) put(inside, CONE, 0xff8a3d, 0.8 + k * 0.25, 0.75, -4.6, 0.1, 0.4, 0.1, Math.PI, 0, 0.3);   // a basket of carrots
         put(glow, BOX, 0xffe68a, -2.2, 1.0, -1.5, 0.25, 0.3, 0.25);
       } else if (th.props === 'boulders') {               // CRYSTAL GROTTO: icy walls, glowing crystals, icicles and a frozen pond
-        for (let k = 0; k < 12; k++) { const a = k / 12 * 6.28 + 0.2, r = 5.4 + (k % 2) * 0.6, [x, z] = [c.x + Math.cos(a) * r, c.z + Math.sin(a) * r], h = 1 + RR() * 1.6; P(glow, GEM, k % 3 ? 0x8fe8ff : 0xb27bff, x, fy + h / 2, z, 0.35, h, 0.35, RR() * 0.4, 0, RR() * 0.4); }
-        for (let k = 0; k < 18; k++) { const a = RR() * 6.28, r = 1.5 + RR() * 4.5; P(inside, CONE, 0xffffff, c.x + Math.cos(a) * r, fy + 4.4, c.z + Math.sin(a) * r, 0.15, 0.8 + RR() * 0.8, 0.15, Math.PI, 0, 0); }
+        for (let k = 0; k < 12; k++) { const a = k / 12 * 6.28 + 0.2, r = 5.4 + (k % 2) * 0.6, [x, z] = ring(a, r), h = 1.5 + RR() * 2.6; P(glow, GEM, k % 3 ? 0x8fe8ff : 0xb27bff, x, fy + h / 2, z, 0.35, h, 0.35, RR() * 0.4, 0, RR() * 0.4); }
+        for (let k = 0; k < 18; k++) { const a = RR() * 6.28, r = 1.5 + RR() * 4.5, [x, z] = ring(a, r); P(inside, CONE, 0xffffff, x, fy + RH - 0.6, z, 0.15, 0.8 + RR() * 0.8, 0.15, Math.PI, 0, 0); }
         put(inside, new THREE.CylinderGeometry(2, 2, 0.05, 18), 0xbfe9ff, -2.5, 0.04, -1.2);
         put(glow, GEM, 0x5bf0e0, -4.2, 0.9, 2.8, 0.6, 1.8, 0.6); solid(-4.2, 2.8, 0.7);
       } else if (th.props === 'stump') {                 // WITCH'S HUT: a bubbling cauldron, shelves of potions, red mushrooms and a broom
@@ -5447,9 +5453,9 @@ const World = (function () {
         [[1, -4.5], [2, -4.9], [-1.5, 4.8]].forEach(([lx, lz]) => { put(inside, CYL, 0xf3e6c0, lx, 0.25, lz, 0.1, 0.5, 0.1); put(inside, BALL, 0xd8241a, lx, 0.55, lz, 0.4, 0.2, 0.4); });
         put(inside, BOX, 0x6b4a2b, 3.2, 1.2, -4.8, 0.08, 2.4, 0.08, 0.25, 0, 0); put(inside, CONE, 0xd8b070, 3.2, 0.25, -5.1, 0.3, 0.6, 0.3);   // a broom against the wall
       } else if (th.props === 'lava') {                   // LAVA FORGE: a glowing lava river across the back, an anvil and orange crystals
-        put(glow, BOX, 0xff5a1f, -5.0, 0.05, 0, 1.4, 0.06, 9); for (let k = -4; k <= 4; k += 2) solid(-5.0, k, 0.9);
+        put(glow, BOX, 0xff5a1f, -5.0, 0.05, 0, 1.4, 0.06, 9 * SZ); for (let k = -4; k <= 4; k += 2) solid(-5.0, k, 0.9);
         put(inside, BOX, 0x4a4f53, -2.6, 0.45, -2.8, 0.7, 0.9, 0.5); put(inside, BOX, 0x6e7479, -2.6, 1.0, -2.8, 1.5, 0.3, 0.6); solid(-2.6, -2.8, 0.8);   // the anvil
-        for (let k = 0; k < 7; k++) { const a = k / 7 * 6.28 + 0.6, [x, z] = [c.x + Math.cos(a) * 6.0, c.z + Math.sin(a) * 6.0], h = 0.8 + RR() * 1.2; P(glow, GEM, 0xff8a3d, x, fy + h / 2, z, 0.3, h, 0.3); }
+        for (let k = 0; k < 7; k++) { const a = k / 7 * 6.28 + 0.6, [x, z] = ring(a, 6.0), h = 0.8 + RR() * 1.2; P(glow, GEM, 0xff8a3d, x, fy + h / 2, z, 0.3, h, 0.3); }
         put(inside, BOX, 0x2a2f33, 1.5, 1.2, 4.8, 2.4, 0.12, 0.2); [0, 1, 2].forEach((k) => put(inside, BOX, 0xb8bec4, 0.8 + k * 0.6, 0.9, 4.75, 0.08, 1.2, 0.06));   // a weapon rack
       }
     }
@@ -5462,8 +5468,9 @@ const World = (function () {
   function hideMove(dx, dz) {                            // walking about in a hideout: round walls, the chest and crates are solid
     const o = hideouts[p.hide];
     let x = p.x + dx, z = p.z + dz;
-    const r = Math.hypot(x - o.x, z - o.z), max = HIDE_R - 0.7;
-    if (r > max) { x = o.x + (x - o.x) / r * max; z = o.z + (z - o.z) / r * max; }
+    const ux = Math.cos(o.door), uz = Math.sin(o.door), lx = (x - o.x) * ux + (z - o.z) * uz, lz = -(x - o.x) * uz + (z - o.z) * ux;
+    const e = Math.hypot(lx / o.lim[0], lz / o.lim[1]);  // each room has its own size and shape (an oval for the long ones)
+    if (e > 1) { x = o.x + (lx * ux - lz * uz) / e; z = o.z + (lx * uz + lz * ux) / e; }
     for (const [bx0, bz0, br] of o.blocks) { const ox = x - bx0, oz = z - bz0, d = Math.hypot(ox, oz); if (d < br + 0.35 && d > 1e-4) { x = bx0 + ox / d * (br + 0.35); z = bz0 + oz / d * (br + 0.35); } }
     p.x = x; p.z = z;
     if (Math.hypot(p.x - o.rope.x, p.z - o.rope.z) < 0.9) leaveHide();   // grab the rope: back up
@@ -6519,6 +6526,7 @@ const World = (function () {
     ...MONTHLY.map((m) => ({ id: m.id, name: m.name, kind: 'fall', look: m.id, month: m.month, slow: m.id === 'heart' || m.id === 'butterfly' || m.id === 'harvest', say: m.say })),
     { id: 'taco', name: '🌮 Raining tacos', kind: 'fall', look: 'taco', swarm: true, say: 'It\'s raining LOTS of tacos', hint: 'Only a BIG taco landing on your dragon gives it the' }   // Adriana: lots of little ones, the big ones mutate
   ];
+  EVENT_LIST.forEach((e) => { if (!e.month && MUT[e.id]) { e.what = e.name; e.name = MUT[e.id].emoji + ' ' + MUT[e.id].name; } });   // Adriana: each event has the same name as its mutation (the old name stays as e.what)
   const EVENTS = Object.fromEntries(EVENT_LIST.map((e) => [e.id, e]));
   const FS_LEN = EV_LEN, FS_PERIOD = EV_EVERY;
   const evUntil = {}, evWas = {}, slotCache = new Map();
@@ -6805,7 +6813,7 @@ const World = (function () {
 
   /* Admin command: start any event. */
   const evRow = adminSection('Start or stop an event (5 minutes)'), evPick = document.createElement('select'), evBtn = document.createElement('button');
-  EVENT_LIST.filter((e) => !e.month).forEach((e) => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.name; evPick.appendChild(o); });   // the seasonal ones have their own section below
+  MUTATIONS.map((m) => EVENTS[m.id]).filter((e) => e && !e.month).forEach((e) => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.name; evPick.appendChild(o); });   // same names and order as "Give a mutation"   // the seasonal ones have their own section below
   evPick.setAttribute('aria-label', 'Event to start'); evBtn.type = 'button'; evBtn.className = 'small'; evBtn.textContent = 'Start';
   const evStop = document.createElement('button'); evStop.type = 'button'; evStop.className = 'small'; evStop.textContent = 'Stop';
   evStop.addEventListener('click', (e) => { stopEvent(evPick.value); toast(EVENTS[evPick.value].name + ' turned off' + (netOnline ? ' for everyone.' : '.'), 3); if (e.detail > 0) evStop.blur(); });
@@ -6826,10 +6834,10 @@ const World = (function () {
     timeRow.appendChild(b);
   });
   function setTimeMode(mode, by) { if (!['day', 'night', 'auto'].includes(mode)) return; timeMode = mode; if (by) toast(by + (mode === 'auto' ? ' set day and night back to normal.' : ' made it ' + mode + '!'), 3); }
-  /* Adriana: an admin button that turns on every mutation's event at once (for everyone online). */
+  /* Adriana: an admin button that turns on every normal mutation event at once (for everyone online); not the seasonal ones. */
   const allEvBtn = document.createElement('button');
   allEvBtn.type = 'button'; allEvBtn.className = 'storm'; allEvBtn.textContent = '🌈 Turn on all mutations';
-  allEvBtn.addEventListener('click', (e) => { if (!isAdmin) return; EVENT_LIST.forEach((ev) => startEvent(ev.id)); toast('Every mutation event is on' + (netOnline ? ' for everyone' : '') + ' for 5 minutes!', 4); if (e.detail > 0) allEvBtn.blur(); });
+  allEvBtn.addEventListener('click', (e) => { if (!isAdmin) return; ROTATION.forEach((ev) => startEvent(ev.id)); toast('Every normal mutation event is on' + (netOnline ? ' for everyone' : '') + ' for 5 minutes!', 4); if (e.detail > 0) allEvBtn.blur(); });
   $('adminCommands').appendChild(allEvBtn);
   const offEvBtn = document.createElement('button');   // and one that turns them all off
   offEvBtn.type = 'button'; offEvBtn.className = 'storm'; offEvBtn.textContent = '⛔ Turn off all mutations';

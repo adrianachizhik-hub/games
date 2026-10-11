@@ -1158,9 +1158,12 @@ console.log('press 1 while riding         : riding', !!I.riding(), '| zone', I.z
     console.log('all', I.EVENT_LIST.length, 'events ran: gave their mutation', got, '| problems', JSON.stringify(errs));
     if (errs.length) throw new Error('some events did not work: ' + errs.join(', '));
   }
+  { const diff = I.EVENT_LIST.filter((e) => !e.month && e.name !== I.MUT[e.id].emoji + ' ' + I.MUT[e.id].name).map((e) => e.id), noEvent = I.MUTATIONS.filter((m) => !I.EVENTS[m.id]).map((m) => m.id);
+    console.log('events named like their mutation: different', diff, '| mutations with no event', noEvent, '| water event:', I.EVENTS.water && I.EVENTS.water.name);
+    if (diff.length || noEvent.length) throw new Error('every event should have its mutation\'s name'); }
   { const b = els.adminCommands.children.find((c) => c.textContent === '🌈 Turn on all mutations');
-    if (b) { b.fire('click', ev({})); const on = I.EVENT_LIST.filter((e) => I.eventOn(e.id)).length; console.log('admin "Turn on all mutations": events on', on, 'of', I.EVENT_LIST.length); if (on !== I.EVENT_LIST.length) throw new Error('all events should be on'); const seen = new Set(); for (let k = 0; k < 60 * 3; k++) { I.fireStormStep(1 / 60); I.fireballs.forEach((f) => seen.add(f.mut)); I.jets.forEach((j) => seen.add(j.ev.id)); I.ufos.forEach((u) => seen.add(u.ev.id)); }
-      const missing = I.EVENT_LIST.filter((e) => !seen.has(e.id)).map((e) => e.id); console.log('  every event shows up in the sky or on the ground:', I.EVENT_LIST.length - missing.length, 'of', I.EVENT_LIST.length, missing.length ? 'missing ' + missing.join(',') : '', '| falling things', I.fireballs.length);
+    if (b && process.env.MODE === 'admin') { I.resetEvents(); b.fire('click', ev({})); const normal = I.EVENT_LIST.filter((e) => !e.month), on = normal.filter((e) => I.eventOn(e.id)).length, seasonal = I.EVENT_LIST.filter((e) => e.month && I.eventOn(e.id)).length; console.log('admin "Turn on all mutations": normal events on', on, 'of', normal.length, '| seasonal ones on', seasonal); if (on !== normal.length || seasonal) throw new Error('all the normal events (and no seasonal ones) should be on'); const seen = new Set(); for (let k = 0; k < 60 * 3; k++) { I.fireStormStep(1 / 60); I.fireballs.forEach((f) => seen.add(f.mut)); I.jets.forEach((j) => seen.add(j.ev.id)); I.ufos.forEach((u) => seen.add(u.ev.id)); }
+      const missing = normal.filter((e) => !seen.has(e.id)).map((e) => e.id); console.log('  every one shows up in the sky or on the ground:', normal.length - missing.length, 'of', normal.length, missing.length ? 'missing ' + missing.join(',') : '', '| falling things', I.fireballs.length);
       if (missing.length) throw new Error('every event should play when they are all on'); } }
   { const off = els.adminCommands.children.find((c) => c.textContent === '⛔ Turn off all mutations');
     if (off && process.env.MODE !== 'admin') { off.fire('click', ev({})); const on = I.EVENT_LIST.filter((e) => I.eventOn(e.id)).length; console.log('a player pressing "Turn off all mutations": still on', on); if (!on) throw new Error('only admins can turn events off'); I.stopAllEvents('Test'); }
@@ -1365,6 +1368,11 @@ if (process.env.MODE !== 'admin') {
 {
   if (I.riding()) I.dismount(true);
   console.log('secret hideouts:', I.hideouts.length, '|', I.hideouts.map((o) => o.th.name + ' (' + o.th.where + ') at ' + o.x.toFixed(0) + ',' + o.z.toFixed(0)).join(' | '));
+  { const sizes = I.hideouts.map((o) => o.th.room + ' ' + (o.lim[0] * 2 + 1.4).toFixed(0) + 'x' + (o.lim[1] * 2 + 1.4).toFixed(0) + ', ' + o.h + ' high, ' + (o.th.size[3] === 24 ? 'round' : o.th.size[3] + ' sides'));
+    console.log('hideout rooms:', sizes.join(' | '));
+    if (new Set(I.hideouts.map((o) => o.lim.join() + o.h)).size !== I.hideouts.length) throw new Error('every hideout room should be a different size');
+    const fits = I.hideouts.every((o) => { const ux = Math.cos(o.door), uz = Math.sin(o.door), rl = (o.rope.x - o.x) * ux + (o.rope.z - o.z) * uz; return rl > 0 && rl < o.lim[0]; });
+    if (!fits) throw new Error('every rope should be inside its room'); }
   const far = Math.min(...I.hideouts.flatMap((a, i) => I.hideouts.slice(i + 1).map((b) => Math.hypot(a.x - b.x, a.z - b.z))));
   if (I.hideouts.length < 7 || far < 50) throw new Error('there should be 7 hideouts, spread out');
   const o = I.hideouts[0], dx = Math.cos(o.door), dz = Math.sin(o.door);
@@ -1432,7 +1440,8 @@ if (process.env.MODE === 'admin') {
   if (I.myPlot() < 0) reclaim();
   I.setHatchScale(1);
   const before = I.ownDragons.length, fr = (n) => { for (let k = 0; k < n; k++) { I.update(1 / 60, 0); I.eggsAnimate(1 / 60, 0); } };
-  const egg = I.eggs.find((e) => e.tier === 1 && !e.taken && !e.spot.dungeon && !e.spot.cave); stand(egg.spot); fr(2);
+  const alone = (e) => !I.eggs.some((q) => q !== e && !q.taken && Math.hypot(q.spot.x - e.spot.x, q.spot.z - e.spot.z) < 4);
+  const egg = I.eggs.find((e) => e.tier === 1 && !e.taken && !e.spot.dungeon && !e.spot.cave && alone(e)); stand(egg.spot); fr(2);
   const hp = I.plotWorld(I.myPlot(), 0, 3); stand({ x: hp.x, z: hp.z, y: 6.3 }); fr(2);
   console.log('bring a Rare egg home: waiting to hatch', I.incubating.length, '| time', I.incubating[0] && I.incubating[0].left.toFixed(0), 's |', said(), '| saved', store['mutation-mayhem-incubating']);
   if (!I.incubating.length || I.ownDragons.length !== before || I.incubating[0].left < 35) throw new Error('an egg should wait on the plot before hatching');
