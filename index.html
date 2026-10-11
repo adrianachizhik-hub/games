@@ -6705,9 +6705,10 @@ const World = (function () {
     jets.push({ g, bits, x, z, t: 0, ev, S });
   }
   function spotsStep(dt) {
-    activeEvents().filter((e) => e.kind === 'spot').forEach((ev) => {
+    const spots = activeEvents().filter((e) => e.kind === 'spot'), each = Math.max(2, Math.floor(16 / Math.max(1, spots.length)));
+    spots.forEach((ev) => {
       ev.spawnT = (ev.spawnT || 0) - dt;
-      if (ev.spawnT <= 0 && jets.length < 16) { ev.spawnT = 0.45; spawnJet(undefined, undefined, ev.id); }
+      if (ev.spawnT <= 0 && jets.length < Math.max(16, each * spots.length) && jets.filter((j) => j.ev === ev).length < each) { ev.spawnT = 0.45; spawnJet(undefined, undefined, ev.id); }
     });
     for (let i = jets.length - 1; i >= 0; i--) {
       const j = jets[i]; j.t += dt;
@@ -6748,14 +6749,19 @@ const World = (function () {
     smoke.forEach((m, k) => { const q = (time * (on ? 0.35 : 0.12) + k / 4) % 1, sc = (on ? 2 : 1) * (0.6 + q * 1.6); m.position.set(crater.x + Math.sin(k * 2 + time * 0.2) * q * 4, crater.y + 2 + q * (on ? 26 : 12), crater.z + Math.cos(k * 2) * q * 4); m.scale.set(sc, sc, sc); });
     if (!on) return;
     volcanoStep.t = (volcanoStep.t || 0) - dt;
-    if (volcanoStep.t <= 0 && fireballs.length < 34) { volcanoStep.t = 0.3; spawnFireball(undefined, undefined, 'magma', crater); }
+    if (volcanoStep.t <= 0 && fallRoom('magma', fireStormStep.n || 1)) { volcanoStep.t = 0.3; spawnFireball(undefined, undefined, 'magma', crater); }
   }
+  /* Adriana: when lots of events are on at once (Turn on all mutations), each one gets its fair share of the sky
+     instead of the first few in the list using it all up. */
+  const fallRoom = (id, n) => { const each = Math.max(2, Math.floor(34 / Math.max(1, n))); return fireballs.length < Math.max(34, each * n) && fireballs.filter((f) => f.mut === id).length < each; };
   function fireStormStep(dt) {                           // every frame: start messages, spawn things, move everything
     const time = Date.now() / 1000;
     eventStarts();
-    activeEvents().filter((e) => e.kind === 'fall').forEach((ev) => {
+    const falls = activeEvents().filter((e) => e.kind === 'fall'), nFall = falls.length + (started && eventOn('magma') ? 1 : 0);
+    fireStormStep.n = nFall;
+    falls.forEach((ev) => {
       ev.spawnT = (ev.spawnT || 0) - dt;
-      if (ev.spawnT <= 0 && fireballs.length < 34) { ev.spawnT = ev.slow ? 0.5 : 0.22; spawnFireball(undefined, undefined, ev.id); }
+      if (ev.spawnT <= 0 && fallRoom(ev.id, nFall)) { ev.spawnT = ev.slow ? 0.5 : 0.22; spawnFireball(undefined, undefined, ev.id); }
       if (ev.swarm) { ev.swarmT = (ev.swarmT || 0) - dt; while (ev.swarmT <= 0) { ev.swarmT += 0.02; spawnLittleTaco(); } }   // lots of little tacos all around you
     });
     littleTacosStep(dt);
